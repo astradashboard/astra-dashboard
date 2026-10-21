@@ -64,7 +64,14 @@
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
   .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
   .pos { color: var(--win); } .neg { color: var(--loss); }
-  #chart { position: relative; }
+  #chart { position: relative; user-select: none; }
+  #chart svg { cursor: grab; touch-action: none; }
+  #chart.dragging svg { cursor: grabbing; }
+  .zoom-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .zoom-bar .btn { padding: 4px 10px; font-size: 12px; border-radius: 7px; }
+  .zoom-bar .btn.on { background: var(--gold-soft); border-color: rgba(212,175,55,.6); color: var(--gold); }
+  .zoom-bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+  .chart-hint { color: var(--muted); font-size: 11px; margin-top: 6px; text-align: right; }
   #chart svg { display: block; width: 100%; }
   .tip { position: absolute; pointer-events: none; background: #0b0f18; border: 1px solid var(--line); border-radius: 8px;
     padding: 7px 10px; font-size: 12px; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
@@ -150,8 +157,22 @@
       <div class="kpis-head"><h2>Indicateurs</h2><button class="btn" id="customBtn">⚙ Personnaliser</button></div>
       <section class="kpis" id="kpis"></section>
       <section class="card">
-        <div class="card-head"><h2>Évolution du capital</h2><span class="s" id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
+        <div class="card-head">
+          <div><h2>Évolution du capital</h2><span id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
+          <div class="zoom-bar" id="zoomBar">
+            <button class="btn" data-range="7">1S</button>
+            <button class="btn" data-range="30">1M</button>
+            <button class="btn" data-range="91">3M</button>
+            <button class="btn" data-range="182">6M</button>
+            <button class="btn" data-range="365">1A</button>
+            <button class="btn" data-range="all">Tout</button>
+            <span class="sep"></span>
+            <button class="btn" id="zoomOut" title="Dézoomer">−</button>
+            <button class="btn" id="zoomIn" title="Zoomer">+</button>
+          </div>
+        </div>
         <div id="chart"><div class="tip" id="tip"></div></div>
+        <div class="chart-hint">Molette pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
       <section class="card">
         <div class="card-head">
@@ -304,7 +325,7 @@ function renderAccounts() {
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
     b.append(left, bal);
-    b.onclick = () => { state.sel = a.login; state.month = null; renderAccounts(); loadData(); };
+    b.onclick = () => { state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     list.appendChild(b);
   }
   $('#removeBtn').hidden = state.sel === 'all' || !state.accounts.length;
@@ -466,54 +487,99 @@ $('#customSave').onclick = async () => {
 };
 api('/api/prefs').then(p => { if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); } }).catch(() => {});
 
-/* ---------- courbe du capital ---------- */
-function renderChart() {
-  const host = $('#chart'), tip = $('#tip');
-  host.querySelectorAll('svg').forEach(s => s.remove());
+/* ---------- courbe du capital (zoomable) ---------- */
+state.view = null; // { i0, i1, preset }
+
+function chartPoints() {
   const d = state.data;
   let eq = d.start_balance;
   const pts = d.daily.map(x => ({ date: x.date, v: (eq += x.pnl), pnl: x.pnl }));
   if (pts.length) pts.unshift({ date: null, v: d.start_balance, pnl: 0 });
-  $('#chartRange').textContent = pts.length > 1 ? 'depuis le ' + new Date(pts[1].date + 'T12:00:00').toLocaleDateString('fr-BE') : '';
-  const W = Math.max(host.clientWidth, 300), H = 260, m = { l: 96, r: 14, t: 12, b: 26 };
+  return pts;
+}
+function clampView(n, i0, i1) {
+  const minSpan = Math.min(n - 1, 4);
+  let span = Math.max(minSpan, Math.min(n - 1, i1 - i0));
+  i0 = Math.max(0, Math.min(i0, n - 1 - span));
+  return { i0: Math.round(i0), i1: Math.round(i0 + span) };
+}
+function presetView(pts, preset) {
+  const n = pts.length;
+  if (preset === 'all' || n < 3) return { i0: 0, i1: n - 1, preset: 'all' };
+  const last = new Date(pts[n - 1].date + 'T12:00:00');
+  const from = new Date(last); from.setDate(last.getDate() - Number(preset));
+  let i0 = 1;
+  while (i0 < n - 1 && new Date(pts[i0].date + 'T12:00:00') < from) i0++;
+  i0 = Math.max(0, i0 - 1); // inclure le point d'avant pour partir du bon niveau
+  return { ...clampView(n, i0, n - 1), preset };
+}
+function setView(v) { state.view = v; renderChart(); }
+
+function renderChart() {
+  const host = $('#chart'), tip = $('#tip');
+  host.querySelectorAll('svg').forEach(s => s.remove());
+  tip.style.display = 'none';
+  const d = state.data, all = chartPoints(), n = all.length;
+  const W = Math.max(host.clientWidth, 300), H = 280, m = { l: 96, r: 14, t: 12, b: 26 };
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', '100%'); svg.setAttribute('height', H);
   host.appendChild(svg);
   const mk = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
-  if (pts.length < 2) {
+  document.querySelectorAll('#zoomBar [data-range]').forEach(b => b.classList.toggle('on', !!state.view && b.dataset.range === state.view.preset || (!state.view && b.dataset.range === 'all')));
+  if (n < 2) {
+    $('#chartRange').textContent = '';
     const t = mk('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)' }); t.textContent = 'Pas encore de trades sur ce compte'; return;
   }
+  const v0 = state.view ? clampView(n, state.view.i0, state.view.i1) : { i0: 0, i1: n - 1 };
+  const pts = all.slice(v0.i0, v0.i1 + 1);
+  const fmtD = p => p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE') : 'départ';
+  $('#chartRange').textContent = 'Du ' + fmtD(pts[0].date ? pts[0] : all[1]) + ' au ' + fmtD(pts[pts.length - 1]);
+
   const vals = pts.map(p => p.v);
-  let lo = Math.min(...vals, d.start_balance), hi = Math.max(...vals, d.start_balance);
-  const padv = (hi - lo) * 0.08 || 100; lo -= padv; hi += padv;
-  const x = i => m.l + (W - m.l - m.r) * i / (pts.length - 1);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const startVisible = d.start_balance >= lo - (hi - lo) * 0.5 && d.start_balance <= hi + (hi - lo) * 0.5;
+  if (startVisible) { lo = Math.min(lo, d.start_balance); hi = Math.max(hi, d.start_balance); }
+  const padv = (hi - lo) * 0.08 || Math.max(50, Math.abs(hi) * 0.002); lo -= padv; hi += padv;
+  const last = pts.length - 1;
+  const x = i => m.l + (W - m.l - m.r) * i / Math.max(1, last);
   const y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+  const fmtAxis = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: d.currency || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 });
   for (let i = 0; i <= 4; i++) {
     const v = lo + (hi - lo) * i / 4;
     mk('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 });
     const t = mk('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 });
-    t.textContent = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: d.currency || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(v);
+    t.textContent = fmtAxis.format(v);
   }
-  mk('line', { x1: m.l, x2: W - m.r, y1: y(d.start_balance), y2: y(d.start_balance), stroke: 'var(--muted)', 'stroke-dasharray': '4 4', 'stroke-width': 1 });
-  const step = Math.max(1, Math.ceil((pts.length - 1) / 6));
-  for (let i = 1; i < pts.length; i += step) {
+  if (d.start_balance > lo && d.start_balance < hi)
+    mk('line', { x1: m.l, x2: W - m.r, y1: y(d.start_balance), y2: y(d.start_balance), stroke: 'var(--muted)', 'stroke-dasharray': '4 4', 'stroke-width': 1 });
+  const labelled = pts.map((p, i) => i).filter(i => pts[i].date);
+  const step = Math.max(1, Math.ceil(labelled.length / Math.max(2, Math.floor((W - m.l) / 110))));
+  for (let k = 0; k < labelled.length; k += step) {
+    const i = labelled[k];
     const t = mk('text', { x: x(i), y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 });
     t.textContent = new Date(pts[i].date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
   }
   const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
   const defs = mk('defs', {});
   defs.innerHTML = '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4af37" stop-opacity=".28"/><stop offset="1" stop-color="#d4af37" stop-opacity="0"/></linearGradient>';
-  mk('path', { d: line + ` L${x(pts.length - 1)} ${H - m.b} L${x(0)} ${H - m.b} Z`, fill: 'url(#g)' });
+  mk('path', { d: line + ` L${x(last)} ${H - m.b} L${x(0)} ${H - m.b} Z`, fill: 'url(#g)' });
   mk('path', { d: line, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
-  const dot = mk('circle', { r: 4, fill: 'var(--gold)', stroke: 'var(--bg)', 'stroke-width': 2, opacity: 0 });
+  if (pts.length <= 60) pts.forEach((p, i) => { if (p.date) mk('circle', { cx: x(i), cy: y(p.v), r: 2.5, fill: 'var(--gold)' }); });
+  const dot = mk('circle', { r: 4.5, fill: 'var(--gold)', stroke: 'var(--bg)', 'stroke-width': 2, opacity: 0 });
   const hit = mk('rect', { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: 'transparent' });
+
+  const idxAt = ev => { const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * W / r.width;
+    return Math.min(last, Math.max(0, (px - m.l) / (W - m.l - m.r) * last)); };
+
+  // info-bulle
   hit.addEventListener('mousemove', ev => {
-    const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * W / r.width;
-    const i = Math.min(pts.length - 1, Math.max(0, Math.round((px - m.l) / (W - m.l - m.r) * (pts.length - 1))));
-    const p = pts[i]; dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.v)); dot.setAttribute('opacity', 1);
+    if (state.drag) return;
+    const r = svg.getBoundingClientRect();
+    const i = Math.round(idxAt(ev)); const p = pts[i];
+    dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.v)); dot.setAttribute('opacity', 1);
     tip.innerHTML = '';
-    const l1 = document.createElement('div'); l1.textContent = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'long' }) : 'Départ';
+    const l1 = document.createElement('div'); l1.textContent = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : 'Départ';
     const l2 = document.createElement('div'); l2.style.fontWeight = 650; l2.textContent = money(p.v, d.currency);
     tip.append(l1, l2);
     if (p.date) { const l3 = document.createElement('div'); l3.className = cls(p.pnl); l3.textContent = money(p.pnl, d.currency, true) + ' ce jour'; tip.append(l3); }
@@ -522,8 +588,51 @@ function renderChart() {
     tip.style.left = Math.min(Math.max(0, tx - tw / 2), r.width - tw) + 'px';
     tip.style.top = Math.max(0, y(p.v) * r.height / H - tip.offsetHeight - 12) + 'px';
   });
-  hit.addEventListener('mouseleave', () => { tip.style.display = 'none'; dot.setAttribute('opacity', 0); });
+  hit.addEventListener('mouseleave', () => { if (!state.drag) { tip.style.display = 'none'; dot.setAttribute('opacity', 0); } });
+
+  // zoom à la molette, centré sur la souris
+  hit.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const at = v0.i0 + idxAt(ev), span = v0.i1 - v0.i0;
+    const f = ev.deltaY < 0 ? 0.8 : 1.25;
+    const ns2 = Math.max(4, Math.min(n - 1, span * f));
+    const ratio = span ? (at - v0.i0) / span : 0.5;
+    const i0 = at - ns2 * ratio;
+    setView({ ...clampView(n, i0, i0 + ns2), preset: null });
+  }, { passive: false });
+
+  // déplacement en cliquant-glissant (suivi au niveau de la fenêtre : le graphique se redessine pendant le geste)
+  hit.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return;
+    const r = svg.getBoundingClientRect();
+    state.drag = { x: ev.clientX, i0: v0.i0, i1: v0.i1, n, plotPx: (W - m.l - m.r) * r.width / W };
+    host.classList.add('dragging'); tip.style.display = 'none'; dot.setAttribute('opacity', 0);
+    ev.preventDefault();
+  });
+  hit.addEventListener('dblclick', () => setView(null));
 }
+
+window.addEventListener('pointermove', ev => {
+  const g = state.drag; if (!g) return;
+  const dx = ev.clientX - g.x; if (Math.abs(dx) < 3) return;
+  const shift = -dx * (g.i1 - g.i0) / g.plotPx;
+  const v = clampView(g.n, g.i0 + shift, g.i1 + shift);
+  if (!state.view || v.i0 !== state.view.i0 || v.i1 !== state.view.i1) setView({ ...v, preset: null });
+});
+window.addEventListener('pointerup', () => { if (state.drag) { state.drag = null; $('#chart').classList.remove('dragging'); } });
+document.querySelectorAll('#zoomBar [data-range]').forEach(b => b.onclick = () => {
+  if (!state.data) return;
+  const pts = chartPoints(); setView(b.dataset.range === 'all' ? null : presetView(pts, b.dataset.range));
+});
+function zoomBy(f) {
+  if (!state.data) return;
+  const n = chartPoints().length; if (n < 3) return;
+  const v = state.view ? clampView(n, state.view.i0, state.view.i1) : { i0: 0, i1: n - 1 };
+  const span = v.i1 - v.i0, mid = (v.i0 + v.i1) / 2, ns2 = Math.max(4, Math.min(n - 1, span * f));
+  setView(ns2 >= n - 1 ? null : { ...clampView(n, mid - ns2 / 2, mid + ns2 / 2), preset: null });
+}
+$('#zoomIn').onclick = () => zoomBy(0.6);
+$('#zoomOut').onclick = () => zoomBy(1.6);
 
 /* ---------- calendrier ---------- */
 function renderCal() {
@@ -598,14 +707,14 @@ $('#loginForm').addEventListener('submit', async e => {
       name: $('#fName').value, login: $('#fLogin').value.trim(), password: $('#fPass').value,
       server: $('#fServer').value.trim(), terminal: $('#fTerm').value.trim(), remember: $('#fRemember').checked,
     });
-    closeLogin(); state.sel = acc.login; state.month = null; await loadState();
+    closeLogin(); state.sel = acc.login; state.month = null; state.view = null; await loadState();
   } catch (err) {
     $('#loginErr').textContent = err.message; $('#loginErr').style.display = 'block';
   } finally {
     form.classList.remove('loading'); $('#connectBtn').textContent = 'Se connecter';
   }
 });
-$('#demoBtn').onclick = async () => { const a = await api('/api/demo', {}); closeLogin(); state.sel = a.login; state.month = null; await loadState(); };
+$('#demoBtn').onclick = async () => { const a = await api('/api/demo', {}); closeLogin(); state.sel = a.login; state.month = null; state.view = null; await loadState(); };
 $('#cancelBtn').onclick = closeLogin;
 $('#addBtn').onclick = () => openLogin();
 $('#prevM').onclick = () => shiftMonth(-1);
@@ -613,7 +722,7 @@ $('#nextM').onclick = () => shiftMonth(1);
 $('#removeBtn').onclick = async () => {
   const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
   if (!confirm('Retirer « ' + acc.name + ' » du dashboard ? Le mot de passe mémorisé sera aussi effacé.')) return;
-  await api('/api/remove', { login: acc.login }); state.sel = 'all'; state.month = null; await loadState();
+  await api('/api/remove', { login: acc.login }); state.sel = 'all'; state.month = null; state.view = null; await loadState();
 };
 $('#refreshBtn').onclick = async () => {
   const btn = $('#refreshBtn'); btn.disabled = true; btn.textContent = 'Actualisation…';
