@@ -153,6 +153,9 @@
   .field label { font-size: 12px; color: var(--muted); }
   .field input { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
   .field input:focus { outline: none; border-color: var(--gold); }
+  .field-select { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
+  .field-select:focus { outline: none; border-color: var(--gold); }
+  .kpi[data-risk] { cursor: pointer; }
   .field .hint { font-size: 11px; color: var(--muted); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0 16px; color: var(--muted); }
@@ -255,6 +258,35 @@
       <button class="btn primary" onclick="openLogin()">Ajouter un compte</button>
     </div>
   </main>
+</div>
+
+<div class="modal-bg" id="riskBg">
+  <form class="modal" id="riskForm" autocomplete="off">
+    <h2>Risque par trade</h2>
+    <p class="sub" id="riskSub"></p>
+    <div class="err" id="riskErr"></div>
+    <div class="field">
+      <label for="riskMode">Type de risque</label>
+      <select id="riskMode" class="field-select">
+        <option value="percent">% du capital initial du compte</option>
+        <option value="amount">Montant fixe</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="riskValue" id="riskValueLabel">Risque</label>
+      <input id="riskValue" inputmode="decimal" required placeholder="Ex. 1">
+      <span class="hint" id="riskHint"></span>
+    </div>
+    <p class="sub" style="margin:4px 0 16px">Chaque trade est converti en R : un gain égal à ton risque = +1 R, une perte de ton risque = −1 R.
+      Entre −0,1 R et +0,1 R, le trade compte comme break-even (BE).</p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost danger" id="riskClear">Effacer</button>
+      <div class="right">
+        <button type="button" class="btn" id="riskCancel">Annuler</button>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </div>
+    </div>
+  </form>
 </div>
 
 <div class="modal-bg" id="customBg">
@@ -396,6 +428,41 @@ function renderAccounts() {
   $('#removeBtn').hidden = state.sel === 'all' || !state.accounts.length;
 }
 
+/* ---------- risque par trade ---------- */
+let riskAcc = null;
+function updateRiskHint() {
+  if (!riskAcc) return;
+  const mode = $('#riskMode').value, v = parseFloat(($('#riskValue').value || '').replace(',', '.'));
+  $('#riskValueLabel').textContent = mode === 'percent' ? 'Risque (%)' : 'Risque (' + (riskAcc.currency || 'USD') + ')';
+  const amount = mode === 'percent' ? v / 100 * (riskAcc.start_balance || 0) : v;
+  $('#riskHint').textContent = isFinite(amount) && amount > 0 ? '1 R = ' + money(amount, riskAcc.currency) : '';
+}
+function openRisk(acc) {
+  riskAcc = acc;
+  $('#riskErr').style.display = 'none';
+  $('#riskSub').textContent = acc.name + (acc.start_balance ? ' · capital initial ' + money(acc.start_balance, acc.currency) : '');
+  $('#riskMode').value = acc.risk ? acc.risk.mode : 'percent';
+  $('#riskValue').value = acc.risk ? String(acc.risk.value).replace('.', ',') : '';
+  $('#riskClear').hidden = !acc.risk;
+  updateRiskHint(); $('#riskBg').classList.add('open'); $('#riskValue').focus();
+}
+function openRiskForSelection() {
+  const acc = state.accounts.find(a => a.login === state.sel);
+  if (acc) return openRisk(acc);
+  const without = state.accounts.find(a => !a.risk);
+  if (without) { notice('Fais un clic droit sur « ' + without.name + ' » puis « Risque par trade… » pour régler chaque compte.'); }
+}
+async function saveRisk(body) {
+  try { await api('/api/risk', { login: riskAcc.login, ...body }); }
+  catch (e) { $('#riskErr').textContent = e.message; $('#riskErr').style.display = 'block'; return; }
+  $('#riskBg').classList.remove('open'); await loadState();
+}
+$('#riskMode').onchange = updateRiskHint;
+$('#riskValue').oninput = updateRiskHint;
+$('#riskCancel').onclick = () => $('#riskBg').classList.remove('open');
+$('#riskClear').onclick = () => saveRisk({ mode: null });
+$('#riskForm').addEventListener('submit', e => { e.preventDefault(); saveRisk({ mode: $('#riskMode').value, value: $('#riskValue').value }); });
+
 /* ---------- menu clic droit des comptes ---------- */
 function closeMenu() { document.querySelectorAll('.ctx').forEach(m => m.remove()); }
 function openAccountMenu(acc, x, y, btn) {
@@ -408,6 +475,7 @@ function openAccountMenu(acc, x, y, btn) {
     it.append(i, l); it.onclick = () => { closeMenu(); fn(); }; menu.appendChild(it);
   };
   item('✎', 'Renommer', () => startRename(acc, btn));
+  item('⚖', 'Risque par trade…', () => openRisk(acc));
   if (!acc.demo) item('↻', 'Actualiser ce compte', () => refreshAccount(acc.login));
   menu.appendChild(document.createElement('hr'));
   item('🗑', 'Supprimer le compte', () => deleteAccount(acc), true);
@@ -476,6 +544,11 @@ async function loadData() {
 /* ---------- indicateurs ---------- */
 /* ---------- indicateurs ---------- */
 state.kpiPeriod = 'all'; // 'all' ou 'AAAA-MM'
+const BE_R = 0.1; // entre −0,1 R et +0,1 R : trade considéré à l'équilibre (break-even)
+function riskAmount(acc) {
+  if (!acc || !acc.risk) return null;
+  return acc.risk.mode === 'amount' ? acc.risk.value : acc.risk.value / 100 * (acc.start_balance || 0);
+}
 function stats(d) {
   const st = {};
   const per = state.kpiPeriod;
@@ -498,9 +571,20 @@ function stats(d) {
   st.monthPnl = d.daily.filter(x => x.date.startsWith(st.monthKey)).reduce((s, x) => s + x.pnl, 0);
   st.weekPnl = d.daily.filter(x => x.date >= st.weekStart).reduce((s, x) => s + x.pnl, 0);
   st.today = d.daily.find(x => x.date === st.todayKey);
-  const sum = f => days.reduce((t, x) => t + (x[f] || 0), 0);
-  st.rWon = sum('r_won'); st.rLost = sum('r_lost'); st.rWins = sum('r_wins'); st.rLosses = sum('r_losses');
-  st.rTrades = sum('r_trades'); st.rNosl = sum('r_nosl');
+  // R de chaque trade = résultat net ÷ risque par trade choisi pour son compte
+  st.rWon = 0; st.rLost = 0; st.rWins = 0; st.rLosses = 0; st.rBe = 0; st.rTrades = 0; st.rNoRisk = 0;
+  const pa = d.per_account || {};
+  const inPeriod = t => per === 'all' || t.d.startsWith(per);
+  for (const t of (d.trades || []).filter(inPeriod)) {
+    const risk = riskAmount(pa[t.a]);
+    if (!risk) { st.rNoRisk++; continue; }
+    const r = t.n / risk; st.rTrades++;
+    if (Math.abs(r) < BE_R) st.rBe++;
+    else if (r > 0) { st.rWon += r; st.rWins++; }
+    else { st.rLost += -r; st.rLosses++; }
+  }
+  st.rRiskSet = Object.values(pa).some(a => a.risk);
+  st.rHasTrades = Object.values(pa).some(a => a.has_trades);
   st.gain = st.winDays.reduce((s, x) => s + x.pnl, 0);
   st.loss = -st.lossDays.reduce((s, x) => s + x.pnl, 0);
   // drawdown sur la balance de fin de journée
@@ -563,19 +647,21 @@ const METRICS = [
     f: (d, s) => [s.tradeDays.length ? (s.trades / s.tradeDays.length).toFixed(1).replace('.', ',') : '—', nb(s.trades) + ' trades au total', ''] },
 ];
 const fmtR = (v, sign) => (sign && v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + ' R';
-const rMissing = (d, s) => !d.r_available ? 'Actualise le compte pour calculer les R'
-  : (s.rTrades ? (s.rNosl ? s.rNosl + ' trade(s) sans SL ignoré(s)' : '') : (s.rNosl ? 'Aucun trade avec SL sur la période' : 'Aucun trade sur la période'));
+const rMissing = (d, s) => !s.rHasTrades ? 'Clique sur Actualiser pour charger tes trades'
+  : !s.rRiskSet ? 'Clique ici pour définir ton risque par trade'
+  : 'Aucun trade sur la période';
+const rNote = s => (s.rBe ? ' · ' + s.rBe + ' BE' : '') + (s.rNoRisk ? ' · ' + s.rNoRisk + ' sans risque défini' : '');
 METRICS.push(
   { id: 'returnPct', label: 'Rendement (%)', help: 'Gain ou perte en % du capital au début de la période',
     f: (d, s) => [s.periodStart ? pct(s.pnl / s.periodStart * 100) : '—', money(s.pnl, d.currency, true), cls(s.pnl)] },
-  { id: 'rNet', label: 'R net', help: 'Somme des R gagnés moins les R perdus (R = profit ÷ risque jusqu\'au SL)',
-    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
-      const net = s.rWon - s.rLost; return [fmtR(net, true), fmtR(s.rWon, true) + ' gagnés · ' + fmtR(-s.rLost) + ' perdus', cls(net)]; } },
-  { id: 'rWinLoss', label: 'RR gagnants / perdants', help: 'Nombre de trades gagnants et perdants mesurés en R, et R cumulés',
-    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
-      return [s.rWins + ' / ' + s.rLosses, fmtR(s.rWon, true) + ' · ' + fmtR(-s.rLost) + (s.rNosl ? ' · ' + s.rNosl + ' sans SL' : ''), s.rWins >= s.rLosses ? 'pos' : 'neg']; } },
-  { id: 'rAvg', label: 'R moyen par trade', help: 'Moyenne des R par trade, et R moyen d\'un gain et d\'une perte',
-    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
+  { id: 'rNet', label: 'R net', risk: true, help: 'R gagnés moins R perdus (1 R = ton risque par trade)',
+    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
+      const net = s.rWon - s.rLost; return [fmtR(net, true), fmtR(s.rWon, true) + ' gagnés · ' + fmtR(-s.rLost) + ' perdus' + rNote(s), cls(net)]; } },
+  { id: 'rWinLoss', label: 'RR gagnants / perdants', risk: true, help: 'Nombre de trades gagnants et perdants, avec les R cumulés (1 R = ton risque par trade)',
+    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
+      return [s.rWins + ' / ' + s.rLosses, fmtR(s.rWon, true) + ' · ' + fmtR(-s.rLost) + rNote(s), s.rWins >= s.rLosses ? 'pos' : 'neg']; } },
+  { id: 'rAvg', label: 'R moyen par trade', risk: true, help: 'R moyen par trade, et R moyen d\'un gain et d\'une perte',
+    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
       const avg = (s.rWon - s.rLost) / s.rTrades;
       return [fmtR(avg, true), 'Gain moyen ' + fmtR(s.rWins ? s.rWon / s.rWins : 0, true) + ' · Perte moyenne ' + fmtR(-(s.rLosses ? s.rLost / s.rLosses : 0)), cls(avg)]; } },
 );
@@ -615,6 +701,8 @@ function renderKpis() {
     const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cet indicateur';
     x.draggable = false;
     x.onclick = ev => { ev.stopPropagation(); removeKpi(id); };
+    if (m.risk) el.dataset.risk = '1';
+    if (m.risk) el.addEventListener('click', ev => { if (!ev.target.closest('.kpi-x')) openRiskForSelection(); });
     el.append(a, b, e, x);
 
     el.addEventListener('dragstart', ev => {
