@@ -95,41 +95,187 @@ if mt5:
     }
 
 
+# ---- terminal MT5 privé et invisible -------------------------------------------
+# L'application n'utilise jamais le MT5 de la personne : elle en garde une copie
+# "portable" dans son propre dossier, la lance cachée, lit les données et la ferme.
+PRIVATE_TERMINALS_DIR = os.path.join(DATA_DIR, "terminaux")
+
+
+def find_installed_terminals():
+    found = []
+    for env in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        root = os.environ.get(env)
+        if not root or not os.path.isdir(root):
+            continue
+        for name in os.listdir(root):
+            exe = os.path.join(root, name, "terminal64.exe")
+            if os.path.isfile(exe):
+                found.append(exe)
+    return found
+
+
+def pick_source_terminal(acc):
+    if acc.get("terminal") and os.path.isfile(acc["terminal"]):
+        return acc["terminal"]
+    terminals = find_installed_terminals()
+    if not terminals:
+        raise RuntimeError(
+            "Aucun MetaTrader 5 trouvé sur cet ordinateur. Installe le MT5 de ta prop firm "
+            "(pour FTMO : depuis ton espace client), ou indique le chemin de terminal64.exe "
+            "dans les options avancées."
+        )
+    # le terminal dont le dossier ressemble au serveur (ex. "FTMO" pour FTMO-Server)
+    brand = acc.get("server", "").split("-")[0].lower()
+    for exe in terminals:
+        if brand and brand in os.path.basename(os.path.dirname(exe)).lower():
+            return exe
+    return terminals[0]
+
+
+def _copy_servers_list(src_dir, dest_dir):
+    """Copie la liste des serveurs du broker depuis le dossier de données du MT5 installé."""
+    import glob
+    import shutil
+
+    roaming = os.environ.get("APPDATA")
+    if not roaming:
+        return
+    for origin in glob.glob(os.path.join(roaming, "MetaQuotes", "Terminal", "*", "origin.txt")):
+        try:
+            with open(origin, "r", encoding="utf-16") as f:
+                path = f.read().strip()
+        except (OSError, UnicodeError):
+            try:
+                with open(origin, "r", encoding="utf-8", errors="ignore") as f:
+                    path = f.read().strip()
+            except OSError:
+                continue
+        if os.path.normcase(os.path.normpath(path)) == os.path.normcase(os.path.normpath(src_dir)):
+            servers = os.path.join(os.path.dirname(origin), "Config", "servers.dat")
+            if os.path.isfile(servers):
+                os.makedirs(os.path.join(dest_dir, "Config"), exist_ok=True)
+                shutil.copy2(servers, os.path.join(dest_dir, "Config", "servers.dat"))
+            return
+
+
+def private_terminal(acc):
+    """Renvoie le terminal64.exe de la copie privée (la crée la première fois)."""
+    import shutil
+
+    src_exe = pick_source_terminal(acc)
+    src_dir = os.path.dirname(src_exe)
+    dest_dir = os.path.join(PRIVATE_TERMINALS_DIR, os.path.basename(src_dir) or "MT5")
+    dest_exe = os.path.join(dest_dir, "terminal64.exe")
+    if not os.path.isfile(dest_exe):
+        shutil.copytree(
+            src_dir, dest_dir, dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("logs", "Logs", "Tester", "Bases", "uninstall.exe"),
+        )
+    if not os.path.isfile(os.path.join(dest_dir, "Config", "servers.dat")):
+        _copy_servers_list(src_dir, dest_dir)
+    return dest_exe
+
+
+class HiddenTerminal:
+    """Lance le terminal privé sans fenêtre et le ferme à la fin."""
+
+    def __init__(self, exe):
+        self.exe = exe
+        self.proc = None
+        self._stop = threading.Event()
+
+    def __enter__(self):
+        import subprocess
+
+        si = subprocess.STARTUPINFO() if hasattr(subprocess, "STARTUPINFO") else None
+        if si is not None:
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0  # SW_HIDE
+        self.proc = subprocess.Popen([self.exe, "/portable"], startupinfo=si,
+                                     cwd=os.path.dirname(self.exe))
+        threading.Thread(target=self._keep_hidden, daemon=True).start()
+        return self
+
+    def _keep_hidden(self):
+        """MT5 ignore parfois la demande : on masque ses fenêtres tant qu'il tourne."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+        except Exception:
+            return
+        user32 = ctypes.windll.user32
+        proto = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+        def hide(hwnd, _):
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if self.proc and pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
+                user32.ShowWindow(hwnd, 0)
+            return True
+
+        callback = proto(hide)
+        while not self._stop.is_set():
+            user32.EnumWindows(callback, 0)
+            self._stop.wait(0.1)
+
+    def __exit__(self, *exc):
+        import subprocess
+
+        self._stop.set()
+        if self.proc and self.proc.poll() is None:
+            subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                           capture_output=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return False
+
+
 def fetch_mt5(acc, password):
-    """Se connecte au compte via le terminal MT5 local et calcule le P&L par jour."""
+    """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
     if mt5 is None:
         raise RuntimeError(
             "Le module MetaTrader5 n'est pas disponible. L'application fonctionne "
             "uniquement sur Windows avec le terminal MetaTrader 5 installé."
         )
     login = int(acc["login"])
-    init_kwargs = {"timeout": 60000}
-    if acc.get("terminal"):
-        init_kwargs["path"] = acc["terminal"]
 
     with mt5_lock:
-        if not mt5.initialize(**init_kwargs):
-            code, msg = mt5.last_error()
-            mt5.shutdown()
-            raise RuntimeError(
-                f"Impossible de démarrer MetaTrader 5 ({code} : {msg}). "
-                "Vérifie que MT5 est installé, ou indique le chemin de terminal64.exe."
-            )
         try:
-            if not mt5.login(login, password=password, server=acc["server"], timeout=60000):
+            exe = private_terminal(acc)
+        except OSError as e:
+            raise RuntimeError(f"Impossible de préparer le terminal MT5 de l'application : {e}")
+
+        with HiddenTerminal(exe):
+            ok = mt5.initialize(path=exe, portable=True, login=login, password=password,
+                                server=acc["server"], timeout=90000)
+            if not ok:
                 code, msg = mt5.last_error()
+                mt5.shutdown()
+                if code == -6:  # autorisation refusée
+                    raise RuntimeError(
+                        f"Connexion refusée ({msg}). Vérifie le numéro de compte, "
+                        "le mot de passe et le nom exact du serveur."
+                    )
                 raise RuntimeError(
-                    f"Connexion refusée ({code} : {msg}). Vérifie le numéro de compte, "
-                    "le mot de passe et le nom exact du serveur."
+                    f"Impossible de se connecter via MetaTrader 5 ({code} : {msg}). "
+                    "Vérifie le nom exact du serveur et réessaie."
                 )
-            info = mt5.account_info()
-            if info is None:
-                raise RuntimeError("Impossible de lire les informations du compte.")
-            deals = mt5.history_deals_get(
-                dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)
-            ) or []
-        finally:
-            mt5.shutdown()
+            try:
+                info = mt5.account_info()
+                if info is None or info.login != login:
+                    if not mt5.login(login, password=password, server=acc["server"], timeout=60000):
+                        code, msg = mt5.last_error()
+                        raise RuntimeError(
+                            f"Connexion refusée ({code} : {msg}). Vérifie le numéro de compte, "
+                            "le mot de passe et le nom exact du serveur."
+                        )
+                    info = mt5.account_info()
+                if info is None:
+                    raise RuntimeError("Impossible de lire les informations du compte.")
+                deals = mt5.history_deals_get(
+                    dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)
+                ) or []
+            finally:
+                mt5.shutdown()
 
     daily = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0, "losses": 0})
     start_balance = 0.0

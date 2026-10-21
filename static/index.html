@@ -453,7 +453,7 @@ function closeLogin() { $('#loginBg').classList.remove('open'); }
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const form = $('#loginForm'); form.classList.add('loading');
-  $('#connectBtn').textContent = 'Connexion…';
+  $('#connectBtn').textContent = 'Connexion… (jusqu\'à 1 min la première fois)';
   try {
     const acc = await api('/api/connect', {
       name: $('#fName').value, login: $('#fLogin').value.trim(), password: $('#fPass').value,
