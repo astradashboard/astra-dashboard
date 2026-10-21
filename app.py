@@ -394,6 +394,47 @@ def no_cache(resp):
     return resp
 
 
+_life = {"last_ping": 0.0, "closing_since": None}
+
+
+@app.post("/api/ping")
+def api_ping():
+    import time
+
+    _life["last_ping"] = time.time()
+    _life["closing_since"] = None
+    return jsonify({"ok": True})
+
+
+@app.post("/api/bye")
+def api_bye():
+    import time
+
+    _life["closing_since"] = time.time()
+    return ("", 204)
+
+
+@app.post("/api/quit")
+def api_quit():
+    threading.Timer(0.3, lambda: os._exit(0)).start()
+    return jsonify({"ok": True})
+
+
+def lifetime_watchdog():
+    """Fenêtre fermée (ou plus aucun signe de vie pendant 10 min) : l'application s'arrête."""
+    import time
+
+    _life["last_ping"] = time.time()
+    while True:
+        time.sleep(1)
+        now = time.time()
+        closing = _life["closing_since"]
+        if closing and now - closing > 5:
+            os._exit(0)
+        if now - _life["last_ping"] > 600:
+            os._exit(0)
+
+
 @app.get("/api/version")
 def api_version():
     return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?")})
@@ -581,7 +622,10 @@ def check_for_update():
     base = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{UPDATE_BRANCH}/"
 
     def get(path):
-        req = urllib.request.Request(base + path, headers={"Cache-Control": "no-cache", "User-Agent": APP_NAME})
+        import time as _t
+
+        url = base + path + f"?t={int(_t.time())}"
+        req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": APP_NAME})
         with urllib.request.urlopen(req, timeout=6) as r:
             return r.read()
 
@@ -730,18 +774,56 @@ def already_running():
         return False
 
 
+def stop_running_instance():
+    """Arrête une instance déjà ouverte (y compris les anciennes versions sans /api/quit)."""
+    import subprocess
+    import time
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{PREFERRED_PORT}/api/quit", data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=2).read()
+    except Exception:
+        pass
+    time.sleep(1)
+    if not already_running():
+        return
+    try:
+        out = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and parts[1].endswith(f":{PREFERRED_PORT}") and parts[3].upper() in ("LISTENING", "ECOUTE", "ÉCOUTE"):
+                subprocess.run(["taskkill", "/PID", parts[4], "/F"], capture_output=True,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        pass
+    time.sleep(1)
+
+
+def restart_updated():
+    import subprocess
+
+    subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj"], cwd=APP_DIR)
+
+
 def main():
-    # Déjà ouverte : on réaffiche simplement une fenêtre.
+    check = "--sans-maj" not in sys.argv
+
     if already_running():
+        # Une version ouverte tourne déjà : si une mise à jour existe, on la remplace.
+        if check and check_for_update():
+            stop_running_instance()
+            restart_updated()
+            return
         if not open_app_window(f"http://127.0.0.1:{PREFERRED_PORT}/"):
             webbrowser.open(f"http://127.0.0.1:{PREFERRED_PORT}/")
         return
 
     # Nouvelle version sur GitHub : on l'installe puis on redémarre avec.
-    if "--sans-maj" not in sys.argv and check_for_update():
-        import subprocess
-
-        subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj"], cwd=APP_DIR)
+    if check and check_for_update():
+        restart_updated()
         return
 
     port = free_port(PREFERRED_PORT)
@@ -751,12 +833,13 @@ def main():
         daemon=True,
     )
     server.start()
+    threading.Thread(target=lifetime_watchdog, daemon=True).start()
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
 
-    # 1) Fenêtre d'application Edge/Chrome : l'app s'arrête quand on la ferme.
-    proc = open_app_window(url)
-    if proc:
-        proc.wait()
+    # 1) Fenêtre d'application Edge/Chrome. L'app s'arrête quand la fenêtre se ferme
+    #    (signalé par la page), même si Edge reste actif en arrière-plan.
+    if open_app_window(url):
+        server.join()
         return
 
     # 2) Fenêtre pywebview si elle est installée.

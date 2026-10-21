@@ -496,6 +496,10 @@ $('#refreshBtn').onclick = async () => {
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
 loadState().catch(e => notice(e.message, true));
+// signes de vie : l'application se ferme quand cette fenêtre est fermée
+const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
+ping(); setInterval(ping, 20000);
+window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });
 api('/api/version').then(v => { $('#appVersion').textContent = 'Version ' + v.version; }).catch(() => {});
 </script>
 </body>
