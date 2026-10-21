@@ -99,7 +99,19 @@
     background: var(--gold-soft); border: 1px solid rgba(196,138,69,.5); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
   .update-bar b { color: var(--gold); }
   .update-bar .btn { padding: 6px 14px; }
-  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .nav > button { font-size: 15px; font-weight: 600; padding: 11px 12px; }
+  .nav .nav-t { flex: 1; }
+  .nav .chev { color: var(--muted); padding: 0 4px; border-radius: 5px; transition: transform .15s; }
+  .nav .chev:hover { color: var(--fg); background: var(--panel-2); }
+  .nav .chev.closed { transform: rotate(-90deg); }
+  .sub { margin: 0 0 6px 21px; padding-left: 10px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+  .sub[hidden] { display: none; }
+  .sub .acc { padding: 7px 9px; font-size: 13px; }
+  .sub .acc small { font-size: 10.5px; }
+  .sub-add { background: none; border: 1px dashed var(--line); color: var(--muted); border-radius: 8px; padding: 7px 9px; text-align: left; font-size: 13px; }
+  .sub-add:hover { color: var(--gold); border-color: var(--gold); }
+  .acc.active.dimmed { background: transparent; border-color: var(--line); }
   .nav button { text-align: left; background: transparent; border: 1px solid transparent; color: var(--fg); border-radius: 9px;
     padding: 9px 10px; display: flex; gap: 10px; align-items: center; }
   .nav button:hover { background: var(--panel-2); }
@@ -223,13 +235,13 @@
       <img class="brand-mark" src="/static/logo-emblem.png" alt="">
       <div><b>ASTRA CAPITAL</b><span>Dashboard des comptes</span></div>
     </div>
-    <div class="label">Comptes</div>
-    <div class="acc-list" id="accList"></div>
-    <button class="btn primary" id="addBtn">+ Ajouter un compte</button>
-    <div class="label">Pages</div>
     <nav class="nav" id="nav">
-      <button data-page="dash" class="active"><span class="ic">▦</span>Tableau de bord</button>
-      <button data-page="journal"><span class="ic">✎</span>Journal de trading</button>
+      <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="chev" id="accToggle" title="Afficher / masquer les comptes">▾</span></button>
+      <div class="sub" id="accSub">
+        <div class="acc-list" id="accList"></div>
+        <button class="sub-add" id="addBtn">+ Ajouter un compte</button>
+      </div>
+      <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span></button>
     </nav>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
@@ -458,7 +470,7 @@ function renderAccounts() {
   if (state.accounts.length === 1) state.sel = state.accounts[0].login;
   for (const a of items) {
     const b = document.createElement('button');
-    b.className = 'acc' + (a.login === state.sel ? ' active' : '');
+    b.className = 'acc' + (a.login === state.sel ? ' active' + (state.page === 'journal' ? ' dimmed' : '') : '');
     const left = document.createElement('div');
     const nm = document.createElement('div'); nm.textContent = a.name;
     const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : a.login + ' · ' + a.server);
@@ -466,7 +478,7 @@ function renderAccounts() {
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
     b.append(left, bal);
-    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.page = 'dash'; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     if (a.login !== 'all') {
       b.title = 'Clic droit : renommer, actualiser ou supprimer';
       b.addEventListener('contextmenu', ev => { ev.preventDefault(); openAccountMenu(a, ev.clientX, ev.clientY, b); });
@@ -1109,15 +1121,27 @@ loadState().catch(e => notice(e.message, true));
 // ---------- navigation entre les pages ----------
 state.page = 'dash'; state.jTrade = null; state.jMonth = 'all'; state.jFilter = 'all';
 function showPage() {
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.page === state.page));
+  document.querySelectorAll('#nav > button').forEach(b => b.classList.toggle('active', b.dataset.page === state.page));
+  renderAccounts();
   const hasAcc = state.accounts.length > 0;
   $('#content').hidden = !hasAcc || state.page !== 'dash';
   $('#journal').hidden = !hasAcc || state.page !== 'journal';
   if (state.page === 'journal' && hasAcc) renderJournal();
 }
-document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
-  state.page = b.dataset.page; state.jTrade = null; showPage(); window.scrollTo(0, 0);
+document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
+  if (ev.target.id === 'accToggle') return;
+  state.page = b.dataset.page; state.jTrade = null;
+  if (state.page === 'journal' && state.sel === 'all' && state.accounts.length) {
+    state.sel = state.accounts[0].login; state.month = null; state.view = null; renderAccounts(); loadData();
+  }
+  showPage(); window.scrollTo(0, 0);
 });
+try { if (localStorage.getItem('accSubClosed') === '1') { $('#accSub').hidden = true; $('#accToggle').classList.add('closed'); } } catch (e) {}
+$('#accToggle').onclick = ev => {
+  ev.stopPropagation();
+  const sub = $('#accSub'); sub.hidden = !sub.hidden; $('#accToggle').classList.toggle('closed', sub.hidden);
+  try { localStorage.setItem('accSubClosed', sub.hidden ? '1' : '0'); } catch (e) {}
+};
 
 // ---------- journal de trading ----------
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -1144,12 +1168,8 @@ function renderJournal() {
   const box = $('#journal'); box.innerHTML = '';
   const accs = state.accounts.filter(a => !a.demo || true);
   if (state.sel === 'all') {
-    const card = el('div', 'card');
-    card.append(el('h2', null, 'Journal de trading'));
-    const p = el('p', null, 'Le journal est propre à chaque compte : choisis le compte à afficher.'); p.style.color = 'var(--muted)';
-    const row = el('div'); row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
-    for (const a of accs) { const b = el('button', 'btn', a.name); b.onclick = () => { state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); }; row.appendChild(b); }
-    card.append(p, row); box.appendChild(card); return;
+    if (state.accounts.length) { state.sel = state.accounts[0].login; renderAccounts(); loadData(); }
+    return;
   }
   const d = state.data; if (!d) return;
   const acc = (d.per_account || {})[state.sel] || {};
@@ -1180,7 +1200,10 @@ function renderJournal() {
   const total = list.reduce((s, t) => s + t.n, 0);
   const sum = el('div', 'sum'); sum.append(list.length + ' trade' + (list.length > 1 ? 's' : '') + ' · ');
   const tb = el('b', cls(total), money(total, d.currency, true)); sum.append(tb);
-  tools.append(ms, fs, sum); box.appendChild(tools);
+  const as = el('select'); as.title = 'Compte du journal';
+  for (const a of state.accounts) as.append(new Option(a.name, a.login));
+  as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
+  tools.append(as, ms, fs, sum); box.appendChild(tools);
 
   const card = el('div', 'card'); card.style.padding = '8px 4px';
   if (!list.length) { const p = el('p', null, 'Aucun trade pour ce filtre.'); p.style.cssText = 'color:var(--muted);padding:12px 14px'; card.appendChild(p); box.appendChild(card); return; }
