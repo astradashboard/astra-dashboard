@@ -117,6 +117,7 @@
     <button class="btn primary" id="addBtn">+ Ajouter un compte</button>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
+    <div class="label" id="appVersion" style="text-align:center"></div>
   </aside>
 
   <main>
@@ -495,6 +496,7 @@ $('#refreshBtn').onclick = async () => {
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
 loadState().catch(e => notice(e.message, true));
+api('/api/version').then(v => { $('#appVersion').textContent = 'Version ' + v.version; }).catch(() => {});
 </script>
 </body>
 </html>

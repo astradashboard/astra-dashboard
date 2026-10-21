@@ -351,6 +351,18 @@ def account_summary(login, acc, cache):
     }
 
 
+@app.after_request
+def no_cache(resp):
+    # la fenêtre doit toujours afficher la version installée, jamais une copie en cache
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/api/version")
+def api_version():
+    return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?")})
+
+
 @app.get("/")
 def index():
     return send_from_directory(STATIC_DIR, "index.html")
