@@ -578,6 +578,9 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    if "heroCur" in body:
+        cur = str(body.get("heroCur") or "")[:3].upper()
+        prefs["heroCur"] = cur if cur in FX_CURRENCIES else ""
     _save(PREFS_FILE, prefs)
     return jsonify(prefs)
 
@@ -625,6 +628,61 @@ def api_update_apply():
     subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj", f"--relance={SERVER['port']}"], cwd=APP_DIR)
     threading.Timer(0.6, lambda: os._exit(0)).start()
     return jsonify({"ok": True, "version": _load(VERSION_FILE, {}).get("version")})
+
+
+FX_CURRENCIES = ("EUR", "USD", "CHF", "JPY", "AUD")
+FX_FILE = os.path.join(DATA_DIR, "taux-de-change.json")
+
+
+def _fetch_rates(base):
+    """Taux du jour depuis un service gratuit (BCE via Frankfurter, sinon open.er-api.com)."""
+    import urllib.request
+
+    others = ",".join(c for c in FX_CURRENCIES if c != base)
+    sources = [
+        f"https://api.frankfurter.dev/v1/latest?base={base}&symbols={others}",
+        f"https://api.frankfurter.app/latest?from={base}&to={others}",
+        f"https://open.er-api.com/v6/latest/{base}",
+    ]
+    for url in sources:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": APP_NAME})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            rates = data.get("rates") or {}
+            rates = {c: float(rates[c]) for c in FX_CURRENCIES if c in rates}
+            if rates:
+                rates[base] = 1.0
+                date = data.get("date") or data.get("time_last_update_utc") or dt.date.today().isoformat()
+                return {"base": base, "rates": rates, "date": str(date)[:16]}
+        except Exception:
+            continue
+    return None
+
+
+@app.get("/api/fx")
+def api_fx():
+    import time
+
+    base = str(request.args.get("from", "USD")).upper()[:3]
+    if base not in FX_CURRENCIES:
+        return jsonify({"error": f"Devise {base} non prise en charge."}), 400
+    cache = _load(FX_FILE, {})
+    entry = cache.get(base)
+    if entry and time.time() - entry.get("fetched", 0) < 3 * 3600:
+        return jsonify(entry)
+    fresh = _fetch_rates(base)
+    if fresh:
+        fresh["fetched"] = time.time()
+        cache[base] = fresh
+        try:
+            _save(FX_FILE, cache)
+        except OSError:
+            pass
+        return jsonify(fresh)
+    if entry:  # hors ligne : derniers taux connus
+        return jsonify({**entry, "stale": True})
+    return jsonify({"error": "Taux de change indisponibles (pas de connexion internet ?)."}), 503
 
 
 @app.get("/api/version")

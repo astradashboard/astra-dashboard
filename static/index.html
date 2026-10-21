@@ -57,6 +57,11 @@
   .hero { background: linear-gradient(135deg, rgba(196,138,69,.10), rgba(196,138,69,0) 55%), var(--panel);
     border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; margin-bottom: 22px; }
   .hero .h-label { color: var(--muted); font-size: 13px; letter-spacing: .04em; }
+  .hero { position: relative; }
+  .hero .h-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .hero select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .hero select:focus { outline: none; border-color: var(--gold); }
+  .hero .h-fx { color: var(--muted); font-size: 12px; margin-top: 8px; }
   .hero .h-value { font-size: 46px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 6px; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .hero .h-month { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .hero .h-month .muted { color: var(--muted); font-weight: 500; }
@@ -263,9 +268,20 @@
 
     <div id="content">
       <section class="hero" id="hero">
-        <div class="h-label">Capital du compte</div>
+        <div class="h-top">
+          <div class="h-label">Capital du compte</div>
+          <select id="heroCur" title="Devise d'affichage">
+            <option value="">Devise du compte</option>
+            <option value="EUR">EUR · Euro €</option>
+            <option value="USD">USD · Dollar US $</option>
+            <option value="CHF">CHF · Franc suisse</option>
+            <option value="JPY">JPY · Yen ¥</option>
+            <option value="AUD">AUD · Dollar australien</option>
+          </select>
+        </div>
         <div class="h-value" id="heroValue">—</div>
         <div class="h-month" id="heroMonth"></div>
+        <div class="h-fx" id="heroFx"></div>
       </section>
       <div class="kpis-head">
         <div class="left">
@@ -423,7 +439,7 @@ async function api(path, body) {
 function money(v, cur, sign) {
   if (v === null || v === undefined || isNaN(v)) return '—';
   let s;
-  try { s = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: cur || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 2 }).format(Math.abs(v)); }
+  try { s = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: cur || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cur === 'JPY' ? 0 : 2 }).format(Math.abs(v)); }
   catch (e) { s = Math.abs(v).toFixed(2) + ' ' + (cur || ''); }
   if (sign) return (v > 0 ? '+' : v < 0 ? '−' : '') + s;
   return (v < 0 ? '−' : '') + s;
@@ -789,20 +805,45 @@ function renderKpis() {
 }
 
 /* ---------- capital du compte ---------- */
-function renderHero() {
+state.heroCur = ''; state.fx = {};
+async function getRate(from, to) {
+  if (!to || from === to) return { rate: 1 };
+  if (!state.fx[from]) state.fx[from] = await api('/api/fx?from=' + encodeURIComponent(from));
+  const r = state.fx[from];
+  if (!r.rates || !r.rates[to]) throw new Error('Taux ' + from + ' → ' + to + ' indisponible');
+  return { rate: r.rates[to], date: r.date, stale: r.stale };
+}
+async function renderHero() {
   const d = state.data, cur = d.currency;
   const acc = state.accounts.find(a => a.login === state.sel);
   $('#hero .h-label').textContent = acc ? 'Capital du compte' : 'Capital total des comptes';
-  $('#heroValue').textContent = money(d.balance, cur);
+  $('#heroCur').value = state.heroCur;
+  const sel = $('#heroCur').options[0]; sel.textContent = 'Devise du compte (' + (cur || 'USD') + ')';
   const now = new Date(); const key = now.getFullYear() + '-' + pad(now.getMonth() + 1);
   const pnl = d.daily.filter(x => x.date.startsWith(key)).reduce((s, x) => s + x.pnl, 0);
   const startOfMonth = d.balance - pnl;
+  let target = state.heroCur || cur, rate = 1, fxNote = '';
+  if (state.heroCur && state.heroCur !== cur) {
+    try {
+      const r = await getRate(cur, state.heroCur); rate = r.rate;
+      const d0 = r.date ? ' · taux du ' + String(r.date).slice(0, 10).split('-').reverse().join('/') : '';
+      fxNote = '1 ' + cur + ' = ' + rate.toLocaleString('fr-BE', { maximumFractionDigits: 4 }) + ' ' + state.heroCur + d0 + (r.stale ? ' (hors ligne)' : '');
+    } catch (e) { target = cur; rate = 1; fxNote = 'Conversion impossible : ' + e.message + '. Montants affichés en ' + cur + '.'; }
+  }
+  if (state.data !== d) return; // un autre compte a été choisi entre-temps
+  $('#heroValue').textContent = money(d.balance * rate, target);
   const box = $('#heroMonth'); box.innerHTML = ''; box.className = 'h-month ' + cls(pnl);
-  const v = document.createElement('span'); v.textContent = money(pnl, cur, true);
+  const v = document.createElement('span'); v.textContent = money(pnl * rate, target, true);
   const t = document.createElement('span'); t.className = 'muted'; t.textContent = ' ce mois-ci  ·  ';
   const pc = document.createElement('span'); pc.textContent = startOfMonth ? pct(pnl / startOfMonth * 100) : '';
   box.append(v, t, pc);
+  $('#heroFx').textContent = fxNote;
 }
+$('#heroCur').onchange = () => {
+  state.heroCur = $('#heroCur').value;
+  if (state.data) renderHero();
+  api('/api/prefs', { heroCur: state.heroCur }).catch(() => {});
+};
 
 /* ---------- période des indicateurs ---------- */
 function periodMonths() {
@@ -867,7 +908,10 @@ $('#customSave').onclick = async () => {
   if (state.data) renderKpis();
   savePrefs();
 };
-api('/api/prefs').then(p => { if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); } }).catch(() => {});
+api('/api/prefs').then(p => {
+  if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); }
+  if (p.heroCur) { state.heroCur = p.heroCur; if (state.data) renderHero(); }
+}).catch(() => {});
 
 /* ---------- courbe du capital (zoomable) ---------- */
 state.view = null; // { i0, i1, preset }
