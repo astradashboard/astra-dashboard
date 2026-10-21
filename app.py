@@ -361,6 +361,11 @@ def favicon():
     return send_from_directory(STATIC_DIR, "favicon.png")
 
 
+@app.get("/static/<path:name>")
+def static_files(name):
+    return send_from_directory(STATIC_DIR, name)
+
+
 @app.get("/api/state")
 def api_state():
     accounts, cache = load_accounts(), load_cache()
