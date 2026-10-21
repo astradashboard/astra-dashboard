@@ -44,6 +44,13 @@
   header.top h1 { margin: 0; font-size: 22px; font-weight: 650; }
   header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hero { background: linear-gradient(135deg, rgba(196,138,69,.10), rgba(196,138,69,0) 55%), var(--panel);
+    border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; margin-bottom: 22px; }
+  .hero .h-label { color: var(--muted); font-size: 13px; letter-spacing: .04em; }
+  .hero .h-value { font-size: 46px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 6px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .hero .h-month { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hero .h-month .muted { color: var(--muted); font-weight: 500; }
+  @media (max-width: 860px) { .hero .h-value { font-size: 34px; } }
   .kpis-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .kpis-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
   .kpis-head .btn { padding: 6px 12px; font-size: 13px; }
@@ -178,6 +185,11 @@
     <div id="notices"></div>
 
     <div id="content">
+      <section class="hero" id="hero">
+        <div class="h-label">Capital du compte</div>
+        <div class="h-value" id="heroValue">—</div>
+        <div class="h-month" id="heroMonth"></div>
+      </section>
       <div class="kpis-head">
         <div class="left">
           <h2>Indicateurs</h2>
@@ -379,7 +391,7 @@ async function loadData() {
     const d = last ? new Date(last + 'T12:00:00') : new Date();
     state.month = [d.getFullYear(), d.getMonth()];
   }
-  renderPeriod(); renderKpis(); renderChart(); renderCal();
+  renderHero(); renderPeriod(); renderKpis(); renderChart(); renderCal();
 }
 
 /* ---------- indicateurs ---------- */
@@ -468,7 +480,7 @@ const METRICS = [
   { id: 'tradesDay', label: 'Trades par jour', help: 'Nombre moyen de trades par jour tradé',
     f: (d, s) => [s.tradeDays.length ? (s.trades / s.tradeDays.length).toFixed(1).replace('.', ',') : '—', nb(s.trades) + ' trades au total', ''] },
 ];
-const DEFAULT_KPIS = ['balance', 'equity', 'total', 'month', 'winDays', 'winTrades', 'best', 'worst'];
+const DEFAULT_KPIS = ['equity', 'total', 'today', 'week', 'winDays', 'winTrades', 'best', 'worst', 'maxDd', 'pf'];
 state.kpis = DEFAULT_KPIS.slice();
 
 function savePrefs() {
@@ -532,6 +544,22 @@ function renderKpis() {
     const el = document.createElement('div'); el.className = 'kpi empty-kpi';
     el.textContent = 'Aucun indicateur : clique sur « Personnaliser » pour en ajouter.'; box.appendChild(el);
   }
+}
+
+/* ---------- capital du compte ---------- */
+function renderHero() {
+  const d = state.data, cur = d.currency;
+  const acc = state.accounts.find(a => a.login === state.sel);
+  $('#hero .h-label').textContent = acc ? 'Capital du compte' : 'Capital total des comptes';
+  $('#heroValue').textContent = money(d.balance, cur);
+  const now = new Date(); const key = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+  const pnl = d.daily.filter(x => x.date.startsWith(key)).reduce((s, x) => s + x.pnl, 0);
+  const startOfMonth = d.balance - pnl;
+  const box = $('#heroMonth'); box.innerHTML = ''; box.className = 'h-month ' + cls(pnl);
+  const v = document.createElement('span'); v.textContent = money(pnl, cur, true);
+  const t = document.createElement('span'); t.className = 'muted'; t.textContent = ' ce mois-ci  ·  ';
+  const pc = document.createElement('span'); pc.textContent = startOfMonth ? pct(pnl / startOfMonth * 100) : '';
+  box.append(v, t, pc);
 }
 
 /* ---------- période des indicateurs ---------- */
