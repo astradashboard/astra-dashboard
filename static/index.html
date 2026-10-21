@@ -277,8 +277,7 @@
       <input id="riskValue" inputmode="decimal" required placeholder="Ex. 1">
       <span class="hint" id="riskHint"></span>
     </div>
-    <p class="sub" style="margin:4px 0 16px">Chaque trade est converti en R : un gain égal à ton risque = +1 R, une perte de ton risque = −1 R.
-      Entre −0,1 R et +0,1 R, le trade compte comme break-even (BE).</p>
+    <p class="sub" style="margin:4px 0 16px">Ton résultat est converti en R : un gain égal à ton risque = +1 R, une perte de ton risque = −1 R.</p>
     <div class="modal-actions">
       <button type="button" class="btn ghost danger" id="riskClear">Effacer</button>
       <div class="right">
@@ -572,14 +571,14 @@ function stats(d) {
   st.weekPnl = d.daily.filter(x => x.date >= st.weekStart).reduce((s, x) => s + x.pnl, 0);
   st.today = d.daily.find(x => x.date === st.todayKey);
   // R de chaque trade = résultat net ÷ risque par trade choisi pour son compte
-  st.rWon = 0; st.rLost = 0; st.rWins = 0; st.rLosses = 0; st.rBe = 0; st.rTrades = 0; st.rNoRisk = 0;
+  st.rWon = 0; st.rLost = 0; st.rWins = 0; st.rLosses = 0; st.rBe = 0; st.rTrades = 0; st.rNoRisk = 0; st.rBeSum = 0; st.rCount = 0;
   const pa = d.per_account || {};
   const inPeriod = t => per === 'all' || t.d.startsWith(per);
   for (const t of (d.trades || []).filter(inPeriod)) {
     const risk = riskAmount(pa[t.a]);
     if (!risk) { st.rNoRisk++; continue; }
-    const r = t.n / risk; st.rTrades++;
-    if (Math.abs(r) < BE_R) st.rBe++;
+    const r = t.n / risk; st.rTrades++; st.rCount++;
+    if (Math.abs(r) < BE_R) { st.rBe++; st.rBeSum += r; }
     else if (r > 0) { st.rWon += r; st.rWins++; }
     else { st.rLost += -r; st.rLosses++; }
   }
@@ -647,23 +646,17 @@ const METRICS = [
     f: (d, s) => [s.tradeDays.length ? (s.trades / s.tradeDays.length).toFixed(1).replace('.', ',') : '—', nb(s.trades) + ' trades au total', ''] },
 ];
 const fmtR = (v, sign) => (sign && v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + ' R';
-const rMissing = (d, s) => !s.rHasTrades ? 'Clique sur Actualiser pour charger tes trades'
-  : !s.rRiskSet ? 'Clique ici pour définir ton risque par trade'
-  : 'Aucun trade sur la période';
-const rNote = s => (s.rBe ? ' · ' + s.rBe + ' BE' : '') + (s.rNoRisk ? ' · ' + s.rNoRisk + ' sans risque défini' : '');
 METRICS.push(
   { id: 'returnPct', label: 'Rendement (%)', help: 'Gain ou perte en % du capital au début de la période',
     f: (d, s) => [s.periodStart ? pct(s.pnl / s.periodStart * 100) : '—', money(s.pnl, d.currency, true), cls(s.pnl)] },
-  { id: 'rNet', label: 'R net', risk: true, help: 'R gagnés moins R perdus (1 R = ton risque par trade)',
-    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
-      const net = s.rWon - s.rLost; return [fmtR(net, true), fmtR(s.rWon, true) + ' gagnés · ' + fmtR(-s.rLost) + ' perdus' + rNote(s), cls(net)]; } },
-  { id: 'rWinLoss', label: 'RR gagnants / perdants', risk: true, help: 'Nombre de trades gagnants et perdants, avec les R cumulés (1 R = ton risque par trade)',
-    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
-      return [s.rWins + ' / ' + s.rLosses, fmtR(s.rWon, true) + ' · ' + fmtR(-s.rLost) + rNote(s), s.rWins >= s.rLosses ? 'pos' : 'neg']; } },
-  { id: 'rAvg', label: 'R moyen par trade', risk: true, help: 'R moyen par trade, et R moyen d\'un gain et d\'une perte',
-    f: (d, s) => { if (!s.rTrades) return ['—', rMissing(d, s), ''];
-      const avg = (s.rWon - s.rLost) / s.rTrades;
-      return [fmtR(avg, true), 'Gain moyen ' + fmtR(s.rWins ? s.rWon / s.rWins : 0, true) + ' · Perte moyenne ' + fmtR(-(s.rLosses ? s.rLost / s.rLosses : 0)), cls(avg)]; } },
+  { id: 'resultR', risk: true, help: 'Résultat de la période exprimé en R (1 R = ton risque par trade, réglable par compte)',
+    label: () => state.kpiPeriod === 'all' ? 'Résultat total en R' : 'Résultat de ' + MONTHS[Number(state.kpiPeriod.slice(5)) - 1] + ' en R',
+    f: (d, s) => {
+      if (!s.rHasTrades) return ['—', 'Clique sur Actualiser pour charger tes trades', ''];
+      if (!s.rRiskSet) return ['—', 'Clique ici pour définir ton risque par trade', ''];
+      const r = s.rWon - s.rLost + s.rBeSum;
+      return [fmtR(r, true), s.rCount + ' trade(s)' + (s.rNoRisk ? ' · ' + s.rNoRisk + ' sans risque défini' : ''), cls(r)];
+    } },
 );
 const DEFAULT_KPIS = ['equity', 'total', 'today', 'week', 'winDays', 'winTrades', 'best', 'worst', 'maxDd', 'pf'];
 state.kpis = DEFAULT_KPIS.slice();
