@@ -68,9 +68,11 @@
   #chart svg { display: block; width: 100%; }
   .tip { position: absolute; pointer-events: none; background: #0b0f18; border: 1px solid var(--line); border-radius: 8px;
     padding: 7px 10px; font-size: 12px; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
-  .month-nav { display: flex; align-items: center; gap: 8px; }
-  .month-nav .btn { padding: 5px 11px; }
-  .month-title { min-width: 150px; text-align: center; font-weight: 600; text-transform: capitalize; }
+  .month-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 2px 0 18px; }
+  .month-nav .btn { width: 42px; height: 42px; padding: 0; font-size: 22px; line-height: 1; border-radius: 50%; }
+  .month-title { min-width: 220px; text-align: center; text-transform: capitalize; }
+  .month-title .mt-name { font-size: 22px; font-weight: 650; letter-spacing: .01em; }
+  .month-title .mt-pnl { font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .cal { display: grid; grid-template-columns: repeat(7, 1fr) 1.1fr; gap: 6px; }
   .cal .dow { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; text-align: center; padding-bottom: 2px; }
   .day { min-height: 84px; border-radius: 9px; background: var(--panel-2); border: 1px solid transparent; padding: 7px 8px;
@@ -154,11 +156,11 @@
       <section class="card">
         <div class="card-head">
           <h2>Calendrier des profits et pertes</h2>
-          <div class="month-nav">
-            <button class="btn" id="prevM">‹</button>
-            <div class="month-title" id="monthTitle"></div>
-            <button class="btn" id="nextM">›</button>
-          </div>
+        </div>
+        <div class="month-nav">
+          <button class="btn" id="prevM" title="Mois précédent">‹</button>
+          <div class="month-title" id="monthTitle"></div>
+          <button class="btn" id="nextM" title="Mois suivant">›</button>
         </div>
         <div class="cal" id="cal"></div>
       </section>
@@ -530,8 +532,8 @@ function renderCal() {
   const monthKey = Y + '-' + pad(M + 1);
   const monthPnl = state.data.daily.filter(x => x.date.startsWith(monthKey)).reduce((s, x) => s + x.pnl, 0);
   const title = $('#monthTitle'); title.innerHTML = '';
-  const tn = document.createElement('div'); tn.textContent = MONTHS[M] + ' ' + Y;
-  const tp = document.createElement('div'); tp.className = cls(monthPnl); tp.style.fontSize = '12px'; tp.textContent = money(monthPnl, cur, true);
+  const tn = document.createElement('div'); tn.className = 'mt-name'; tn.textContent = MONTHS[M] + ' ' + Y;
+  const tp = document.createElement('div'); tp.className = 'mt-pnl ' + cls(monthPnl); tp.textContent = money(monthPnl, cur, true);
   title.append(tn, tp);
   const cal = $('#cal'); cal.innerHTML = '';
   for (const n of ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim', 'Semaine']) {
