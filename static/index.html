@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASTRA Dashboard</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  :root {
+    --bg: #0a0d14; --panel: #121722; --panel-2: #181e2b; --line: #252d3d;
+    --fg: #e8ebf2; --muted: #8a93a6; --gold: #d4af37; --gold-soft: rgba(212,175,55,.14);
+    --win: #22c55e; --win-soft: rgba(34,197,94,.14); --loss: #ef4444; --loss-soft: rgba(239,68,68,.14);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  button { font: inherit; cursor: pointer; }
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 6px; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--gold), #8a6d1c);
+    display: grid; place-items: center; font-weight: 800; color: #0a0d14; }
+  .brand b { display: block; letter-spacing: .14em; font-size: 13px; }
+  .brand span { color: var(--muted); font-size: 12px; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; padding: 0 6px; }
+  .acc-list { display: flex; flex-direction: column; gap: 4px; }
+  .acc { text-align: left; background: transparent; border: 1px solid transparent; color: var(--fg); border-radius: 9px; padding: 9px 10px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .acc:hover { background: var(--panel-2); }
+  .acc.active { background: var(--gold-soft); border-color: rgba(212,175,55,.4); }
+  .acc small { display: block; color: var(--muted); font-size: 11px; }
+  .acc .bal { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 9px; padding: 9px 12px; }
+  .btn:hover { border-color: var(--gold); }
+  .btn.primary { background: var(--gold); color: #0a0d14; border-color: var(--gold); font-weight: 600; }
+  .btn.ghost { background: transparent; }
+  .btn.danger:hover { border-color: var(--loss); color: var(--loss); }
+  aside .spacer { flex: 1; }
+  main { padding: 24px 28px 40px; min-width: 0; }
+  header.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  header.top h1 { margin: 0; font-size: 22px; font-weight: 650; }
+  header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi .k { color: var(--muted); font-size: 12px; }
+  .kpi .v { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 18px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .pos { color: var(--win); } .neg { color: var(--loss); }
+  #chart { position: relative; }
+  #chart svg { display: block; width: 100%; }
+  .tip { position: absolute; pointer-events: none; background: #0b0f18; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; font-size: 12px; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
+  .month-nav { display: flex; align-items: center; gap: 8px; }
+  .month-nav .btn { padding: 5px 11px; }
+  .month-title { min-width: 150px; text-align: center; font-weight: 600; text-transform: capitalize; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr) 1.1fr; gap: 6px; }
+  .cal .dow { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; text-align: center; padding-bottom: 2px; }
+  .day { min-height: 84px; border-radius: 9px; background: var(--panel-2); border: 1px solid transparent; padding: 7px 8px;
+    display: flex; flex-direction: column; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .day.empty { background: transparent; }
+  .day.today { border-color: rgba(212,175,55,.6); }
+  .day .n { color: var(--muted); font-size: 12px; }
+  .day .p { font-weight: 650; font-size: 14px; text-align: right; }
+  .day .t { color: var(--muted); font-size: 11px; text-align: right; }
+  .day.win { background: var(--win-soft); } .day.win .p { color: var(--win); }
+  .day.loss { background: var(--loss-soft); } .day.loss .p { color: var(--loss); }
+  .week { border-radius: 9px; border: 1px dashed var(--line); padding: 7px 8px; display: flex; flex-direction: column; justify-content: center; text-align: right; font-variant-numeric: tabular-nums; }
+  .week .k { color: var(--muted); font-size: 11px; }
+  .week .p { font-weight: 650; }
+  .notice { background: var(--gold-soft); border: 1px solid rgba(212,175,55,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .notice.error { background: var(--loss-soft); border-color: rgba(239,68,68,.4); }
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .empty-state h2 { color: var(--fg); margin-bottom: 6px; }
+  /* modale de connexion */
+  .modal-bg { position: fixed; inset: 0; background: rgba(4,6,10,.75); display: none; place-items: center; padding: 16px; z-index: 10; }
+  .modal-bg.open { display: grid; }
+  .modal { width: 100%; max-width: 440px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .modal h2 { margin: 0 0 4px; font-size: 19px; }
+  .modal p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input { background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
+  .field input:focus { outline: none; border-color: var(--gold); }
+  .field .hint { font-size: 11px; color: var(--muted); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0 16px; color: var(--muted); }
+  details { margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+  summary { cursor: pointer; margin-bottom: 8px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+  .modal-actions .right { display: flex; gap: 8px; }
+  .modal .err { color: var(--loss); font-size: 13px; margin-bottom: 10px; display: none; }
+  .loading { opacity: .6; pointer-events: none; }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--line); }
+    .cal { grid-template-columns: repeat(7, 1fr); }
+    .week, .cal .dow.wk { display: none; }
+    .day { min-height: 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div><b>ASTRA CAPITAL</b><span>Dashboard des comptes</span></div>
+    </div>
+    <div class="label">Comptes</div>
+    <div class="acc-list" id="accList"></div>
+    <button class="btn primary" id="addBtn">+ Ajouter un compte</button>
+    <div class="spacer"></div>
+    <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div>
+        <h1 id="title">Tous les comptes</h1>
+        <p id="subtitle"></p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="refreshBtn">↻ Actualiser</button>
+      </div>
+    </header>
+    <div id="notices"></div>
+
+    <div id="content">
+      <section class="kpis" id="kpis"></section>
+      <section class="card">
+        <div class="card-head"><h2>Évolution du capital</h2><span class="s" id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
+        <div id="chart"><div class="tip" id="tip"></div></div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>Calendrier des profits et pertes</h2>
+          <div class="month-nav">
+            <button class="btn" id="prevM">‹</button>
+            <div class="month-title" id="monthTitle"></div>
+            <button class="btn" id="nextM">›</button>
+          </div>
+        </div>
+        <div class="cal" id="cal"></div>
+      </section>
+    </div>
+
+    <div class="empty-state" id="emptyState" hidden>
+      <h2>Aucun compte connecté</h2>
+      <p>Ajoute un compte MT5 (FTMO ou autre prop firm) pour voir ton capital et ton calendrier.</p>
+      <button class="btn primary" onclick="openLogin()">Ajouter un compte</button>
+    </div>
+  </main>
+</div>
+
+<div class="modal-bg" id="loginBg">
+  <form class="modal" id="loginForm" autocomplete="off">
+    <h2 id="loginTitle">Connecter un compte</h2>
+    <p class="sub">Compte MetaTrader 5 : FTMO ou toute autre prop firm sur MT5.</p>
+    <div class="err" id="loginErr"></div>
+    <div class="field">
+      <label for="fName">Nom du compte</label>
+      <input id="fName" placeholder="Ex. FTMO 100k Challenge">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fLogin">Numéro de compte</label>
+        <input id="fLogin" inputmode="numeric" required placeholder="Ex. 1510012345">
+      </div>
+      <div class="field">
+        <label for="fServer">Serveur</label>
+        <input id="fServer" required placeholder="Ex. FTMO-Server">
+      </div>
+    </div>
+    <div class="field">
+      <label for="fPass">Mot de passe</label>
+      <input id="fPass" type="password" required>
+      <span class="hint">Utilise le mot de passe <b>investisseur</b> (lecture seule) : il suffit pour le dashboard et ne permet pas de trader.</span>
+    </div>
+    <details>
+      <summary>Options avancées</summary>
+      <div class="field">
+        <label for="fTerm">Chemin du terminal MT5 (si plusieurs MT5 installés)</label>
+        <input id="fTerm" placeholder="C:\Program Files\FTMO MetaTrader 5\terminal64.exe">
+      </div>
+    </details>
+    <label class="check"><input type="checkbox" id="fRemember"> Mémoriser le mot de passe sur ce PC (Gestionnaire d'identification Windows)</label>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="demoBtn">Essayer le mode démo</button>
+      <div class="right">
+        <button type="button" class="btn" id="cancelBtn">Annuler</button>
+        <button type="submit" class="btn primary" id="connectBtn">Se connecter</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const state = { accounts: [], sel: 'all', data: null, month: null, mt5: true, keyring: true };
+const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Erreur inattendue');
+  return j;
+}
+
+function money(v, cur, sign) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  let s;
+  try { s = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: cur || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 2 }).format(Math.abs(v)); }
+  catch (e) { s = Math.abs(v).toFixed(2) + ' ' + (cur || ''); }
+  if (sign) return (v > 0 ? '+' : v < 0 ? '−' : '') + s;
+  return (v < 0 ? '−' : '') + s;
+}
+function compact(v, cur) {
+  const a = Math.abs(v);
+  const sym = { USD: '$', EUR: '€', GBP: '£' }[cur] || '';
+  const n = a >= 1000 ? (a / 1000).toFixed(a >= 10000 ? 1 : 2).replace('.', ',') + 'k' : a.toFixed(0);
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + n + sym;
+}
+const pct = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
+const pad = n => String(n).padStart(2, '0');
+const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+
+function notice(msg, isError) {
+  const el = document.createElement('div');
+  el.className = 'notice' + (isError ? ' error' : '');
+  el.textContent = msg;
+  $('#notices').appendChild(el);
+  setTimeout(() => el.remove(), 9000);
+}
+
+/* ---------- comptes ---------- */
+async function loadState() {
+  const s = await api('/api/state');
+  state.accounts = s.accounts; state.mt5 = s.mt5_available; state.keyring = s.keyring_available;
+  if (!state.keyring) { $('#fRemember').disabled = true; $('#fRemember').parentElement.style.opacity = .5; }
+  if (state.sel !== 'all' && !state.accounts.find(a => a.login === state.sel)) state.sel = 'all';
+  renderAccounts();
+  if (!state.accounts.length) {
+    $('#content').hidden = true; $('#emptyState').hidden = false; $('#refreshBtn').hidden = true;
+    $('#title').textContent = 'Bienvenue'; $('#subtitle').textContent = '';
+    if (!state.mt5) notice("MetaTrader 5 n'est pas détecté sur cet ordinateur : seul le mode démo fonctionne ici. L'application doit tourner sur Windows avec MT5 installé.", true);
+    openLogin();
+    return;
+  }
+  $('#content').hidden = false; $('#emptyState').hidden = true; $('#refreshBtn').hidden = false;
+  await loadData();
+}
+
+function renderAccounts() {
+  const list = $('#accList'); list.innerHTML = '';
+  const items = state.accounts.length > 1 ? [{ login: 'all', name: 'Tous les comptes', server: state.accounts.length + ' comptes' }, ...state.accounts] : state.accounts;
+  if (state.accounts.length === 1) state.sel = state.accounts[0].login;
+  for (const a of items) {
+    const b = document.createElement('button');
+    b.className = 'acc' + (a.login === state.sel ? ' active' : '');
+    const left = document.createElement('div');
+    const nm = document.createElement('div'); nm.textContent = a.name;
+    const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : a.login + ' · ' + a.server);
+    left.append(nm, sm);
+    const bal = document.createElement('span'); bal.className = 'bal';
+    bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
+    b.append(left, bal);
+    b.onclick = () => { state.sel = a.login; state.month = null; renderAccounts(); loadData(); };
+    list.appendChild(b);
+  }
+  $('#removeBtn').hidden = state.sel === 'all' || !state.accounts.length;
+}
+
+async function loadData() {
+  try { state.data = await api('/api/data?login=' + encodeURIComponent(state.sel)); }
+  catch (e) { notice(e.message, true); return; }
+  const acc = state.accounts.find(a => a.login === state.sel);
+  $('#title').textContent = acc ? acc.name : 'Tous les comptes';
+  const fetched = acc ? acc.fetched_at : state.accounts.map(a => a.fetched_at).filter(Boolean).sort()[0];
+  $('#subtitle').textContent = (acc ? (acc.demo ? 'Données fictives' : acc.login + ' · ' + acc.server) : state.data.accounts + ' comptes')
+    + (fetched ? ' · mis à jour le ' + new Date(fetched).toLocaleString('fr-BE', { dateStyle: 'short', timeStyle: 'short' }) : '');
+  if (state.data.mixed_currencies) notice('Les comptes ont des devises différentes : les totaux additionnent les montants sans conversion.', true);
+  if (!state.month) {
+    const last = state.data.daily.length ? state.data.daily[state.data.daily.length - 1].date : null;
+    const d = last ? new Date(last + 'T12:00:00') : new Date();
+    state.month = [d.getFullYear(), d.getMonth()];
+  }
+  renderKpis(); renderChart(); renderCal();
+}
+
+/* ---------- indicateurs ---------- */
+function renderKpis() {
+  const d = state.data, cur = d.currency;
+  const pnl = d.daily.reduce((s, x) => s + x.pnl, 0);
+  const tradeDays = d.daily.filter(x => x.trades > 0 || x.pnl !== 0);
+  const winDays = tradeDays.filter(x => x.pnl > 0).length;
+  const best = tradeDays.reduce((m, x) => !m || x.pnl > m.pnl ? x : m, null);
+  const worst = tradeDays.reduce((m, x) => !m || x.pnl < m.pnl ? x : m, null);
+  const trades = d.daily.reduce((s, x) => s + x.trades, 0);
+  const wins = d.daily.reduce((s, x) => s + x.wins, 0);
+  const now = new Date(); const key = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+  const monthPnl = d.daily.filter(x => x.date.startsWith(key)).reduce((s, x) => s + x.pnl, 0);
+  const floating = d.equity - d.balance;
+  const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) : '';
+  const cards = [
+    ['Capital (balance)', money(d.balance, cur), 'Départ ' + money(d.start_balance, cur), ''],
+    ['Équité', money(d.equity, cur), 'Flottant ' + money(floating, cur, true), cls(floating)],
+    ['Profit / perte total', money(pnl, cur, true), d.start_balance ? pct(pnl / d.start_balance * 100) : '', cls(pnl)],
+    ['Ce mois-ci', money(monthPnl, cur, true), MONTHS[now.getMonth()], cls(monthPnl)],
+    ['Jours gagnants', tradeDays.length ? Math.round(winDays / tradeDays.length * 100) + ' %' : '—', winDays + ' / ' + tradeDays.length + ' jours', ''],
+    ['Trades gagnants', trades ? Math.round(wins / trades * 100) + ' %' : '—', trades + ' trades clôturés', ''],
+    ['Meilleur jour', best ? money(best.pnl, cur, true) : '—', fmtDay(best), best ? cls(best.pnl) : ''],
+    ['Pire jour', worst ? money(worst.pnl, cur, true) : '—', fmtDay(worst), worst ? cls(worst.pnl) : ''],
+  ];
+  const box = $('#kpis'); box.innerHTML = '';
+  for (const [k, v, s, c] of cards) {
+    const el = document.createElement('div'); el.className = 'kpi';
+    const a = document.createElement('div'); a.className = 'k'; a.textContent = k;
+    const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
+    const e = document.createElement('div'); e.className = 's'; e.textContent = s;
+    el.append(a, b, e); box.appendChild(el);
+  }
+}
+
+/* ---------- courbe du capital ---------- */
+function renderChart() {
+  const host = $('#chart'), tip = $('#tip');
+  host.querySelectorAll('svg').forEach(s => s.remove());
+  const d = state.data;
+  let eq = d.start_balance;
+  const pts = d.daily.map(x => ({ date: x.date, v: (eq += x.pnl), pnl: x.pnl }));
+  if (pts.length) pts.unshift({ date: null, v: d.start_balance, pnl: 0 });
+  $('#chartRange').textContent = pts.length > 1 ? 'depuis le ' + new Date(pts[1].date + 'T12:00:00').toLocaleDateString('fr-BE') : '';
+  const W = Math.max(host.clientWidth, 300), H = 260, m = { l: 96, r: 14, t: 12, b: 26 };
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', '100%'); svg.setAttribute('height', H);
+  host.appendChild(svg);
+  const mk = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+  if (pts.length < 2) {
+    const t = mk('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)' }); t.textContent = 'Pas encore de trades sur ce compte'; return;
+  }
+  const vals = pts.map(p => p.v);
+  let lo = Math.min(...vals, d.start_balance), hi = Math.max(...vals, d.start_balance);
+  const padv = (hi - lo) * 0.08 || 100; lo -= padv; hi += padv;
+  const x = i => m.l + (W - m.l - m.r) * i / (pts.length - 1);
+  const y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4;
+    mk('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 });
+    const t = mk('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 });
+    t.textContent = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: d.currency || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(v);
+  }
+  mk('line', { x1: m.l, x2: W - m.r, y1: y(d.start_balance), y2: y(d.start_balance), stroke: 'var(--muted)', 'stroke-dasharray': '4 4', 'stroke-width': 1 });
+  const step = Math.max(1, Math.ceil((pts.length - 1) / 6));
+  for (let i = 1; i < pts.length; i += step) {
+    const t = mk('text', { x: x(i), y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 });
+    t.textContent = new Date(pts[i].date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
+  }
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const defs = mk('defs', {});
+  defs.innerHTML = '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4af37" stop-opacity=".28"/><stop offset="1" stop-color="#d4af37" stop-opacity="0"/></linearGradient>';
+  mk('path', { d: line + ` L${x(pts.length - 1)} ${H - m.b} L${x(0)} ${H - m.b} Z`, fill: 'url(#g)' });
+  mk('path', { d: line, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
+  const dot = mk('circle', { r: 4, fill: 'var(--gold)', stroke: 'var(--bg)', 'stroke-width': 2, opacity: 0 });
+  const hit = mk('rect', { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: 'transparent' });
+  hit.addEventListener('mousemove', ev => {
+    const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * W / r.width;
+    const i = Math.min(pts.length - 1, Math.max(0, Math.round((px - m.l) / (W - m.l - m.r) * (pts.length - 1))));
+    const p = pts[i]; dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.v)); dot.setAttribute('opacity', 1);
+    tip.innerHTML = '';
+    const l1 = document.createElement('div'); l1.textContent = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'long' }) : 'Départ';
+    const l2 = document.createElement('div'); l2.style.fontWeight = 650; l2.textContent = money(p.v, d.currency);
+    tip.append(l1, l2);
+    if (p.date) { const l3 = document.createElement('div'); l3.className = cls(p.pnl); l3.textContent = money(p.pnl, d.currency, true) + ' ce jour'; tip.append(l3); }
+    tip.style.display = 'block';
+    const tx = x(i) * r.width / W; const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(0, tx - tw / 2), r.width - tw) + 'px';
+    tip.style.top = Math.max(0, y(p.v) * r.height / H - tip.offsetHeight - 12) + 'px';
+  });
+  hit.addEventListener('mouseleave', () => { tip.style.display = 'none'; dot.setAttribute('opacity', 0); });
+}
+
+/* ---------- calendrier ---------- */
+function renderCal() {
+  const [Y, M] = state.month, cur = state.data.currency;
+  const byDate = Object.fromEntries(state.data.daily.map(x => [x.date, x]));
+  const monthKey = Y + '-' + pad(M + 1);
+  const monthPnl = state.data.daily.filter(x => x.date.startsWith(monthKey)).reduce((s, x) => s + x.pnl, 0);
+  const title = $('#monthTitle'); title.innerHTML = '';
+  const tn = document.createElement('div'); tn.textContent = MONTHS[M] + ' ' + Y;
+  const tp = document.createElement('div'); tp.className = cls(monthPnl); tp.style.fontSize = '12px'; tp.textContent = money(monthPnl, cur, true);
+  title.append(tn, tp);
+  const cal = $('#cal'); cal.innerHTML = '';
+  for (const n of ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim', 'Semaine']) {
+    const h = document.createElement('div'); h.className = 'dow' + (n === 'Semaine' ? ' wk' : ''); h.textContent = n; cal.appendChild(h);
+  }
+  const first = new Date(Y, M, 1), days = new Date(Y, M + 1, 0).getDate();
+  const offset = (first.getDay() + 6) % 7;
+  const today = new Date(); const todayKey = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+  let week = { pnl: 0, trades: 0, any: false };
+  const totalCells = Math.ceil((offset + days) / 7) * 7;
+  for (let c = 0; c < totalCells; c++) {
+    const dn = c - offset + 1;
+    const cell = document.createElement('div');
+    if (dn < 1 || dn > days) { cell.className = 'day empty'; }
+    else {
+      const key = monthKey + '-' + pad(dn); const v = byDate[key];
+      cell.className = 'day' + (v ? (v.pnl > 0 ? ' win' : v.pnl < 0 ? ' loss' : '') : '') + (key === todayKey ? ' today' : '');
+      const n = document.createElement('div'); n.className = 'n'; n.textContent = dn; cell.appendChild(n);
+      if (v) {
+        const p = document.createElement('div'); p.className = 'p'; p.textContent = compact(v.pnl, cur); p.title = money(v.pnl, cur, true);
+        const t = document.createElement('div'); t.className = 't'; t.textContent = v.trades + (v.trades > 1 ? ' trades' : ' trade');
+        cell.append(p, t);
+        week.pnl += v.pnl; week.trades += v.trades; week.any = true;
+      }
+    }
+    cal.appendChild(cell);
+    if (c % 7 === 6) {
+      const w = document.createElement('div'); w.className = 'week';
+      const k = document.createElement('div'); k.className = 'k'; k.textContent = 'Semaine ' + (Math.floor(c / 7) + 1);
+      const p = document.createElement('div'); p.className = 'p ' + cls(week.pnl); p.textContent = week.any ? money(week.pnl, cur, true) : '—';
+      const t = document.createElement('div'); t.className = 'k'; t.textContent = week.any ? week.trades + ' trades' : '';
+      w.append(k, p, t); cal.appendChild(w);
+      week = { pnl: 0, trades: 0, any: false };
+    }
+  }
+}
+function shiftMonth(delta) {
+  let [Y, M] = state.month; M += delta;
+  if (M < 0) { M = 11; Y--; } if (M > 11) { M = 0; Y++; }
+  state.month = [Y, M]; renderCal();
+}
+
+/* ---------- connexion ---------- */
+let reconnectLogin = null;
+function openLogin(prefill) {
+  reconnectLogin = prefill ? prefill.login : null;
+  $('#loginForm').reset(); $('#loginErr').style.display = 'none';
+  $('#loginTitle').textContent = prefill ? 'Mot de passe requis' : 'Connecter un compte';
+  if (prefill) { $('#fName').value = prefill.name; $('#fLogin').value = prefill.login; $('#fServer').value = prefill.server; }
+  $('#cancelBtn').hidden = !state.accounts.length;
+  $('#loginBg').classList.add('open');
+  (prefill ? $('#fPass') : $('#fName')).focus();
+}
+function closeLogin() { $('#loginBg').classList.remove('open'); }
+
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = $('#loginForm'); form.classList.add('loading');
+  $('#connectBtn').textContent = 'Connexion…';
+  try {
+    const acc = await api('/api/connect', {
+      name: $('#fName').value, login: $('#fLogin').value.trim(), password: $('#fPass').value,
+      server: $('#fServer').value.trim(), terminal: $('#fTerm').value.trim(), remember: $('#fRemember').checked,
+    });
+    closeLogin(); state.sel = acc.login; state.month = null; await loadState();
+  } catch (err) {
+    $('#loginErr').textContent = err.message; $('#loginErr').style.display = 'block';
+  } finally {
+    form.classList.remove('loading'); $('#connectBtn').textContent = 'Se connecter';
+  }
+});
+$('#demoBtn').onclick = async () => { const a = await api('/api/demo', {}); closeLogin(); state.sel = a.login; state.month = null; await loadState(); };
+$('#cancelBtn').onclick = closeLogin;
+$('#addBtn').onclick = () => openLogin();
+$('#prevM').onclick = () => shiftMonth(-1);
+$('#nextM').onclick = () => shiftMonth(1);
+$('#removeBtn').onclick = async () => {
+  const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
+  if (!confirm('Retirer « ' + acc.name + ' » du dashboard ? Le mot de passe mémorisé sera aussi effacé.')) return;
+  await api('/api/remove', { login: acc.login }); state.sel = 'all'; state.month = null; await loadState();
+};
+$('#refreshBtn').onclick = async () => {
+  const btn = $('#refreshBtn'); btn.disabled = true; btn.textContent = 'Actualisation…';
+  try {
+    const r = await api('/api/refresh', { login: state.sel });
+    r.errors.forEach(m => notice(m, true));
+    await loadState();
+    if (r.need_password.length) {
+      const acc = state.accounts.find(a => a.login === r.need_password[0]);
+      if (acc) openLogin(acc);
+    }
+  } catch (e) { notice(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = '↻ Actualiser'; }
+};
+let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
+
+loadState().catch(e => notice(e.message, true));
+</script>
+</body>
+</html>

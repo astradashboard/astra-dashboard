@@ -1,0 +1,76 @@
+ASTRA CAPITAL - DASHBOARD DES COMPTES
+=====================================
+
+Ce que fait l'application
+-------------------------
+- Connexion à un ou plusieurs comptes MetaTrader 5 (FTMO ou toute autre prop firm sur MT5)
+- Choix d'un compte ou de "Tous les comptes" dans la barre de gauche
+- Capital (balance), équité, profit total, résultat du mois, jours et trades gagnants
+- Courbe d'évolution du capital
+- Calendrier mensuel : profit ou perte de chaque jour, nombre de trades, total par semaine
+- Mode démo avec des données fictives pour découvrir l'application
+
+
+Ce qu'il faut sur l'ordinateur
+------------------------------
+1. Windows 10 ou 11
+2. Le terminal MetaTrader 5 de la prop firm installé (pour FTMO : télécharger MT5 depuis l'espace client FTMO)
+   Pas besoin qu'il soit ouvert : l'application le démarre toute seule.
+
+Mac : non compatible (MetaTrader 5 ne donne pas accès à ses données sur Mac).
+
+
+ÉTAPE 1 - Lancer l'application sur ton PC
+-----------------------------------------
+1. Installe Python : https://www.python.org/downloads/
+   IMPORTANT : coche "Add python.exe to PATH" au début de l'installation.
+2. Décompresse ce dossier où tu veux (par exemple dans Documents).
+3. Double-clique sur "Lancer ASTRA Dashboard.bat".
+   La première fois, l'installation prend une minute, ensuite c'est instantané.
+
+Raccourci sur le bureau : clic droit sur "Lancer ASTRA Dashboard.bat" > Afficher plus d'options >
+Envoyer vers > Bureau (créer un raccourci).
+
+
+ÉTAPE 2 - Connecter un compte
+-----------------------------
+- Nom du compte : ce que tu veux (ex. "FTMO 100k Challenge")
+- Numéro de compte : le login MT5
+- Serveur : le nom exact indiqué dans l'espace client (ex. FTMO-Server, FTMO-Demo, FTMO-Server3)
+- Mot de passe : utilise le MOT DE PASSE INVESTISSEUR (lecture seule).
+  Il suffit pour lire le capital et l'historique, et il ne permet pas de passer d'ordres.
+  Sur FTMO, il se trouve dans les identifiants du compte dans l'espace client.
+- "Mémoriser le mot de passe" : enregistré de façon chiffrée dans le Gestionnaire
+  d'identification Windows, pour que le bouton Actualiser fonctionne sans le retaper.
+
+Si tu as plusieurs MT5 installés (FTMO + une autre prop firm), ouvre "Options avancées" et indique
+le chemin du bon terminal64.exe, par exemple :
+C:\Program Files\FTMO MetaTrader 5\terminal64.exe
+
+
+ÉTAPE 3 - Créer le .exe pour tes membres
+----------------------------------------
+1. Double-clique sur "Creer le .exe.bat" (sur ton PC, avec Python installé).
+2. Au bout de quelques minutes, le fichier "dist\ASTRA Dashboard.exe" est créé.
+3. Envoie ce seul fichier à tes membres : ils n'ont pas besoin de Python,
+   seulement de Windows et du MT5 de leur prop firm.
+   Option : place un fichier "icone.ico" (ton logo) dans le dossier avant de créer le .exe.
+
+Note : Windows SmartScreen peut afficher "Windows a protégé votre ordinateur" au premier lancement,
+car le fichier n'est pas signé. Il faut cliquer sur "Informations complémentaires" puis "Exécuter quand même".
+
+
+Confidentialité
+---------------
+- Tout reste sur l'ordinateur de la personne : aucun serveur externe, aucun envoi de données.
+- Les comptes et les résultats sont stockés dans %APPDATA%\ASTRA Dashboard
+- Les mots de passe ne sont jamais écrits dans un fichier (seulement dans le Gestionnaire
+  d'identification Windows si la case est cochée). "Retirer ce compte" les efface.
+
+
+Bon à savoir
+------------
+- Les jours du calendrier suivent l'heure du serveur du broker (comme dans MT5 et FTMO MetriX).
+- Le profit d'un jour inclut commissions et swaps.
+- Le capital de départ correspond aux dépôts du compte (la taille du challenge chez FTMO).
+- MT4, cTrader, DXtrade et Match-Trader ne sont pas pris en charge pour l'instant.

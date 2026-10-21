@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "files": [
+    "app.py",
+    "requirements.txt",
+    "icone.ico",
+    "static/index.html",
+    "static/favicon.png",
+    "Lancer ASTRA Dashboard.bat",
+    "Creer le .exe.bat",
+    "LISEZMOI.txt"
+  ]
+}
