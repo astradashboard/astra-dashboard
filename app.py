@@ -475,6 +475,51 @@ def api_prefs_set():
     return jsonify(prefs)
 
 
+SERVER = {"port": None}
+_remote_cache = {"at": 0.0, "version": None}
+
+
+def remote_version():
+    """Dernière version publiée sur GitHub (gardée 60 s en mémoire)."""
+    import time
+    import urllib.request
+
+    if time.time() - _remote_cache["at"] < 60 and _remote_cache["version"]:
+        return _remote_cache["version"]
+    url = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{UPDATE_BRANCH}/version.json?t={int(time.time())}"
+    req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": APP_NAME})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        v = json.loads(r.read().decode("utf-8")).get("version")
+    _remote_cache.update(at=time.time(), version=v)
+    return v
+
+
+@app.get("/api/update/check")
+def api_update_check():
+    current = _load(VERSION_FILE, {}).get("version", "0")
+    try:
+        latest = remote_version()
+    except Exception:
+        return jsonify({"current": current, "latest": None, "available": False})
+    return jsonify({"current": current, "latest": latest,
+                    "available": _version_tuple(latest) > _version_tuple(current)})
+
+
+@app.post("/api/update/apply")
+def api_update_apply():
+    import subprocess
+
+    if not check_for_update():
+        status = _load(UPDATE_STATUS_FILE, {})
+        if status.get("ok") is False:
+            return jsonify({"error": f"Mise à jour impossible ({status.get('step')}) : {status.get('error')}"}), 500
+        return jsonify({"error": "Aucune nouvelle version à installer."}), 400
+    # relancer la nouvelle version sur le même port : la fenêtre ouverte se recharge simplement
+    subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj", f"--relance={SERVER['port']}"], cwd=APP_DIR)
+    threading.Timer(0.6, lambda: os._exit(0)).start()
+    return jsonify({"ok": True, "version": _load(VERSION_FILE, {}).get("version")})
+
+
 @app.get("/api/version")
 def api_version():
     return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?"),
@@ -922,8 +967,30 @@ def restart_updated():
     subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj"], cwd=APP_DIR)
 
 
+def serve_only(port):
+    """Relance après une mise à jour depuis l'app : même port, pas de nouvelle fenêtre."""
+    import time
+
+    deadline = time.time() + 20
+    while time.time() < deadline:  # attendre que l'ancienne version libère le port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_:
+            try:
+                s_.bind(("127.0.0.1", port))
+                break
+            except OSError:
+                time.sleep(0.3)
+    SERVER["port"] = port
+    threading.Thread(target=lifetime_watchdog, daemon=True).start()
+    threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
+    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+
+
 def main():
     check = "--sans-maj" not in sys.argv
+    relance = next((a for a in sys.argv if a.startswith("--relance=")), None)
+    if relance:
+        serve_only(int(relance.split("=", 1)[1]))
+        return
 
     if already_running():
         # Une version ouverte tourne déjà : si une mise à jour existe, on la remplace.
@@ -941,6 +1008,7 @@ def main():
         return
 
     port = free_port(PREFERRED_PORT)
+    SERVER["port"] = port
     url = f"http://127.0.0.1:{port}/"
     server = threading.Thread(
         target=lambda: app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False),

@@ -95,6 +95,10 @@
   .kpi:hover .kpi-x { opacity: 1; }
   .kpi-x:hover { color: var(--loss); border-color: var(--loss); }
   .kpi.empty-kpi { cursor: default; color: var(--muted); }
+  .update-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: var(--gold-soft); border: 1px solid rgba(196,138,69,.5); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+  .update-bar b { color: var(--gold); }
+  .update-bar .btn { padding: 6px 14px; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -192,6 +196,7 @@
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
+    <div id="updateBar"></div>
     <div id="notices"></div>
 
     <div id="content">
@@ -950,6 +955,35 @@ $('#refreshBtn').onclick = async () => {
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
 loadState().catch(e => notice(e.message, true));
+// ---------- mise à jour depuis l'app ouverte ----------
+async function checkUpdate() {
+  let u; try { u = await api('/api/update/check'); } catch (e) { return; }
+  const box = $('#updateBar');
+  if (!u.available) { box.innerHTML = ''; return; }
+  if (box.dataset.shown === u.latest) return;
+  box.dataset.shown = u.latest; box.innerHTML = '';
+  const bar = document.createElement('div'); bar.className = 'update-bar';
+  const t = document.createElement('span'); t.append('Nouvelle version ');
+  const b = document.createElement('b'); b.textContent = u.latest; t.append(b, ' disponible (tu as la ' + u.current + ').');
+  const btn = document.createElement('button'); btn.className = 'btn primary'; btn.textContent = 'Mettre à jour maintenant';
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Mise à jour…';
+    try {
+      const r = await api('/api/update/apply', {});
+      t.textContent = 'Installation de la version ' + r.version + '… la fenêtre va se recharger.';
+      const until = Date.now() + 60000;
+      const wait = async () => {
+        try { const v = await api('/api/version'); if (v.version === r.version) { location.reload(); return; } } catch (e) {}
+        if (Date.now() < until) setTimeout(wait, 1000);
+        else t.textContent = 'La mise à jour est installée : ferme la fenêtre et relance l\'app.';
+      };
+      setTimeout(wait, 1500);
+    } catch (e) { btn.disabled = false; btn.textContent = 'Réessayer'; notice(e.message, true); }
+  };
+  bar.append(t, btn); box.appendChild(bar);
+}
+checkUpdate(); setInterval(checkUpdate, 120000);
+
 // signes de vie : l'application se ferme quand cette fenêtre est fermée
 const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
 ping(); setInterval(ping, 20000);
