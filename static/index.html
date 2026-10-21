@@ -622,7 +622,7 @@ const METRICS = [
     f: (d, s) => [money(s.monthPnl, d.currency, true), MONTHS[new Date().getMonth()], cls(s.monthPnl)] },
   { id: 'winDays', label: 'Jours gagnants', help: '% des jours tradés en profit',
     f: (d, s) => [s.tradeDays.length ? Math.round(s.winDays.length / s.tradeDays.length * 100) + ' %' : '—', s.winDays.length + ' / ' + s.tradeDays.length + ' jours', ''] },
-  { id: 'winTrades', label: 'Trades gagnants', help: '% des trades clôturés en profit',
+  { id: 'winTrades', label: 'Taux de réussite', help: '% des trades clôturés en profit',
     f: (d, s) => [s.trades ? Math.round(s.wins / s.trades * 100) + ' %' : '—', nb(s.trades) + ' trades clôturés', ''] },
   { id: 'best', label: 'Meilleur jour', help: 'Plus gros gain sur une journée',
     f: (d, s) => [s.best ? money(s.best.pnl, d.currency, true) : '—', fmtDay(s.best), s.best ? cls(s.best.pnl) : ''] },
