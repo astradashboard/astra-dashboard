@@ -57,6 +57,19 @@
   .pick .mv:disabled { opacity: .3; cursor: default; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
   .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi { position: relative; cursor: grab; transition: opacity .15s, border-color .15s; }
+  .kpi:hover { border-color: #34405a; }
+  .kpi.dragging { opacity: .35; cursor: grabbing; }
+  .kpi.drop-before { box-shadow: -4px 0 0 -1px var(--gold); }
+  .kpi.drop-after { box-shadow: 4px 0 0 -1px var(--gold); }
+  .kpi-x { position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--muted); font-size: 14px; line-height: 1; padding: 0; opacity: 0; transition: opacity .15s; }
+  .kpi:hover .kpi-x { opacity: 1; }
+  .kpi-x:hover { color: var(--loss); border-color: var(--loss); }
+  .kpi.empty-kpi { cursor: default; color: var(--muted); }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+  .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
   .kpi .k { color: var(--muted); font-size: 12px; }
   .kpi .v { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
   .kpi .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
@@ -154,7 +167,7 @@
     <div id="notices"></div>
 
     <div id="content">
-      <div class="kpis-head"><h2>Indicateurs</h2><button class="btn" id="customBtn">⚙ Personnaliser</button></div>
+      <div class="kpis-head"><h2>Indicateurs</h2><button class="btn" id="customBtn">＋ Ajouter / ⚙ Personnaliser</button></div>
       <section class="kpis" id="kpis"></section>
       <section class="card">
         <div class="card-head">
@@ -432,21 +445,66 @@ const METRICS = [
 const DEFAULT_KPIS = ['balance', 'equity', 'total', 'month', 'winDays', 'winTrades', 'best', 'worst'];
 state.kpis = DEFAULT_KPIS.slice();
 
+function savePrefs() {
+  return api('/api/prefs', { kpis: state.kpis }).catch(e => notice('Choix non enregistré : ' + e.message, true));
+}
+let toastTimer;
+function toast(msg, undo) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast';
+  const sp = document.createElement('span'); sp.textContent = msg; t.appendChild(sp);
+  if (undo) { const b = document.createElement('button'); b.textContent = 'Annuler'; b.onclick = () => { t.remove(); undo(); }; t.appendChild(b); }
+  document.body.appendChild(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 6000);
+}
+function removeKpi(id) {
+  const before = state.kpis.slice();
+  const m = METRICS.find(x => x.id === id);
+  state.kpis = state.kpis.filter(k => k !== id); renderKpis(); savePrefs();
+  toast('« ' + (m ? m.label : id) + ' » retiré', () => { state.kpis = before; renderKpis(); savePrefs(); });
+}
+
+let dragId = null;
 function renderKpis() {
   const d = state.data, s = stats(d);
   const box = $('#kpis'); box.innerHTML = '';
   for (const id of state.kpis) {
     const m = METRICS.find(x => x.id === id); if (!m) continue;
     const [v, sub, c] = m.f(d, s);
-    const el = document.createElement('div'); el.className = 'kpi'; el.title = m.help;
+    const el = document.createElement('div'); el.className = 'kpi'; el.title = m.help + ' — glisser pour déplacer';
+    el.draggable = true; el.dataset.id = id;
     const a = document.createElement('div'); a.className = 'k'; a.textContent = m.label;
     const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
     const e = document.createElement('div'); e.className = 's'; e.textContent = sub;
-    el.append(a, b, e); box.appendChild(el);
+    const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cet indicateur';
+    x.draggable = false;
+    x.onclick = ev => { ev.stopPropagation(); removeKpi(id); };
+    el.append(a, b, e, x);
+
+    el.addEventListener('dragstart', ev => {
+      dragId = id; el.classList.add('dragging');
+      ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', id); } catch (_) {}
+    });
+    el.addEventListener('dragend', () => { dragId = null; box.querySelectorAll('.kpi').forEach(k => k.classList.remove('dragging', 'drop-before', 'drop-after')); });
+    el.addEventListener('dragover', ev => {
+      if (!dragId || dragId === id) return;
+      ev.preventDefault(); ev.dataTransfer.dropEffect = 'move';
+      const r = el.getBoundingClientRect(); const after = ev.clientX > r.left + r.width / 2;
+      box.querySelectorAll('.kpi').forEach(k => k.classList.remove('drop-before', 'drop-after'));
+      el.classList.add(after ? 'drop-after' : 'drop-before');
+    });
+    el.addEventListener('drop', ev => {
+      ev.preventDefault();
+      if (!dragId || dragId === id) return;
+      const after = el.classList.contains('drop-after');
+      const list = state.kpis.filter(k => k !== dragId);
+      list.splice(list.indexOf(id) + (after ? 1 : 0), 0, dragId);
+      state.kpis = list; dragId = null; renderKpis(); savePrefs();
+    });
+    box.appendChild(el);
   }
   if (!box.children.length) {
-    const el = document.createElement('div'); el.className = 'kpi'; el.style.color = 'var(--muted)';
-    el.textContent = 'Aucun indicateur choisi : clique sur « Personnaliser ».'; box.appendChild(el);
+    const el = document.createElement('div'); el.className = 'kpi empty-kpi';
+    el.textContent = 'Aucun indicateur : clique sur « Personnaliser » pour en ajouter.'; box.appendChild(el);
   }
 }
 
@@ -483,7 +541,7 @@ $('#customSave').onclick = async () => {
   state.kpis = draft.filter(x => x.on).map(x => x.id);
   $('#customBg').classList.remove('open');
   if (state.data) renderKpis();
-  try { await api('/api/prefs', { kpis: state.kpis }); } catch (e) { notice('Choix non enregistré : ' + e.message, true); }
+  savePrefs();
 };
 api('/api/prefs').then(p => { if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); } }).catch(() => {});
 
