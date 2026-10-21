@@ -289,30 +289,75 @@ def wait_for_full_history(info, max_wait=45):
         time.sleep(0.5)
 
 
-def closed_trades(deals):
-    """Résultat net de chaque position clôturée (commissions et swaps compris), à sa date de clôture.
-    Sert à calculer les R avec le risque par trade choisi par l'utilisateur."""
+def _iso(ts):
+    return dt.datetime.utcfromtimestamp(ts).isoformat(timespec="seconds")  # heure du serveur, comme MT5
+
+
+def closed_trades(deals, orders=None):
+    """Une ligne par position clôturée, avec tout ce qu'affiche le journal :
+    sens, volume, prix moyens d'entrée et de sortie, SL/TP, frais, résultat brut et net, heures."""
     entries = {mt5.DEAL_ENTRY_IN}
     exits = {getattr(mt5, n) for n in ("DEAL_ENTRY_OUT", "DEAL_ENTRY_INOUT", "DEAL_ENTRY_OUT_BY") if hasattr(mt5, n)}
     trade_types = {mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL}
-    positions = defaultdict(lambda: {"opened": False, "net": 0.0, "vol_in": 0.0, "vol_out": 0.0, "close": None})
+    reason_sl = getattr(mt5, "DEAL_REASON_SL", None)
+    reason_tp = getattr(mt5, "DEAL_REASON_TP", None)
+    orders = {o.ticket: o for o in (orders or [])}
+
+    positions = defaultdict(lambda: {"first": None, "in_vol": 0.0, "in_px": 0.0, "out_vol": 0.0, "out_px": 0.0,
+                                     "open": None, "close": None, "g": 0.0, "c": 0.0, "sw": 0.0, "fee": 0.0,
+                                     "exit_reason": None, "exit_price": None})
     for d in deals:
         if d.type not in trade_types or not d.position_id:
             continue
         p = positions[d.position_id]
-        p["net"] += d.profit + d.commission + d.swap + getattr(d, "fee", 0.0)
+        p["g"] += d.profit
+        p["c"] += d.commission
+        p["sw"] += d.swap
+        p["fee"] += getattr(d, "fee", 0.0)
         if d.entry in entries:
-            p["opened"] = True
-            p["vol_in"] += d.volume
+            if p["first"] is None:
+                p["first"] = d
+            p["in_vol"] += d.volume
+            p["in_px"] += d.price * d.volume
+            p["open"] = d.time if p["open"] is None else min(p["open"], d.time)
         elif d.entry in exits:
-            p["vol_out"] += d.volume
-            p["close"] = d.time if p["close"] is None else max(p["close"], d.time)
+            p["out_vol"] += d.volume
+            p["out_px"] += d.price * d.volume
+            if p["close"] is None or d.time >= p["close"]:
+                p["close"] = d.time
+                p["exit_reason"] = getattr(d, "reason", None)
+                p["exit_price"] = d.price
+
     trades = []
-    for p in positions.values():
-        if p["close"] is None or (p["opened"] and p["vol_out"] + 1e-9 < p["vol_in"]):
+    for pid, p in positions.items():
+        if p["close"] is None or (p["first"] is not None and p["out_vol"] + 1e-9 < p["in_vol"]):
             continue  # position encore ouverte
-        trades.append({"d": dt.datetime.utcfromtimestamp(p["close"]).date().isoformat(), "n": round(p["net"], 2)})
-    trades.sort(key=lambda t: t["d"])
+        first = p["first"]
+        net = p["g"] + p["c"] + p["sw"] + p["fee"]
+        t = {"d": dt.datetime.utcfromtimestamp(p["close"]).date().isoformat(), "n": round(net, 2),
+             "id": int(pid), "ct": _iso(p["close"]), "g": round(p["g"], 2), "c": round(p["c"], 2),
+             "sw": round(p["sw"], 2), "fee": round(p["fee"], 2)}
+        if first is not None:
+            sl = tp = 0.0
+            order = orders.get(first.order)
+            if order is not None:
+                sl, tp = getattr(order, "sl", 0.0) or 0.0, getattr(order, "tp", 0.0) or 0.0
+            if not sl and p["exit_reason"] == reason_sl:
+                sl = p["exit_price"]  # stop touché : son prix est le SL final
+            if not tp and p["exit_reason"] == reason_tp:
+                tp = p["exit_price"]
+            t.update({
+                "s": first.symbol,
+                "side": "buy" if first.type == mt5.DEAL_TYPE_BUY else "sell",
+                "v": round(p["in_vol"], 2),
+                "ot": _iso(p["open"]),
+                "op": round(p["in_px"] / p["in_vol"] if p["in_vol"] else first.price, 5),
+                "cp": round(p["out_px"] / p["out_vol"], 5) if p["out_vol"] else None,
+                "sl": sl or None,
+                "tp": tp or None,
+            })
+        trades.append(t)
+    trades.sort(key=lambda t: t["ct"])
     return trades
 
 
@@ -359,6 +404,11 @@ def fetch_mt5(acc, password):
                 if info is None:
                     raise RuntimeError("Impossible de lire les informations du compte.")
                 deals = wait_for_full_history(info)
+                try:  # ordres d'ouverture : SL et TP des trades
+                    orders = list(mt5.history_orders_get(dt.datetime(2000, 1, 1),
+                                                         dt.datetime.now() + dt.timedelta(days=2)) or [])
+                except Exception:
+                    orders = []
             finally:
                 mt5.shutdown()
 
@@ -382,7 +432,7 @@ def fetch_mt5(acc, password):
                 daily[day]["losses"] += 1
 
     try:
-        trades = closed_trades(deals)
+        trades = closed_trades(deals, orders)
     except Exception:
         trades = None  # bonus : ne doit jamais bloquer la lecture du compte
 
@@ -417,7 +467,22 @@ def make_demo_data(size=100000.0):
             if not parts:
                 parts = [pnl]
             adj = (pnl - sum(parts)) / len(parts)
-            demo_trades.extend({"d": day.isoformat(), "n": round(x + adj, 2)} for x in parts)
+            for x in parts:
+                net = round(x + adj, 2)
+                side = rnd.choice(("buy", "sell"))
+                vol = round(rnd.uniform(2, 12), 2)
+                op = round(rnd.uniform(19500, 21500), 2)
+                move = round(net / (vol * 1.0) / 1.0, 2) if vol else 0  # 1 lot US100 ~ 1 $/point ici
+                cp = round(op + move if side == "buy" else op - move, 2)
+                risk_pts = round(rnd.uniform(25, 60), 2)
+                sl = round(op - risk_pts if side == "buy" else op + risk_pts, 2)
+                opened = dt.datetime.combine(day, dt.time(15, 30)) + dt.timedelta(minutes=rnd.randint(0, 240))
+                closed = opened + dt.timedelta(seconds=rnd.randint(90, 5400))
+                demo_trades.append({
+                    "d": day.isoformat(), "n": net, "id": 170000000 + len(demo_trades), "s": "US100.cash",
+                    "side": side, "v": vol, "ot": opened.isoformat(timespec="seconds"),
+                    "ct": closed.isoformat(timespec="seconds"), "op": op, "cp": cp, "sl": sl, "tp": None,
+                    "g": net, "c": 0.0, "sw": 0.0, "fee": 0.0})
             balance += pnl
         day += dt.timedelta(days=1)
     return {

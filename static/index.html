@@ -99,6 +99,48 @@
     background: var(--gold-soft); border: 1px solid rgba(196,138,69,.5); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
   .update-bar b { color: var(--gold); }
   .update-bar .btn { padding: 6px 14px; }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav button { text-align: left; background: transparent; border: 1px solid transparent; color: var(--fg); border-radius: 9px;
+    padding: 9px 10px; display: flex; gap: 10px; align-items: center; }
+  .nav button:hover { background: var(--panel-2); }
+  .nav button.active { background: var(--gold-soft); border-color: rgba(196,138,69,.4); }
+  .nav .ic { width: 18px; text-align: center; color: var(--gold); }
+  /* journal */
+  .j-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .j-tools select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; font: inherit; }
+  .j-tools .sum { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .j-tools .sum b { font-weight: 650; }
+  .j-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .j-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em;
+    padding: 0 14px 8px; border-bottom: 1px solid var(--line); }
+  .j-table th:last-child, .j-table td:last-child { text-align: right; }
+  .j-table td { padding: 13px 14px; border-bottom: 1px solid var(--line); }
+  .j-table tr.row { cursor: pointer; }
+  .j-table tr.row:hover td { background: var(--panel-2); }
+  .j-table .sym { font-weight: 600; }
+  .j-table .muted { color: var(--muted); font-size: 12px; }
+  .j-table .pnl { font-weight: 650; }
+  .j-day td { background: transparent; color: var(--muted); font-size: 12px; padding: 16px 14px 6px; border-bottom: none; cursor: default; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 7px; font-size: 12px; font-weight: 600; }
+  .badge.buy { background: rgba(34,197,94,.16); color: var(--win); }
+  .badge.sell { background: rgba(239,68,68,.16); color: var(--loss); }
+  .j-back { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .j-back .btn { width: 38px; height: 38px; padding: 0; font-size: 20px; }
+  .j-back h2 { margin: 0; font-size: 20px; }
+  .j-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px 24px; margin-bottom: 22px; }
+  .j-grid .k { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .j-grid .v { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .j-grid .v small { display: block; font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .j-sec { margin-bottom: 18px; }
+  .j-sec h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; display: flex; gap: 8px; align-items: center; }
+  .j-sec h3 .ic { color: var(--gold); }
+  .j-rows { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .j-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .j-rows div:last-child { border-bottom: none; }
+  .j-rows span:first-child { color: var(--muted); }
+  .j-rows span:last-child { font-weight: 600; text-align: right; }
+  .j-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 18px; }
+  .linklike { background: none; border: none; color: var(--gold); padding: 0; font: inherit; font-weight: 600; text-decoration: underline; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -184,6 +226,11 @@
     <div class="label">Comptes</div>
     <div class="acc-list" id="accList"></div>
     <button class="btn primary" id="addBtn">+ Ajouter un compte</button>
+    <div class="label">Pages</div>
+    <nav class="nav" id="nav">
+      <button data-page="dash" class="active"><span class="ic">▦</span>Tableau de bord</button>
+      <button data-page="journal"><span class="ic">✎</span>Journal de trading</button>
+    </nav>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
     <div class="label" id="appVersion" style="text-align:center"></div>
@@ -250,6 +297,8 @@
         <div class="cal" id="cal"></div>
       </section>
     </div>
+
+    <div id="journal" hidden></div>
 
     <div class="empty-state" id="emptyState" hidden>
       <img class="hero-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
@@ -393,13 +442,13 @@ async function loadState() {
   if (state.sel !== 'all' && !state.accounts.find(a => a.login === state.sel)) state.sel = 'all';
   renderAccounts();
   if (!state.accounts.length) {
-    $('#content').hidden = true; $('#emptyState').hidden = false; $('#refreshBtn').hidden = true;
+    $('#content').hidden = true; $('#journal').hidden = true; $('#emptyState').hidden = false; $('#refreshBtn').hidden = true;
     $('#title').textContent = 'Bienvenue'; $('#subtitle').textContent = '';
     if (!state.mt5) notice("MetaTrader 5 n'est pas détecté sur cet ordinateur : seul le mode démo fonctionne ici. L'application doit tourner sur Windows avec MT5 installé.", true);
     openLogin();
     return;
   }
-  $('#content').hidden = false; $('#emptyState').hidden = true; $('#refreshBtn').hidden = false;
+  $('#emptyState').hidden = true; $('#refreshBtn').hidden = false; showPage();
   await loadData();
 }
 
@@ -417,7 +466,7 @@ function renderAccounts() {
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
     b.append(left, bal);
-    b.onclick = () => { if (b.dataset.editing) return; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     if (a.login !== 'all') {
       b.title = 'Clic droit : renommer, actualiser ou supprimer';
       b.addEventListener('contextmenu', ev => { ev.preventDefault(); openAccountMenu(a, ev.clientX, ev.clientY, b); });
@@ -538,6 +587,7 @@ async function loadData() {
     state.month = [d.getFullYear(), d.getMonth()];
   }
   renderHero(); renderPeriod(); renderKpis(); renderChart(); renderCal();
+  showPage();
 }
 
 /* ---------- indicateurs ---------- */
@@ -1056,6 +1106,165 @@ $('#refreshBtn').onclick = async () => {
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
 loadState().catch(e => notice(e.message, true));
+// ---------- navigation entre les pages ----------
+state.page = 'dash'; state.jTrade = null; state.jMonth = 'all'; state.jFilter = 'all';
+function showPage() {
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.page === state.page));
+  const hasAcc = state.accounts.length > 0;
+  $('#content').hidden = !hasAcc || state.page !== 'dash';
+  $('#journal').hidden = !hasAcc || state.page !== 'journal';
+  if (state.page === 'journal' && hasAcc) renderJournal();
+}
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
+  state.page = b.dataset.page; state.jTrade = null; showPage(); window.scrollTo(0, 0);
+});
+
+// ---------- journal de trading ----------
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const fmtPx = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
+const fmtPts = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('fr-BE', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const dtObj = iso => new Date(iso);
+const fmtDate = iso => dtObj(iso).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fmtTime = iso => dtObj(iso).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const fmtLong = iso => dtObj(iso).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + fmtTime(iso);
+function fmtDuration(a, b) {
+  let sec = Math.max(0, Math.round((dtObj(b) - dtObj(a)) / 1000));
+  const d = Math.floor(sec / 86400); sec %= 86400; const h = Math.floor(sec / 3600); sec %= 3600; const m = Math.floor(sec / 60); sec %= 60;
+  if (d) return d + 'j ' + h + 'h'; if (h) return h + 'h ' + pad(m) + 'm'; if (m) return m + 'm ' + pad(sec) + 's'; return sec + 's';
+}
+const fmtR2 = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2).replace('.', ',') + ' R';
+const sideLabel = t => t.side === 'buy' ? '↗ Achat · Long' : '↘ Vente · Short';
+const pts = (t, price) => price === null || price === undefined || t.op === undefined ? null : (t.side === 'buy' ? price - t.op : t.op - price);
+
+function journalTrades() {
+  return (state.data && state.data.trades || []).filter(t => t.a === state.sel).slice().sort((a, b) => (b.ct || b.d).localeCompare(a.ct || a.d));
+}
+
+function renderJournal() {
+  const box = $('#journal'); box.innerHTML = '';
+  const accs = state.accounts.filter(a => !a.demo || true);
+  if (state.sel === 'all') {
+    const card = el('div', 'card');
+    card.append(el('h2', null, 'Journal de trading'));
+    const p = el('p', null, 'Le journal est propre à chaque compte : choisis le compte à afficher.'); p.style.color = 'var(--muted)';
+    const row = el('div'); row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    for (const a of accs) { const b = el('button', 'btn', a.name); b.onclick = () => { state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); }; row.appendChild(b); }
+    card.append(p, row); box.appendChild(card); return;
+  }
+  const d = state.data; if (!d) return;
+  const acc = (d.per_account || {})[state.sel] || {};
+  const all = journalTrades();
+  if (state.jTrade) {
+    const t = all.find(x => String(x.id) === String(state.jTrade));
+    if (t) return renderTradeDetail(box, t, acc, d.currency);
+    state.jTrade = null;
+  }
+  if (!acc.has_trades || (all.length && all[0].s === undefined)) {
+    const n = el('div', 'notice', 'Clique sur « Actualiser » en haut à droite pour charger le détail de tes trades dans le journal.');
+    box.appendChild(n);
+    if (!all.length) return;
+  }
+  // filtres
+  const tools = el('div', 'j-tools');
+  const months = [...new Set(all.map(t => t.d.slice(0, 7)))];
+  const ms = el('select');
+  ms.append(new Option('Tous les mois', 'all'));
+  for (const k of months) { const mn = MONTHS[Number(k.slice(5)) - 1]; ms.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
+  if (state.jMonth !== 'all' && !months.includes(state.jMonth)) state.jMonth = 'all';
+  ms.value = state.jMonth; ms.onchange = () => { state.jMonth = ms.value; renderJournal(); };
+  const fs = el('select');
+  fs.append(new Option('Tous les trades', 'all'), new Option('Gagnants', 'win'), new Option('Perdants', 'loss'));
+  fs.value = state.jFilter; fs.onchange = () => { state.jFilter = fs.value; renderJournal(); };
+  const list = all.filter(t => (state.jMonth === 'all' || t.d.startsWith(state.jMonth))
+    && (state.jFilter === 'all' || (state.jFilter === 'win' ? t.n > 0 : t.n < 0)));
+  const total = list.reduce((s, t) => s + t.n, 0);
+  const sum = el('div', 'sum'); sum.append(list.length + ' trade' + (list.length > 1 ? 's' : '') + ' · ');
+  const tb = el('b', cls(total), money(total, d.currency, true)); sum.append(tb);
+  tools.append(ms, fs, sum); box.appendChild(tools);
+
+  const card = el('div', 'card'); card.style.padding = '8px 4px';
+  if (!list.length) { const p = el('p', null, 'Aucun trade pour ce filtre.'); p.style.cssText = 'color:var(--muted);padding:12px 14px'; card.appendChild(p); box.appendChild(card); return; }
+  const table = el('table', 'j-table');
+  const thead = el('thead'); const hr = el('tr');
+  ['Date', 'Symbole', 'PnL'].forEach(h => hr.appendChild(el('th', null, h))); thead.appendChild(hr); table.appendChild(thead);
+  const tbody = el('tbody'); let lastDay = null;
+  for (const t of list) {
+    if (t.d !== lastDay) {
+      lastDay = t.d;
+      const dayPnl = list.filter(x => x.d === t.d).reduce((s, x) => s + x.n, 0);
+      const tr = el('tr', 'j-day'); const td = el('td'); td.colSpan = 3;
+      td.append(new Date(t.d + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ');
+      td.append(el('span', cls(dayPnl), money(dayPnl, d.currency, true))); tr.appendChild(td); tbody.appendChild(tr);
+    }
+    const tr = el('tr', 'row'); tr.onclick = () => { state.jTrade = t.id; renderJournal(); window.scrollTo(0, 0); };
+    const c1 = el('td'); c1.append(t.ct ? fmtDate(t.ct) : new Date(t.d + 'T12:00:00').toLocaleDateString('fr-BE'));
+    if (t.ct) { c1.append(' '); c1.append(el('span', 'muted', fmtTime(t.ct).slice(0, 5))); }
+    const c2 = el('td'); c2.append(el('span', 'sym', t.s || '—'));
+    if (t.side) { c2.append(' '); c2.append(el('span', 'badge ' + t.side, t.side === 'buy' ? 'Long' : 'Short')); }
+    const c3 = el('td', 'pnl ' + cls(t.n), money(t.n, d.currency, true));
+    tr.append(c1, c2, c3); tbody.appendChild(tr);
+  }
+  table.appendChild(tbody); card.appendChild(table); box.appendChild(card);
+}
+
+function renderTradeDetail(box, t, acc, cur) {
+  const back = el('div', 'j-back');
+  const bb = el('button', 'btn', '‹'); bb.title = 'Retour au journal'; bb.onclick = () => { state.jTrade = null; renderJournal(); };
+  back.append(bb, el('h2', null, 'Trade clôturé ' + (t.id || ''))); box.appendChild(back);
+  if (t.s === undefined) { box.appendChild(el('div', 'notice', 'Clique sur « Actualiser » pour charger le détail de ce trade.')); }
+
+  const risk = riskAmount(acc);
+  const pctV = acc.start_balance ? t.n / acc.start_balance * 100 : null;
+  const rV = risk ? t.n / risk : null;
+  const move = pts(t, t.cp);
+
+  const grid = el('div', 'j-grid');
+  const cell = (k, v, sub, c) => { const g = el('div'); g.append(el('div', 'k', k)); const vv = el('div', 'v ' + (c || ''), v); if (sub) vv.append(sub); g.append(vv); grid.appendChild(g); return vv; };
+  const typ = cell('Type', String(t.id || '—')); if (t.side) { const sm = el('small'); sm.append(el('span', 'badge ' + t.side, sideLabel(t))); typ.append(sm); }
+  if (t.ot) cell('Ouverture', fmtDate(t.ot), el('small', null, fmtTime(t.ot)));
+  if (t.v !== undefined) cell('Volume (lots)', t.v.toLocaleString('fr-BE', { maximumFractionDigits: 2 }));
+  cell('Symbole', t.s || '—');
+  cell('PnL', money(t.n, cur, true), null, cls(t.n));
+  if (move !== null) cell('Points', fmtPts(move), null, cls(move));
+  cell('Profit en %', pctV === null ? '—' : pct(pctV), null, pctV === null ? '' : cls(pctV));
+  const rCell = cell('Profit en R', rV === null ? '' : fmtR2(rV), null, rV === null ? '' : cls(rV));
+  if (rV === null) {
+    const l = el('button', 'linklike', 'Définir le risque');
+    l.onclick = () => { const a = state.accounts.find(x => x.login === state.sel); if (a) openRisk(a); };
+    rCell.appendChild(l);
+  }
+  if (t.ot && t.ct) cell('Durée', fmtDuration(t.ot, t.ct));
+  box.appendChild(grid);
+
+  const section = (icon, title, rows) => {
+    const sec = el('div', 'j-sec'); const h = el('h3'); h.append(el('span', 'ic', icon), title); sec.appendChild(h);
+    const r = el('div', 'j-rows');
+    for (const [k, v, c] of rows) { const row = el('div'); row.append(el('span', null, k), el('span', c || '', v)); r.appendChild(row); }
+    sec.appendChild(r); return sec;
+  };
+  const cols = el('div', 'j-cols'), left = el('div'), right = el('div');
+  if (t.op !== undefined) left.appendChild(section('$', 'Prix', [
+    ['Type', t.side === 'buy' ? 'Achat (Long)' : 'Vente (Short)', t.side === 'buy' ? 'pos' : 'neg'],
+    ['Ouverture', fmtPx(t.op)], ['Fermeture', fmtPx(t.cp)]]));
+  if (t.op !== undefined) {
+    const slP = pts(t, t.sl), tpP = pts(t, t.tp);
+    left.appendChild(section('⛨', 'Protection du trade', [
+      ['SL', t.sl ? fmtPx(t.sl) : 'Aucun'], ['SL en points', slP === null ? '—' : fmtPts(slP)],
+      ['TP', t.tp ? fmtPx(t.tp) : 'Aucun'], ['TP en points', tpP === null ? '—' : fmtPts(tpP)]]));
+  }
+  const fees = (t.c || 0) + (t.sw || 0) + (t.fee || 0);
+  const res = [['Profit brut', money(t.g !== undefined ? t.g : t.n, cur, true), cls(t.g !== undefined ? t.g : t.n)],
+    ['Swap', money(t.sw || 0, cur, true)], ['Commission', money(t.c || 0, cur, true)]];
+  if (t.fee) res.push(['Autres frais', money(t.fee, cur, true)]);
+  res.push(['Frais au total', money(fees, cur, true), fees < 0 ? 'neg' : ''],
+    ['Profit net', money(t.n, cur, true), cls(t.n)],
+    ['Profit en % (du capital initial)', pctV === null ? '—' : pct(pctV), pctV === null ? '' : cls(pctV)],
+    ['Profit en R' + (risk ? ' (1 R = ' + money(risk, cur) + ')' : ''), rV === null ? 'Risque non défini' : fmtR2(rV), rV === null ? '' : cls(rV)]);
+  right.appendChild(section('✓', 'Résultats', res));
+  if (t.ot) right.appendChild(section('◷', 'Heure', [['Ouverture', fmtLong(t.ot)], ['Fermeture', fmtLong(t.ct)], ['Durée', fmtDuration(t.ot, t.ct)]]));
+  cols.append(left, right); box.appendChild(cols);
+}
+
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
   let u; try { u = await api('/api/update/check'); } catch (e) { return; }
