@@ -47,6 +47,17 @@
   .kpis-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .kpis-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
   .kpis-head .btn { padding: 6px 12px; font-size: 13px; }
+  .kpis-head { gap: 12px; flex-wrap: wrap; }
+  .kpis-head .left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .period { display: flex; align-items: center; gap: 6px; }
+  .period .btn { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
+  .period .btn:disabled { opacity: .35; cursor: default; }
+  .period select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px;
+    padding: 7px 30px 7px 12px; font: inherit; font-weight: 600; text-transform: capitalize; cursor: pointer; min-width: 230px;
+    appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .period select:focus { outline: none; border-color: var(--gold); }
+  .period select option { background: var(--panel); text-transform: capitalize; }
   .pick-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 16px; max-height: 52vh; overflow-y: auto; }
   .pick { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
   .pick.on { border-color: rgba(212,175,55,.45); }
@@ -167,7 +178,17 @@
     <div id="notices"></div>
 
     <div id="content">
-      <div class="kpis-head"><h2>Indicateurs</h2><button class="btn" id="customBtn">＋ Ajouter / ⚙ Personnaliser</button></div>
+      <div class="kpis-head">
+        <div class="left">
+          <h2>Indicateurs</h2>
+          <div class="period">
+            <button class="btn" id="perPrev" title="Mois précédent">‹</button>
+            <select id="perSel" title="Période des indicateurs"></select>
+            <button class="btn" id="perNext" title="Mois suivant">›</button>
+          </div>
+        </div>
+        <button class="btn" id="customBtn">＋ Ajouter / ⚙ Personnaliser</button>
+      </div>
       <section class="kpis" id="kpis"></section>
       <section class="card">
         <div class="card-head">
@@ -358,21 +379,26 @@ async function loadData() {
     const d = last ? new Date(last + 'T12:00:00') : new Date();
     state.month = [d.getFullYear(), d.getMonth()];
   }
-  renderKpis(); renderChart(); renderCal();
+  renderPeriod(); renderKpis(); renderChart(); renderCal();
 }
 
 /* ---------- indicateurs ---------- */
 /* ---------- indicateurs ---------- */
+state.kpiPeriod = 'all'; // 'all' ou 'AAAA-MM'
 function stats(d) {
   const st = {};
-  st.pnl = d.daily.reduce((s, x) => s + x.pnl, 0);
-  st.tradeDays = d.daily.filter(x => x.trades > 0 || x.pnl !== 0);
+  const per = state.kpiPeriod;
+  const days = per === 'all' ? d.daily : d.daily.filter(x => x.date.startsWith(per));
+  // capital au début de la période
+  st.periodStart = d.start_balance + (per === 'all' ? 0 : d.daily.filter(x => x.date < per + '-01').reduce((s, x) => s + x.pnl, 0));
+  st.pnl = days.reduce((s, x) => s + x.pnl, 0);
+  st.tradeDays = days.filter(x => x.trades > 0 || x.pnl !== 0);
   st.winDays = st.tradeDays.filter(x => x.pnl > 0);
   st.lossDays = st.tradeDays.filter(x => x.pnl < 0);
   st.best = st.tradeDays.reduce((m, x) => !m || x.pnl > m.pnl ? x : m, null);
   st.worst = st.tradeDays.reduce((m, x) => !m || x.pnl < m.pnl ? x : m, null);
-  st.trades = d.daily.reduce((s, x) => s + x.trades, 0);
-  st.wins = d.daily.reduce((s, x) => s + x.wins, 0);
+  st.trades = days.reduce((s, x) => s + x.trades, 0);
+  st.wins = days.reduce((s, x) => s + x.wins, 0);
   const now = new Date();
   st.monthKey = now.getFullYear() + '-' + pad(now.getMonth() + 1);
   st.todayKey = st.monthKey + '-' + pad(now.getDate());
@@ -384,8 +410,8 @@ function stats(d) {
   st.gain = st.winDays.reduce((s, x) => s + x.pnl, 0);
   st.loss = -st.lossDays.reduce((s, x) => s + x.pnl, 0);
   // drawdown sur la balance de fin de journée
-  let bal = d.start_balance, peak = d.start_balance; st.maxDd = 0; st.maxDdPct = 0;
-  for (const x of d.daily) {
+  let bal = st.periodStart, peak = st.periodStart; st.maxDd = 0; st.maxDdPct = 0;
+  for (const x of days) {
     bal += x.pnl; peak = Math.max(peak, bal);
     const dd = peak - bal;
     if (dd > st.maxDd) { st.maxDd = dd; st.maxDdPct = peak ? dd / peak * 100 : 0; }
@@ -409,13 +435,13 @@ const METRICS = [
     f: (d, s) => [money(d.balance, d.currency), 'Départ ' + money(d.start_balance, d.currency), ''] },
   { id: 'equity', label: 'Équité', help: 'Solde + positions ouvertes',
     f: (d, s) => { const fl = d.equity - d.balance; return [money(d.equity, d.currency), 'Flottant ' + money(fl, d.currency, true), cls(fl)]; } },
-  { id: 'total', label: 'Profit / perte total', help: 'Depuis le début du compte',
-    f: (d, s) => [money(s.pnl, d.currency, true), d.start_balance ? pct(s.pnl / d.start_balance * 100) : '', cls(s.pnl)] },
+  { id: 'total', label: () => state.kpiPeriod === 'all' ? 'Profit / perte total' : 'Résultat de ' + MONTHS[Number(state.kpiPeriod.slice(5)) - 1] + ' ' + state.kpiPeriod.slice(0, 4), help: 'Sur la période choisie',
+    f: (d, s) => [money(s.pnl, d.currency, true), s.periodStart ? pct(s.pnl / s.periodStart * 100) : '', cls(s.pnl)] },
   { id: 'today', label: "Aujourd'hui", help: 'Résultat du jour',
     f: (d, s) => { const v = s.today ? s.today.pnl : 0; return [money(v, d.currency, true), s.today ? s.today.trades + ' trade(s)' : 'aucun trade', cls(v)]; } },
   { id: 'week', label: 'Cette semaine', help: 'Depuis lundi',
     f: (d, s) => [money(s.weekPnl, d.currency, true), d.start_balance ? pct(s.weekPnl / d.start_balance * 100) : '', cls(s.weekPnl)] },
-  { id: 'month', label: 'Ce mois-ci', help: 'Depuis le 1er du mois',
+  { id: 'month', label: 'Mois en cours', help: 'Depuis le 1er du mois',
     f: (d, s) => [money(s.monthPnl, d.currency, true), MONTHS[new Date().getMonth()], cls(s.monthPnl)] },
   { id: 'winDays', label: 'Jours gagnants', help: '% des jours tradés en profit',
     f: (d, s) => [s.tradeDays.length ? Math.round(s.winDays.length / s.tradeDays.length * 100) + ' %' : '—', s.winDays.length + ' / ' + s.tradeDays.length + ' jours', ''] },
@@ -460,7 +486,7 @@ function removeKpi(id) {
   const before = state.kpis.slice();
   const m = METRICS.find(x => x.id === id);
   state.kpis = state.kpis.filter(k => k !== id); renderKpis(); savePrefs();
-  toast('« ' + (m ? m.label : id) + ' » retiré', () => { state.kpis = before; renderKpis(); savePrefs(); });
+  toast('« ' + (m ? (typeof m.label === 'function' ? m.label() : m.label) : id) + ' » retiré', () => { state.kpis = before; renderKpis(); savePrefs(); });
 }
 
 let dragId = null;
@@ -472,7 +498,7 @@ function renderKpis() {
     const [v, sub, c] = m.f(d, s);
     const el = document.createElement('div'); el.className = 'kpi'; el.title = m.help + ' — glisser pour déplacer';
     el.draggable = true; el.dataset.id = id;
-    const a = document.createElement('div'); a.className = 'k'; a.textContent = m.label;
+    const a = document.createElement('div'); a.className = 'k'; a.textContent = typeof m.label === 'function' ? m.label() : m.label;
     const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
     const e = document.createElement('div'); e.className = 's'; e.textContent = sub;
     const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cet indicateur';
@@ -508,6 +534,34 @@ function renderKpis() {
   }
 }
 
+/* ---------- période des indicateurs ---------- */
+function periodMonths() {
+  const set = new Set((state.data ? state.data.daily : []).map(x => x.date.slice(0, 7)));
+  const now = new Date(); set.add(now.getFullYear() + '-' + pad(now.getMonth() + 1));
+  return [...set].sort().reverse(); // du plus récent au plus ancien
+}
+function renderPeriod() {
+  const sel = $('#perSel'), months = periodMonths();
+  if (state.kpiPeriod !== 'all' && !months.includes(state.kpiPeriod)) state.kpiPeriod = 'all';
+  sel.innerHTML = '';
+  const o = document.createElement('option'); o.value = 'all'; o.textContent = 'Depuis le début du compte'; sel.appendChild(o);
+  for (const k of months) {
+    const [y, mo] = k.split('-');
+    const op = document.createElement('option'); op.value = k; op.textContent = MONTHS[Number(mo) - 1] + ' ' + y; sel.appendChild(op);
+  }
+  sel.value = state.kpiPeriod;
+  const i = state.kpiPeriod === 'all' ? -1 : months.indexOf(state.kpiPeriod);
+  // ‹ = mois plus ancien, › = mois plus récent (depuis « début du compte », › va au mois actuel)
+  $('#perPrev').disabled = i === months.length - 1;
+  $('#perNext').disabled = i === -1;
+}
+function setPeriod(p) { state.kpiPeriod = p; renderPeriod(); if (state.data) renderKpis(); }
+$('#perSel').onchange = () => setPeriod($('#perSel').value);
+$('#perPrev').onclick = () => { const ms = periodMonths(); const i = state.kpiPeriod === 'all' ? -1 : ms.indexOf(state.kpiPeriod);
+  if (i < ms.length - 1) setPeriod(ms[i + 1]); };
+$('#perNext').onclick = () => { const ms = periodMonths(); const i = ms.indexOf(state.kpiPeriod);
+  setPeriod(i <= 0 ? 'all' : ms[i - 1]); };
+
 /* ---------- personnalisation ---------- */
 let draft = [];
 function openCustom() {
@@ -524,7 +578,7 @@ function renderPicks() {
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on; cb.id = 'pk_' + it.id;
     cb.onchange = () => { it.on = cb.checked; row.classList.toggle('on', it.on); };
     const lb = document.createElement('label'); lb.htmlFor = cb.id;
-    const t = document.createElement('span'); t.textContent = m.label;
+    const t = document.createElement('span'); t.textContent = typeof m.label === 'function' ? m.label() : m.label;
     const h = document.createElement('small'); h.textContent = m.help; lb.append(t, h);
     const up = document.createElement('button'); up.className = 'mv'; up.textContent = '↑'; up.disabled = i === 0;
     up.onclick = () => { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderPicks(); };
