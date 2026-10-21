@@ -437,7 +437,8 @@ def lifetime_watchdog():
 
 @app.get("/api/version")
 def api_version():
-    return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?")})
+    return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?"),
+                    "update": _load(UPDATE_STATUS_FILE, {})})
 
 
 @app.get("/")
@@ -610,63 +611,121 @@ def _version_tuple(v):
         return (0,)
 
 
+UPDATE_STATUS_FILE = os.path.join(DATA_DIR, "mise-a-jour.json")
+# fichiers sans lesquels la nouvelle version ne fonctionne pas
+CRITICAL_FILES = ("app.py", "static/index.html")
+
+
+def _record_update(status):
+    status["at"] = dt.datetime.now().isoformat(timespec="seconds")
+    try:
+        _save(UPDATE_STATUS_FILE, status)
+    except OSError:
+        pass
+
+
+def _replace_file(dest, content):
+    """Remplace un fichier, en réessayant s'il est momentanément verrouillé par Windows."""
+    import time
+
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    tmp = dest + ".maj"
+    with open(tmp, "wb") as f:
+        f.write(content)
+    for attempt in range(5):
+        try:
+            os.replace(tmp, dest)
+            return
+        except PermissionError:
+            if attempt == 4:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                raise
+            time.sleep(0.4)
+
+
 def check_for_update():
     """Télécharge la dernière version depuis GitHub si elle est plus récente.
-    Renvoie True si des fichiers ont été mis à jour (l'application doit redémarrer)."""
+    Renvoie True si la nouvelle version est installée (l'application doit redémarrer)."""
     if getattr(sys, "frozen", False):  # version .exe : pas de mise à jour de fichiers
         return False
     import hashlib
     import subprocess
+    import time
     import urllib.request
 
     base = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{UPDATE_BRANCH}/"
 
     def get(path):
-        import time as _t
+        from urllib.parse import quote
 
-        url = base + path + f"?t={int(_t.time())}"
+        url = base + quote(path) + f"?t={int(time.time())}"
         req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": APP_NAME})
-        with urllib.request.urlopen(req, timeout=6) as r:
+        with urllib.request.urlopen(req, timeout=10) as r:
             return r.read()
 
+    local_version = _load(VERSION_FILE, {"version": "0"}).get("version", "0")
     try:
-        local = _load(VERSION_FILE, {"version": "0"})
         remote = json.loads(get("version.json").decode("utf-8"))
-        if _version_tuple(remote.get("version")) <= _version_tuple(local.get("version")):
-            return False
+    except Exception as e:
+        _record_update({"ok": False, "step": "vérification", "error": f"{type(e).__name__} : {e}",
+                        "installed": local_version})
+        return False
+    if _version_tuple(remote.get("version")) <= _version_tuple(local_version):
+        _record_update({"ok": True, "installed": local_version, "latest": remote.get("version")})
+        return False
 
-        old_requirements = b""
-        req_path = os.path.join(APP_DIR, "requirements.txt")
-        if os.path.exists(req_path):
-            with open(req_path, "rb") as f:
-                old_requirements = f.read()
-
-        # tout télécharger d'abord, puis écrire : pas de version à moitié installée
-        downloads = {}
+    # 1) tout télécharger avant de toucher au moindre fichier
+    downloads = {}
+    try:
         for rel in remote.get("files", []):
             if rel.startswith(("/", "\\")) or ".." in rel.replace("\\", "/").split("/"):
                 continue  # chemin refusé : on reste dans le dossier de l'application
             downloads[rel] = get(rel)
-        for rel, content in downloads.items():
-            dest = os.path.join(APP_DIR, *rel.split("/"))
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            tmp = dest + ".maj"
-            with open(tmp, "wb") as f:
-                f.write(content)
-            os.replace(tmp, dest)
-        with open(VERSION_FILE, "w", encoding="utf-8") as f:
-            json.dump(remote, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        _record_update({"ok": False, "step": "téléchargement", "error": f"{type(e).__name__} : {e}",
+                        "installed": local_version, "latest": remote.get("version")})
+        return False
 
-        new_requirements = downloads.get("requirements.txt")
-        if new_requirements is not None and hashlib.sha256(new_requirements).digest() != hashlib.sha256(old_requirements).digest():
+    req_path = os.path.join(APP_DIR, "requirements.txt")
+    try:
+        with open(req_path, "rb") as f:
+            old_requirements = f.read()
+    except OSError:
+        old_requirements = b""
+
+    # 2) installer : les fichiers verrouillés non essentiels (icône...) sont ignorés
+    order = [r for r in downloads if r not in CRITICAL_FILES] + [r for r in CRITICAL_FILES if r in downloads]
+    skipped, failed_critical = [], []
+    for rel in order:
+        try:
+            _replace_file(os.path.join(APP_DIR, *rel.split("/")), downloads[rel])
+        except Exception as e:
+            (failed_critical if rel in CRITICAL_FILES else skipped).append(f"{rel} ({type(e).__name__})")
+    if failed_critical:
+        _record_update({"ok": False, "step": "installation", "error": "Fichiers impossibles à remplacer : "
+                        + ", ".join(failed_critical + skipped), "installed": local_version,
+                        "latest": remote.get("version")})
+        return False
+    try:
+        _replace_file(VERSION_FILE, json.dumps(remote, ensure_ascii=False, indent=2).encode("utf-8"))
+    except Exception:
+        pass
+
+    new_requirements = downloads.get("requirements.txt")
+    if new_requirements is not None and hashlib.sha256(new_requirements).digest() != hashlib.sha256(old_requirements).digest():
+        try:
             subprocess.run(
                 [sys.executable.replace("pythonw.exe", "python.exe"), "-m", "pip", "install", "-q", "-r", req_path],
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                timeout=600,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=600,
             )
-        return True
-    except Exception:
-        return False  # hors ligne ou GitHub indisponible : on garde la version actuelle
+        except Exception:
+            pass
+    _record_update({"ok": True, "installed": remote.get("version"), "latest": remote.get("version"),
+                    "skipped": skipped})
+    return True
 
 
 def find_app_browser():

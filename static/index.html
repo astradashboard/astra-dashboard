@@ -501,7 +501,16 @@ loadState().catch(e => notice(e.message, true));
 const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
 ping(); setInterval(ping, 20000);
 window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });
-api('/api/version').then(v => { $('#appVersion').textContent = 'Version ' + v.version; }).catch(() => {});
+api('/api/version').then(v => {
+  $('#appVersion').textContent = 'Version ' + v.version;
+  const u = v.update || {};
+  if (u.ok === false) {
+    const el = document.createElement('div'); el.className = 'notice error';
+    el.textContent = 'La mise à jour automatique a échoué (' + (u.step || '') + ') : ' + (u.error || 'raison inconnue')
+      + '. Fais une capture de ce message pour Claude.';
+    $('#notices').appendChild(el);
+  }
+}).catch(() => {});
 </script>
 </body>
 </html>

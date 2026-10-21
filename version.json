@@ -1,13 +1,11 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.8",
   "files": [
     "app.py",
     "requirements.txt",
     "icone.ico",
     "static/index.html",
     "static/favicon.png",
-    "Lancer ASTRA Dashboard.bat",
-    "Creer le .exe.bat",
     "LISEZMOI.txt",
     "static/logo.png",
     "static/logo-emblem.png"
