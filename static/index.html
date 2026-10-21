@@ -8,7 +8,7 @@
 <style>
   :root {
     --bg: #0a0d14; --panel: #121722; --panel-2: #181e2b; --line: #252d3d;
-    --fg: #e8ebf2; --muted: #8a93a6; --gold: #d4af37; --gold-soft: rgba(212,175,55,.14);
+    --fg: #e8ebf2; --muted: #8a93a6; --gold: #c48a45; --gold-soft: rgba(196,138,69,.14);
     --win: #22c55e; --win-soft: rgba(34,197,94,.14); --loss: #ef4444; --loss-soft: rgba(239,68,68,.14);
     --radius: 12px;
   }
@@ -30,7 +30,7 @@
   .acc { text-align: left; background: transparent; border: 1px solid transparent; color: var(--fg); border-radius: 9px; padding: 9px 10px;
     display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .acc:hover { background: var(--panel-2); }
-  .acc.active { background: var(--gold-soft); border-color: rgba(212,175,55,.4); }
+  .acc.active { background: var(--gold-soft); border-color: rgba(196,138,69,.4); }
   .acc small { display: block; color: var(--muted); font-size: 11px; }
   .acc .bal { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 9px; padding: 9px 12px; }
@@ -53,17 +53,17 @@
   .period .btn { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
   .period .btn:disabled { opacity: .35; cursor: default; }
   .period select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px;
-    padding: 7px 30px 7px 12px; font: inherit; font-weight: 600; text-transform: capitalize; cursor: pointer; min-width: 230px;
+    padding: 7px 30px 7px 12px; font: inherit; font-weight: 600; cursor: pointer; min-width: 230px;
     appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
     background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
   .period select:focus { outline: none; border-color: var(--gold); }
-  .period select option { background: var(--panel); text-transform: capitalize; }
+  .period select option { background: var(--panel); }
   .pick-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 16px; max-height: 52vh; overflow-y: auto; }
   .pick { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
-  .pick.on { border-color: rgba(212,175,55,.45); }
+  .pick.on { border-color: rgba(196,138,69,.45); }
   .pick label { flex: 1; display: flex; flex-direction: column; cursor: pointer; }
   .pick label small { color: var(--muted); font-size: 11px; }
-  .pick input { width: 16px; height: 16px; accent-color: #d4af37; }
+  .pick input { width: 16px; height: 16px; accent-color: #c48a45; }
   .pick .mv { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 6px; width: 28px; height: 26px; padding: 0; }
   .pick .mv:disabled { opacity: .3; cursor: default; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -93,7 +93,7 @@
   #chart.dragging svg { cursor: grabbing; }
   .zoom-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .zoom-bar .btn { padding: 4px 10px; font-size: 12px; border-radius: 7px; }
-  .zoom-bar .btn.on { background: var(--gold-soft); border-color: rgba(212,175,55,.6); color: var(--gold); }
+  .zoom-bar .btn.on { background: var(--gold-soft); border-color: rgba(196,138,69,.6); color: var(--gold); }
   .zoom-bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
   .chart-hint { color: var(--muted); font-size: 11px; margin-top: 6px; text-align: right; }
   #chart svg { display: block; width: 100%; }
@@ -109,7 +109,7 @@
   .day { min-height: 84px; border-radius: 9px; background: var(--panel-2); border: 1px solid transparent; padding: 7px 8px;
     display: flex; flex-direction: column; justify-content: space-between; font-variant-numeric: tabular-nums; }
   .day.empty { background: transparent; }
-  .day.today { border-color: rgba(212,175,55,.6); }
+  .day.today { border-color: rgba(196,138,69,.6); }
   .day .n { color: var(--muted); font-size: 12px; }
   .day .p { font-weight: 650; font-size: 14px; text-align: right; }
   .day .t { color: var(--muted); font-size: 11px; text-align: right; }
@@ -118,7 +118,7 @@
   .week { border-radius: 9px; border: 1px dashed var(--line); padding: 7px 8px; display: flex; flex-direction: column; justify-content: center; text-align: right; font-variant-numeric: tabular-nums; }
   .week .k { color: var(--muted); font-size: 11px; }
   .week .p { font-weight: 650; }
-  .notice { background: var(--gold-soft); border: 1px solid rgba(212,175,55,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .notice { background: var(--gold-soft); border: 1px solid rgba(196,138,69,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
   .notice.error { background: var(--loss-soft); border-color: rgba(239,68,68,.4); }
   .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty-state h2 { color: var(--fg); margin-bottom: 6px; }
@@ -547,7 +547,7 @@ function renderPeriod() {
   const o = document.createElement('option'); o.value = 'all'; o.textContent = 'Depuis le début du compte'; sel.appendChild(o);
   for (const k of months) {
     const [y, mo] = k.split('-');
-    const op = document.createElement('option'); op.value = k; op.textContent = MONTHS[Number(mo) - 1] + ' ' + y; sel.appendChild(op);
+    const op = document.createElement('option'); op.value = k; const mn = MONTHS[Number(mo) - 1]; op.textContent = mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + y; sel.appendChild(op);
   }
   sel.value = state.kpiPeriod;
   const i = state.kpiPeriod === 'all' ? -1 : months.indexOf(state.kpiPeriod);
@@ -674,7 +674,7 @@ function renderChart() {
   }
   const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
   const defs = mk('defs', {});
-  defs.innerHTML = '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4af37" stop-opacity=".28"/><stop offset="1" stop-color="#d4af37" stop-opacity="0"/></linearGradient>';
+  defs.innerHTML = '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c48a45" stop-opacity=".28"/><stop offset="1" stop-color="#c48a45" stop-opacity="0"/></linearGradient>';
   mk('path', { d: line + ` L${x(last)} ${H - m.b} L${x(0)} ${H - m.b} Z`, fill: 'url(#g)' });
   mk('path', { d: line, fill: 'none', stroke: 'var(--gold)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
   if (pts.length <= 60) pts.forEach((p, i) => { if (p.date) mk('circle', { cx: x(i), cy: y(p.v), r: 2.5, fill: 'var(--gold)' }); });
