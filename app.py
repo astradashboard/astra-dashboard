@@ -176,28 +176,62 @@ def private_terminal(acc):
     return dest_exe
 
 
+def _private_terminal_pids():
+    """PID de tous les processus lancés depuis la copie privée de MT5 (Windows uniquement)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except Exception:
+        return set()
+    psapi, kernel32 = ctypes.windll.psapi, ctypes.windll.kernel32
+    arr = (wintypes.DWORD * 4096)()
+    needed = wintypes.DWORD()
+    if not psapi.EnumProcesses(ctypes.byref(arr), ctypes.sizeof(arr), ctypes.byref(needed)):
+        return set()
+    root = os.path.normcase(os.path.abspath(PRIVATE_TERMINALS_DIR))
+    pids = set()
+    buf = ctypes.create_unicode_buffer(1024)
+    for pid in arr[: needed.value // ctypes.sizeof(wintypes.DWORD)]:
+        if not pid:
+            continue
+        h = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            continue
+        try:
+            size = wintypes.DWORD(len(buf))
+            if kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                if os.path.normcase(buf.value).startswith(root):
+                    pids.add(pid)
+        finally:
+            kernel32.CloseHandle(h)
+    return pids
+
+
+def _kill_private_terminals():
+    import subprocess
+
+    for pid in _private_terminal_pids():
+        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
 class HiddenTerminal:
-    """Lance le terminal privé sans fenêtre et le ferme à la fin."""
+    """Garde invisible toute fenêtre de la copie privée de MT5, puis la ferme à la fin.
+    C'est la bibliothèque MetaTrader5 qui démarre le terminal : on ne fait que le cacher."""
 
     def __init__(self, exe):
         self.exe = exe
-        self.proc = None
         self._stop = threading.Event()
+        self._thread = None
 
     def __enter__(self):
-        import subprocess
-
-        si = subprocess.STARTUPINFO() if hasattr(subprocess, "STARTUPINFO") else None
-        if si is not None:
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0  # SW_HIDE
-        self.proc = subprocess.Popen([self.exe, "/portable"], startupinfo=si,
-                                     cwd=os.path.dirname(self.exe))
-        threading.Thread(target=self._keep_hidden, daemon=True).start()
+        if os.name == "nt":
+            _kill_private_terminals()  # une copie restée ouverte après un plantage
+            self._thread = threading.Thread(target=self._keep_hidden, daemon=True)
+            self._thread.start()
         return self
 
     def _keep_hidden(self):
-        """MT5 ignore parfois la demande : on masque ses fenêtres tant qu'il tourne."""
         try:
             import ctypes
             from ctypes import wintypes
@@ -205,27 +239,29 @@ class HiddenTerminal:
             return
         user32 = ctypes.windll.user32
         proto = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        pids = set()
 
         def hide(hwnd, _):
             pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            if self.proc and pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
-                user32.ShowWindow(hwnd, 0)
+            if pid.value in pids and user32.IsWindowVisible(hwnd):
+                user32.ShowWindow(hwnd, 0)  # SW_HIDE
             return True
 
         callback = proto(hide)
+        tick = 0
         while not self._stop.is_set():
-            user32.EnumWindows(callback, 0)
-            self._stop.wait(0.1)
+            if tick % 5 == 0:  # liste des processus rafraîchie toutes les 100 ms
+                pids = _private_terminal_pids()
+            if pids:
+                user32.EnumWindows(callback, 0)
+            tick += 1
+            self._stop.wait(0.02)
 
     def __exit__(self, *exc):
-        import subprocess
-
+        if os.name == "nt":
+            _kill_private_terminals()
         self._stop.set()
-        if self.proc and self.proc.poll() is None:
-            subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
-                           capture_output=True,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return False
 
 
