@@ -620,6 +620,70 @@ def open_app_window(url):
     ])
 
 
+def ensure_desktop_shortcut():
+    """Crée ou met à jour le raccourci du bureau. L'icône est copiée sous un nouveau nom
+    à chaque changement de logo : Windows ne peut plus afficher l'ancienne image en mémoire."""
+    if getattr(sys, "frozen", False) or os.name != "nt":
+        return
+    import hashlib
+    import shutil
+    import subprocess
+
+    try:
+        ico = os.path.join(APP_DIR, "icone.ico")
+        if not os.path.isfile(ico):
+            return
+        with open(ico, "rb") as f:
+            digest = hashlib.sha1(f.read()).hexdigest()[:10]
+        icons_dir = os.path.join(DATA_DIR, "icones")
+        os.makedirs(icons_dir, exist_ok=True)
+        marker = os.path.join(icons_dir, "raccourci.txt")
+        try:
+            with open(marker, "r", encoding="utf-8") as f:
+                if f.read().strip() == f"{digest}|{APP_DIR}":
+                    return  # raccourci déjà à jour
+        except OSError:
+            pass
+
+        icon_copy = os.path.join(icons_dir, f"astra-{digest}.ico")
+        shutil.copy2(ico, icon_copy)
+        pythonw = sys.executable
+        candidate = os.path.join(os.path.dirname(pythonw), "pythonw.exe")
+        if os.path.isfile(candidate):
+            pythonw = candidate
+
+        script = (
+            "$lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'ASTRA Dashboard.lnk';"
+            "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk);"
+            "$s.TargetPath = $env:ASTRA_TARGET; $s.Arguments = 'app.py';"
+            "$s.WorkingDirectory = $env:ASTRA_DIR; $s.IconLocation = $env:ASTRA_ICON + ',0';"
+            "$s.Description = 'ASTRA CAPITAL - Dashboard des comptes'; $s.Save()"
+        )
+        env = {**os.environ, "ASTRA_TARGET": pythonw, "ASTRA_DIR": APP_DIR, "ASTRA_ICON": icon_copy}
+        no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        done = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            env=env, capture_output=True, timeout=30, creationflags=no_window,
+        )
+        if done.returncode != 0:
+            return
+        # demander à Windows de redessiner les icônes
+        import ctypes
+
+        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0x0000, None, None)
+        subprocess.run(["ie4uinit.exe", "-show"], capture_output=True, timeout=15, creationflags=no_window)
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write(f"{digest}|{APP_DIR}")
+        for old in os.listdir(icons_dir):
+            if old.startswith("astra-") and old.endswith(".ico") and old != os.path.basename(icon_copy):
+                try:
+                    os.remove(os.path.join(icons_dir, old))
+                except OSError:
+                    pass
+    except Exception:
+        pass  # le raccourci n'est qu'un confort : l'application démarre quand même
+
+
 def already_running():
     import urllib.request
 
@@ -651,6 +715,7 @@ def main():
         daemon=True,
     )
     server.start()
+    threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
 
     # 1) Fenêtre d'application Edge/Chrome : l'app s'arrête quand on la ferme.
     proc = open_app_window(url)
