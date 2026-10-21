@@ -265,6 +265,30 @@ class HiddenTerminal:
         return False
 
 
+def wait_for_full_history(info, max_wait=45):
+    """MT5 télécharge l'historique petit à petit après la connexion.
+    On attend qu'il soit complet : la somme de toutes les opérations doit redonner
+    le solde du compte (ou, à défaut, le nombre d'opérations doit cesser d'augmenter)."""
+    import time
+
+    start, end = dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)
+    deadline = time.time() + max_wait
+    last_count, stable_since, deals = -1, time.time(), []
+    while True:
+        deals = list(mt5.history_deals_get(start, end) or [])
+        total = sum(d.profit + d.commission + d.swap + getattr(d, "fee", 0.0) for d in deals)
+        if deals and abs(total - info.balance) < 0.01:
+            return deals  # historique complet : il correspond au solde
+        now = time.time()
+        if len(deals) != last_count:
+            last_count, stable_since = len(deals), now
+        elif deals and now - stable_since > 8:
+            return deals  # plus rien n'arrive depuis 8 s
+        if now > deadline:
+            return deals
+        time.sleep(0.5)
+
+
 def fetch_mt5(acc, password):
     """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
     if mt5 is None:
@@ -307,9 +331,7 @@ def fetch_mt5(acc, password):
                     info = mt5.account_info()
                 if info is None:
                     raise RuntimeError("Impossible de lire les informations du compte.")
-                deals = mt5.history_deals_get(
-                    dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)
-                ) or []
+                deals = wait_for_full_history(info)
             finally:
                 mt5.shutdown()
 
