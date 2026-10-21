@@ -498,6 +498,9 @@ function stats(d) {
   st.monthPnl = d.daily.filter(x => x.date.startsWith(st.monthKey)).reduce((s, x) => s + x.pnl, 0);
   st.weekPnl = d.daily.filter(x => x.date >= st.weekStart).reduce((s, x) => s + x.pnl, 0);
   st.today = d.daily.find(x => x.date === st.todayKey);
+  const sum = f => days.reduce((t, x) => t + (x[f] || 0), 0);
+  st.rWon = sum('r_won'); st.rLost = sum('r_lost'); st.rWins = sum('r_wins'); st.rLosses = sum('r_losses');
+  st.rTrades = sum('r_trades'); st.rNosl = sum('r_nosl');
   st.gain = st.winDays.reduce((s, x) => s + x.pnl, 0);
   st.loss = -st.lossDays.reduce((s, x) => s + x.pnl, 0);
   // drawdown sur la balance de fin de journée
@@ -559,6 +562,23 @@ const METRICS = [
   { id: 'tradesDay', label: 'Trades par jour', help: 'Nombre moyen de trades par jour tradé',
     f: (d, s) => [s.tradeDays.length ? (s.trades / s.tradeDays.length).toFixed(1).replace('.', ',') : '—', nb(s.trades) + ' trades au total', ''] },
 ];
+const fmtR = (v, sign) => (sign && v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + ' R';
+const rMissing = (d, s) => !d.r_available ? 'Actualise le compte pour calculer les R'
+  : (s.rTrades ? (s.rNosl ? s.rNosl + ' trade(s) sans SL ignoré(s)' : '') : (s.rNosl ? 'Aucun trade avec SL sur la période' : 'Aucun trade sur la période'));
+METRICS.push(
+  { id: 'returnPct', label: 'Rendement (%)', help: 'Gain ou perte en % du capital au début de la période',
+    f: (d, s) => [s.periodStart ? pct(s.pnl / s.periodStart * 100) : '—', money(s.pnl, d.currency, true), cls(s.pnl)] },
+  { id: 'rNet', label: 'R net', help: 'Somme des R gagnés moins les R perdus (R = profit ÷ risque jusqu\'au SL)',
+    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
+      const net = s.rWon - s.rLost; return [fmtR(net, true), fmtR(s.rWon, true) + ' gagnés · ' + fmtR(-s.rLost) + ' perdus', cls(net)]; } },
+  { id: 'rWinLoss', label: 'RR gagnants / perdants', help: 'Nombre de trades gagnants et perdants mesurés en R, et R cumulés',
+    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
+      return [s.rWins + ' / ' + s.rLosses, fmtR(s.rWon, true) + ' · ' + fmtR(-s.rLost) + (s.rNosl ? ' · ' + s.rNosl + ' sans SL' : ''), s.rWins >= s.rLosses ? 'pos' : 'neg']; } },
+  { id: 'rAvg', label: 'R moyen par trade', help: 'Moyenne des R par trade, et R moyen d\'un gain et d\'une perte',
+    f: (d, s) => { if (!d.r_available || !s.rTrades) return ['—', rMissing(d, s), ''];
+      const avg = (s.rWon - s.rLost) / s.rTrades;
+      return [fmtR(avg, true), 'Gain moyen ' + fmtR(s.rWins ? s.rWon / s.rWins : 0, true) + ' · Perte moyenne ' + fmtR(-(s.rLosses ? s.rLost / s.rLosses : 0)), cls(avg)]; } },
+);
 const DEFAULT_KPIS = ['equity', 'total', 'today', 'week', 'winDays', 'winTrades', 'best', 'worst', 'maxDd', 'pf'];
 state.kpis = DEFAULT_KPIS.slice();
 

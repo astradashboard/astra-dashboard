@@ -289,6 +289,62 @@ def wait_for_full_history(info, max_wait=45):
         time.sleep(0.5)
 
 
+def compute_r_multiples(deals):
+    """R de chaque position clôturée : profit net ÷ perte qu'aurait coûtée le stop loss initial.
+    À appeler pendant que MT5 est connecté (il faut les ordres et le calcul de profit du broker).
+    Renvoie, par jour de clôture : r_won, r_lost (somme des R), r_wins, r_losses, r_trades, r_nosl."""
+    start, end = dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)
+    orders = {o.ticket: o for o in (mt5.history_orders_get(start, end) or [])}
+    entries = {mt5.DEAL_ENTRY_IN}
+    exits = {getattr(mt5, n) for n in ("DEAL_ENTRY_OUT", "DEAL_ENTRY_INOUT", "DEAL_ENTRY_OUT_BY") if hasattr(mt5, n)}
+    trade_types = {mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL}
+
+    positions = defaultdict(lambda: {"in": None, "net": 0.0, "vol_in": 0.0, "vol_out": 0.0, "close": None})
+    for d in deals:
+        if d.type not in trade_types or not d.position_id:
+            continue
+        p = positions[d.position_id]
+        p["net"] += d.profit + d.commission + d.swap + getattr(d, "fee", 0.0)
+        if d.entry in entries:
+            if p["in"] is None:
+                p["in"] = d
+            p["vol_in"] += d.volume
+        elif d.entry in exits:
+            p["vol_out"] += d.volume
+            p["close"] = d.time if p["close"] is None else max(p["close"], d.time)
+
+    out = defaultdict(lambda: {"r_won": 0.0, "r_lost": 0.0, "r_wins": 0, "r_losses": 0, "r_trades": 0, "r_nosl": 0})
+    selected = set()
+    for p in positions.values():
+        d_in = p["in"]
+        if d_in is None or p["close"] is None or p["vol_out"] + 1e-9 < p["vol_in"]:
+            continue  # position encore ouverte ou entrée hors historique
+        day = dt.datetime.utcfromtimestamp(p["close"]).date().isoformat()
+        order = orders.get(d_in.order)
+        sl = getattr(order, "sl", 0.0) if order else 0.0
+        if not sl:
+            out[day]["r_nosl"] += 1
+            continue
+        if d_in.symbol not in selected:
+            mt5.symbol_select(d_in.symbol, True)
+            selected.add(d_in.symbol)
+        order_type = mt5.ORDER_TYPE_BUY if d_in.type == mt5.DEAL_TYPE_BUY else mt5.ORDER_TYPE_SELL
+        risk = mt5.order_calc_profit(order_type, d_in.symbol, p["vol_in"], d_in.price, sl)
+        if risk is None or abs(risk) < 1e-9:
+            out[day]["r_nosl"] += 1
+            continue
+        r = p["net"] / abs(risk)
+        o = out[day]
+        o["r_trades"] += 1
+        if r > 0:
+            o["r_won"] += r
+            o["r_wins"] += 1
+        elif r < 0:
+            o["r_lost"] += -r
+            o["r_losses"] += 1
+    return {k: {**v, "r_won": round(v["r_won"], 3), "r_lost": round(v["r_lost"], 3)} for k, v in out.items()}
+
+
 def fetch_mt5(acc, password):
     """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
     if mt5 is None:
@@ -332,6 +388,10 @@ def fetch_mt5(acc, password):
                 if info is None:
                     raise RuntimeError("Impossible de lire les informations du compte.")
                 deals = wait_for_full_history(info)
+                try:
+                    r_days = compute_r_multiples(deals)
+                except Exception:
+                    r_days = {}  # le calcul des R est un bonus : il ne doit jamais bloquer la lecture
             finally:
                 mt5.shutdown()
 
@@ -354,7 +414,11 @@ def fetch_mt5(acc, password):
             elif d.profit + d.swap < 0:
                 daily[day]["losses"] += 1
 
+    for day, r in r_days.items():
+        daily[day].update(r)
+
     return {
+        "r_available": bool(r_days),
         "currency": info.currency,
         "balance": info.balance,
         "equity": info.equity,
@@ -377,7 +441,11 @@ def make_demo_data(size=100000.0):
             trades = rnd.randint(1, 3)
             pnl = round(rnd.gauss(220, 650), 2)
             wins = rnd.randint((trades + 1) // 2, trades) if pnl > 0 else rnd.randint(0, trades // 2)
-            daily[day.isoformat()] = {"pnl": pnl, "trades": trades, "wins": wins, "losses": trades - wins}
+            r_won = round(sum(rnd.uniform(1.0, 3.0) for _ in range(wins)), 3)
+            r_lost = round(sum(rnd.uniform(0.6, 1.0) for _ in range(trades - wins)), 3)
+            daily[day.isoformat()] = {"pnl": pnl, "trades": trades, "wins": wins, "losses": trades - wins,
+                                      "r_won": r_won, "r_lost": r_lost, "r_wins": wins, "r_losses": trades - wins,
+                                      "r_trades": trades, "r_nosl": 0}
             balance += pnl
         day += dt.timedelta(days=1)
     return {
@@ -385,6 +453,7 @@ def make_demo_data(size=100000.0):
         "balance": round(balance, 2),
         "equity": round(balance + rnd.uniform(-300, 300), 2),
         "start_balance": size,
+        "r_available": True,
         "company": "Démo",
         "fetched_at": dt.datetime.now().isoformat(timespec="seconds"),
         "daily": daily,
@@ -662,24 +731,29 @@ def api_data():
     if not logins:
         return jsonify({"error": "Aucune donnée pour ce compte."}), 404
 
-    daily = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0, "losses": 0})
+    r_fields = ("r_won", "r_lost", "r_wins", "r_losses", "r_trades", "r_nosl")
+    daily = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0, "losses": 0, **{f: 0 for f in r_fields}})
     totals = {"balance": 0.0, "equity": 0.0, "start_balance": 0.0}
+    r_available = False
     currencies = set()
     for login in logins:
         c = cache[login]
         currencies.add(c.get("currency") or "USD")
+        r_available = r_available or bool(c.get("r_available"))
         for k in totals:
             totals[k] += c.get(k) or 0.0
         for day, v in c.get("daily", {}).items():
-            for f in ("pnl", "trades", "wins", "losses"):
+            for f in ("pnl", "trades", "wins", "losses") + r_fields:
                 daily[day][f] += v.get(f, 0)
 
     return jsonify({
         **{k: round(v, 2) for k, v in totals.items()},
         "currency": sorted(currencies)[0],
         "mixed_currencies": len(currencies) > 1,
+        "r_available": r_available,
         "accounts": len(logins),
-        "daily": [{"date": d, **{**v, "pnl": round(v["pnl"], 2)}} for d, v in sorted(daily.items())],
+        "daily": [{"date": d, **{**v, "pnl": round(v["pnl"], 2), "r_won": round(v["r_won"], 3),
+                                 "r_lost": round(v["r_lost"], 3)}} for d, v in sorted(daily.items())],
     })
 
 
