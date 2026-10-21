@@ -44,6 +44,17 @@
   header.top h1 { margin: 0; font-size: 22px; font-weight: 650; }
   header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kpis-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .kpis-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .kpis-head .btn { padding: 6px 12px; font-size: 13px; }
+  .pick-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 16px; max-height: 52vh; overflow-y: auto; }
+  .pick { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+  .pick.on { border-color: rgba(212,175,55,.45); }
+  .pick label { flex: 1; display: flex; flex-direction: column; cursor: pointer; }
+  .pick label small { color: var(--muted); font-size: 11px; }
+  .pick input { width: 16px; height: 16px; accent-color: #d4af37; }
+  .pick .mv { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 6px; width: 28px; height: 26px; padding: 0; }
+  .pick .mv:disabled { opacity: .3; cursor: default; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
   .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
   .kpi .k { color: var(--muted); font-size: 12px; }
@@ -134,6 +145,7 @@
     <div id="notices"></div>
 
     <div id="content">
+      <div class="kpis-head"><h2>Indicateurs</h2><button class="btn" id="customBtn">⚙ Personnaliser</button></div>
       <section class="kpis" id="kpis"></section>
       <section class="card">
         <div class="card-head"><h2>Évolution du capital</h2><span class="s" id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
@@ -159,6 +171,21 @@
       <button class="btn primary" onclick="openLogin()">Ajouter un compte</button>
     </div>
   </main>
+</div>
+
+<div class="modal-bg" id="customBg">
+  <div class="modal">
+    <h2>Personnaliser les indicateurs</h2>
+    <p class="sub">Coche ceux à afficher et range-les avec les flèches. Le choix est gardé sur ce PC.</p>
+    <div class="pick-list" id="pickList"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="customReset">Par défaut</button>
+      <div class="right">
+        <button type="button" class="btn" id="customCancel">Annuler</button>
+        <button type="button" class="btn primary" id="customSave">Enregistrer</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-bg" id="loginBg">
@@ -299,38 +326,143 @@ async function loadData() {
 }
 
 /* ---------- indicateurs ---------- */
+/* ---------- indicateurs ---------- */
+function stats(d) {
+  const st = {};
+  st.pnl = d.daily.reduce((s, x) => s + x.pnl, 0);
+  st.tradeDays = d.daily.filter(x => x.trades > 0 || x.pnl !== 0);
+  st.winDays = st.tradeDays.filter(x => x.pnl > 0);
+  st.lossDays = st.tradeDays.filter(x => x.pnl < 0);
+  st.best = st.tradeDays.reduce((m, x) => !m || x.pnl > m.pnl ? x : m, null);
+  st.worst = st.tradeDays.reduce((m, x) => !m || x.pnl < m.pnl ? x : m, null);
+  st.trades = d.daily.reduce((s, x) => s + x.trades, 0);
+  st.wins = d.daily.reduce((s, x) => s + x.wins, 0);
+  const now = new Date();
+  st.monthKey = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+  st.todayKey = st.monthKey + '-' + pad(now.getDate());
+  const monday = new Date(now); monday.setDate(now.getDate() - (now.getDay() + 6) % 7);
+  st.weekStart = monday.getFullYear() + '-' + pad(monday.getMonth() + 1) + '-' + pad(monday.getDate());
+  st.monthPnl = d.daily.filter(x => x.date.startsWith(st.monthKey)).reduce((s, x) => s + x.pnl, 0);
+  st.weekPnl = d.daily.filter(x => x.date >= st.weekStart).reduce((s, x) => s + x.pnl, 0);
+  st.today = d.daily.find(x => x.date === st.todayKey);
+  st.gain = st.winDays.reduce((s, x) => s + x.pnl, 0);
+  st.loss = -st.lossDays.reduce((s, x) => s + x.pnl, 0);
+  // drawdown sur la balance de fin de journée
+  let bal = d.start_balance, peak = d.start_balance; st.maxDd = 0; st.maxDdPct = 0;
+  for (const x of d.daily) {
+    bal += x.pnl; peak = Math.max(peak, bal);
+    const dd = peak - bal;
+    if (dd > st.maxDd) { st.maxDd = dd; st.maxDdPct = peak ? dd / peak * 100 : 0; }
+  }
+  st.curDd = peak - bal; st.curDdPct = peak ? st.curDd / peak * 100 : 0;
+  // séries de jours gagnants / perdants
+  let run = 0, bestRun = 0, worstRun = 0, cur = 0;
+  for (const x of st.tradeDays) {
+    if (x.pnl > 0) { run = run > 0 ? run + 1 : 1; } else if (x.pnl < 0) { run = run < 0 ? run - 1 : -1; } else run = 0;
+    bestRun = Math.max(bestRun, run); worstRun = Math.min(worstRun, run);
+  }
+  st.curRun = run; st.bestRun = bestRun; st.worstRun = -worstRun;
+  return st;
+}
+
+const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) : '';
+const nb = n => n.toLocaleString('fr-BE');
+
+const METRICS = [
+  { id: 'balance', label: 'Capital (balance)', help: 'Solde actuel du compte',
+    f: (d, s) => [money(d.balance, d.currency), 'Départ ' + money(d.start_balance, d.currency), ''] },
+  { id: 'equity', label: 'Équité', help: 'Solde + positions ouvertes',
+    f: (d, s) => { const fl = d.equity - d.balance; return [money(d.equity, d.currency), 'Flottant ' + money(fl, d.currency, true), cls(fl)]; } },
+  { id: 'total', label: 'Profit / perte total', help: 'Depuis le début du compte',
+    f: (d, s) => [money(s.pnl, d.currency, true), d.start_balance ? pct(s.pnl / d.start_balance * 100) : '', cls(s.pnl)] },
+  { id: 'today', label: "Aujourd'hui", help: 'Résultat du jour',
+    f: (d, s) => { const v = s.today ? s.today.pnl : 0; return [money(v, d.currency, true), s.today ? s.today.trades + ' trade(s)' : 'aucun trade', cls(v)]; } },
+  { id: 'week', label: 'Cette semaine', help: 'Depuis lundi',
+    f: (d, s) => [money(s.weekPnl, d.currency, true), d.start_balance ? pct(s.weekPnl / d.start_balance * 100) : '', cls(s.weekPnl)] },
+  { id: 'month', label: 'Ce mois-ci', help: 'Depuis le 1er du mois',
+    f: (d, s) => [money(s.monthPnl, d.currency, true), MONTHS[new Date().getMonth()], cls(s.monthPnl)] },
+  { id: 'winDays', label: 'Jours gagnants', help: '% des jours tradés en profit',
+    f: (d, s) => [s.tradeDays.length ? Math.round(s.winDays.length / s.tradeDays.length * 100) + ' %' : '—', s.winDays.length + ' / ' + s.tradeDays.length + ' jours', ''] },
+  { id: 'winTrades', label: 'Trades gagnants', help: '% des trades clôturés en profit',
+    f: (d, s) => [s.trades ? Math.round(s.wins / s.trades * 100) + ' %' : '—', nb(s.trades) + ' trades clôturés', ''] },
+  { id: 'best', label: 'Meilleur jour', help: 'Plus gros gain sur une journée',
+    f: (d, s) => [s.best ? money(s.best.pnl, d.currency, true) : '—', fmtDay(s.best), s.best ? cls(s.best.pnl) : ''] },
+  { id: 'worst', label: 'Pire jour', help: 'Plus grosse perte sur une journée',
+    f: (d, s) => [s.worst ? money(s.worst.pnl, d.currency, true) : '—', fmtDay(s.worst), s.worst ? cls(s.worst.pnl) : ''] },
+  { id: 'maxDd', label: 'Drawdown max', help: 'Plus forte baisse depuis un sommet',
+    f: (d, s) => [s.maxDd ? money(-s.maxDd, d.currency) : '—', s.maxDd ? pct(-s.maxDdPct) : 'aucun', s.maxDd ? 'neg' : ''] },
+  { id: 'curDd', label: 'Drawdown actuel', help: 'Écart avec le plus haut du compte',
+    f: (d, s) => [s.curDd ? money(-s.curDd, d.currency) : 'Au sommet', s.curDd ? pct(-s.curDdPct) : '', s.curDd ? 'neg' : 'pos'] },
+  { id: 'avgDay', label: 'Moyenne par jour', help: 'Résultat moyen d\'un jour tradé',
+    f: (d, s) => { const v = s.tradeDays.length ? s.pnl / s.tradeDays.length : 0; return [money(v, d.currency, true), s.tradeDays.length + ' jours tradés', cls(v)]; } },
+  { id: 'avgWinLoss', label: 'Jour gagnant / perdant moyen', help: 'Gain moyen et perte moyenne par jour',
+    f: (d, s) => { const g = s.winDays.length ? s.gain / s.winDays.length : 0, l = s.lossDays.length ? s.loss / s.lossDays.length : 0;
+      return [money(g, d.currency, true), 'Perte moyenne ' + money(-l, d.currency, true), 'pos']; } },
+  { id: 'pf', label: 'Profit factor', help: 'Total des gains ÷ total des pertes (par jour)',
+    f: (d, s) => [s.loss ? (s.gain / s.loss).toFixed(2).replace('.', ',') : (s.gain ? '∞' : '—'), 'Gains ' + money(s.gain, d.currency) + ' · Pertes ' + money(s.loss, d.currency), s.loss && s.gain / s.loss >= 1 ? 'pos' : (s.loss ? 'neg' : '')] },
+  { id: 'streak', label: 'Série en cours', help: 'Jours gagnants ou perdants d\'affilée',
+    f: (d, s) => [s.curRun > 0 ? s.curRun + ' gagnant' + (s.curRun > 1 ? 's' : '') : s.curRun < 0 ? (-s.curRun) + ' perdant' + (s.curRun < -1 ? 's' : '') : '—',
+      'Record : ' + s.bestRun + ' gagnants · ' + s.worstRun + ' perdants', s.curRun > 0 ? 'pos' : s.curRun < 0 ? 'neg' : ''] },
+  { id: 'tradesDay', label: 'Trades par jour', help: 'Nombre moyen de trades par jour tradé',
+    f: (d, s) => [s.tradeDays.length ? (s.trades / s.tradeDays.length).toFixed(1).replace('.', ',') : '—', nb(s.trades) + ' trades au total', ''] },
+];
+const DEFAULT_KPIS = ['balance', 'equity', 'total', 'month', 'winDays', 'winTrades', 'best', 'worst'];
+state.kpis = DEFAULT_KPIS.slice();
+
 function renderKpis() {
-  const d = state.data, cur = d.currency;
-  const pnl = d.daily.reduce((s, x) => s + x.pnl, 0);
-  const tradeDays = d.daily.filter(x => x.trades > 0 || x.pnl !== 0);
-  const winDays = tradeDays.filter(x => x.pnl > 0).length;
-  const best = tradeDays.reduce((m, x) => !m || x.pnl > m.pnl ? x : m, null);
-  const worst = tradeDays.reduce((m, x) => !m || x.pnl < m.pnl ? x : m, null);
-  const trades = d.daily.reduce((s, x) => s + x.trades, 0);
-  const wins = d.daily.reduce((s, x) => s + x.wins, 0);
-  const now = new Date(); const key = now.getFullYear() + '-' + pad(now.getMonth() + 1);
-  const monthPnl = d.daily.filter(x => x.date.startsWith(key)).reduce((s, x) => s + x.pnl, 0);
-  const floating = d.equity - d.balance;
-  const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) : '';
-  const cards = [
-    ['Capital (balance)', money(d.balance, cur), 'Départ ' + money(d.start_balance, cur), ''],
-    ['Équité', money(d.equity, cur), 'Flottant ' + money(floating, cur, true), cls(floating)],
-    ['Profit / perte total', money(pnl, cur, true), d.start_balance ? pct(pnl / d.start_balance * 100) : '', cls(pnl)],
-    ['Ce mois-ci', money(monthPnl, cur, true), MONTHS[now.getMonth()], cls(monthPnl)],
-    ['Jours gagnants', tradeDays.length ? Math.round(winDays / tradeDays.length * 100) + ' %' : '—', winDays + ' / ' + tradeDays.length + ' jours', ''],
-    ['Trades gagnants', trades ? Math.round(wins / trades * 100) + ' %' : '—', trades + ' trades clôturés', ''],
-    ['Meilleur jour', best ? money(best.pnl, cur, true) : '—', fmtDay(best), best ? cls(best.pnl) : ''],
-    ['Pire jour', worst ? money(worst.pnl, cur, true) : '—', fmtDay(worst), worst ? cls(worst.pnl) : ''],
-  ];
+  const d = state.data, s = stats(d);
   const box = $('#kpis'); box.innerHTML = '';
-  for (const [k, v, s, c] of cards) {
-    const el = document.createElement('div'); el.className = 'kpi';
-    const a = document.createElement('div'); a.className = 'k'; a.textContent = k;
+  for (const id of state.kpis) {
+    const m = METRICS.find(x => x.id === id); if (!m) continue;
+    const [v, sub, c] = m.f(d, s);
+    const el = document.createElement('div'); el.className = 'kpi'; el.title = m.help;
+    const a = document.createElement('div'); a.className = 'k'; a.textContent = m.label;
     const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
-    const e = document.createElement('div'); e.className = 's'; e.textContent = s;
+    const e = document.createElement('div'); e.className = 's'; e.textContent = sub;
     el.append(a, b, e); box.appendChild(el);
   }
+  if (!box.children.length) {
+    const el = document.createElement('div'); el.className = 'kpi'; el.style.color = 'var(--muted)';
+    el.textContent = 'Aucun indicateur choisi : clique sur « Personnaliser ».'; box.appendChild(el);
+  }
 }
+
+/* ---------- personnalisation ---------- */
+let draft = [];
+function openCustom() {
+  // ordre affiché : choisis d'abord (dans leur ordre), puis les autres
+  draft = state.kpis.filter(id => METRICS.some(m => m.id === id)).map(id => ({ id, on: true }))
+    .concat(METRICS.filter(m => !state.kpis.includes(m.id)).map(m => ({ id: m.id, on: false })));
+  renderPicks(); $('#customBg').classList.add('open');
+}
+function renderPicks() {
+  const list = $('#pickList'); list.innerHTML = '';
+  draft.forEach((it, i) => {
+    const m = METRICS.find(x => x.id === it.id);
+    const row = document.createElement('div'); row.className = 'pick' + (it.on ? ' on' : '');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on; cb.id = 'pk_' + it.id;
+    cb.onchange = () => { it.on = cb.checked; row.classList.toggle('on', it.on); };
+    const lb = document.createElement('label'); lb.htmlFor = cb.id;
+    const t = document.createElement('span'); t.textContent = m.label;
+    const h = document.createElement('small'); h.textContent = m.help; lb.append(t, h);
+    const up = document.createElement('button'); up.className = 'mv'; up.textContent = '↑'; up.disabled = i === 0;
+    up.onclick = () => { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderPicks(); };
+    const dn = document.createElement('button'); dn.className = 'mv'; dn.textContent = '↓'; dn.disabled = i === draft.length - 1;
+    dn.onclick = () => { [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; renderPicks(); };
+    row.append(cb, lb, up, dn); list.appendChild(row);
+  });
+}
+$('#customBtn').onclick = openCustom;
+$('#customCancel').onclick = () => $('#customBg').classList.remove('open');
+$('#customReset').onclick = () => { draft = METRICS.map(m => ({ id: m.id, on: DEFAULT_KPIS.includes(m.id) }));
+  draft.sort((a, b) => (a.on ? DEFAULT_KPIS.indexOf(a.id) : 99) - (b.on ? DEFAULT_KPIS.indexOf(b.id) : 99)); renderPicks(); };
+$('#customSave').onclick = async () => {
+  state.kpis = draft.filter(x => x.on).map(x => x.id);
+  $('#customBg').classList.remove('open');
+  if (state.data) renderKpis();
+  try { await api('/api/prefs', { kpis: state.kpis }); } catch (e) { notice('Choix non enregistré : ' + e.message, true); }
+};
+api('/api/prefs').then(p => { if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); } }).catch(() => {});
 
 /* ---------- courbe du capital ---------- */
 function renderChart() {

@@ -435,6 +435,24 @@ def lifetime_watchdog():
             os._exit(0)
 
 
+PREFS_FILE = os.path.join(DATA_DIR, "preferences.json")
+
+
+@app.get("/api/prefs")
+def api_prefs_get():
+    return jsonify(_load(PREFS_FILE, {}))
+
+
+@app.post("/api/prefs")
+def api_prefs_set():
+    body = request.get_json(force=True) or {}
+    prefs = _load(PREFS_FILE, {})
+    if isinstance(body.get("kpis"), list):
+        prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    _save(PREFS_FILE, prefs)
+    return jsonify(prefs)
+
+
 @app.get("/api/version")
 def api_version():
     return jsonify({"version": _load(VERSION_FILE, {}).get("version", "?"),
