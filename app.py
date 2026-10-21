@@ -566,6 +566,21 @@ def api_refresh():
     return jsonify({"errors": errors, "need_password": need_password})
 
 
+@app.post("/api/rename")
+def api_rename():
+    body = request.get_json(force=True) or {}
+    login = str(body.get("login", ""))
+    name = str(body.get("name", "")).strip()[:60]
+    if not name:
+        return jsonify({"error": "Le nom ne peut pas être vide."}), 400
+    accounts = load_accounts()
+    if login not in accounts:
+        return jsonify({"error": "Compte introuvable."}), 404
+    accounts[login]["name"] = name
+    save_accounts(accounts)
+    return jsonify({"ok": True, "name": name})
+
+
 @app.post("/api/remove")
 def api_remove():
     login = str((request.get_json(force=True) or {}).get("login", ""))

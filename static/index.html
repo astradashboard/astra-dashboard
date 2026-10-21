@@ -32,6 +32,16 @@
   .acc:hover { background: var(--panel-2); }
   .acc.active { background: var(--gold-soft); border-color: rgba(196,138,69,.4); }
   .acc small { display: block; color: var(--muted); font-size: 11px; }
+  .acc-edit { width: 100%; background: var(--bg); border: 1px solid var(--gold); color: var(--fg); border-radius: 6px; padding: 3px 6px; font: inherit; }
+  .acc-edit:focus { outline: none; }
+  .ctx { position: fixed; z-index: 30; min-width: 190px; background: #1b2232; border: 1px solid var(--line); border-radius: 10px;
+    padding: 5px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .ctx button { display: flex; width: 100%; gap: 10px; align-items: center; background: none; border: none; color: var(--fg);
+    text-align: left; padding: 8px 10px; border-radius: 7px; }
+  .ctx button:hover { background: var(--panel-2); }
+  .ctx button.danger { color: var(--loss); }
+  .ctx hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
+  .ctx .ic { width: 16px; text-align: center; opacity: .8; }
   .acc .bal { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 9px; padding: 9px 12px; }
   .btn:hover { border-color: var(--gold); }
@@ -371,10 +381,74 @@ function renderAccounts() {
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
     b.append(left, bal);
-    b.onclick = () => { state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing) return; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    if (a.login !== 'all') {
+      b.title = 'Clic droit : renommer, actualiser ou supprimer';
+      b.addEventListener('contextmenu', ev => { ev.preventDefault(); openAccountMenu(a, ev.clientX, ev.clientY, b); });
+    }
     list.appendChild(b);
   }
   $('#removeBtn').hidden = state.sel === 'all' || !state.accounts.length;
+}
+
+/* ---------- menu clic droit des comptes ---------- */
+function closeMenu() { document.querySelectorAll('.ctx').forEach(m => m.remove()); }
+function openAccountMenu(acc, x, y, btn) {
+  closeMenu();
+  const menu = document.createElement('div'); menu.className = 'ctx';
+  const item = (ic, label, fn, danger) => {
+    const it = document.createElement('button'); if (danger) it.className = 'danger';
+    const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic;
+    const l = document.createElement('span'); l.textContent = label;
+    it.append(i, l); it.onclick = () => { closeMenu(); fn(); }; menu.appendChild(it);
+  };
+  item('✎', 'Renommer', () => startRename(acc, btn));
+  if (!acc.demo) item('↻', 'Actualiser ce compte', () => refreshAccount(acc.login));
+  menu.appendChild(document.createElement('hr'));
+  item('🗑', 'Supprimer le compte', () => deleteAccount(acc), true);
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, innerWidth - r.width - 8) + 'px';
+  menu.style.top = Math.min(y, innerHeight - r.height - 8) + 'px';
+}
+document.addEventListener('click', ev => { if (!ev.target.closest('.ctx')) closeMenu(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeMenu(); });
+window.addEventListener('blur', closeMenu);
+document.addEventListener('scroll', closeMenu, true);
+
+function startRename(acc, btn) {
+  const nameEl = btn.querySelector('div > div'); if (!nameEl) return;
+  btn.dataset.editing = '1';
+  const input = document.createElement('input'); input.className = 'acc-edit'; input.value = acc.name; input.maxLength = 60;
+  nameEl.replaceWith(input); input.focus(); input.select();
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true;
+    const name = input.value.trim();
+    if (save && name && name !== acc.name) {
+      try { await api('/api/rename', { login: acc.login, name }); } catch (e) { notice(e.message, true); }
+    }
+    await loadState();
+  };
+  input.addEventListener('keydown', ev => { if (ev.key === 'Enter') finish(true); if (ev.key === 'Escape') finish(false); ev.stopPropagation(); });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('click', ev => ev.stopPropagation());
+}
+async function refreshAccount(login) {
+  const btn = $('#refreshBtn'); btn.disabled = true; btn.textContent = 'Actualisation…';
+  try {
+    const r = await api('/api/refresh', { login });
+    r.errors.forEach(m => notice(m, true));
+    await loadState();
+    if (r.need_password.length) { const acc = state.accounts.find(a => a.login === r.need_password[0]); if (acc) openLogin(acc); }
+  } catch (e) { notice(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = '↻ Actualiser'; }
+}
+async function deleteAccount(acc) {
+  if (!confirm('Supprimer « ' + acc.name + ' » du dashboard ?\n\nSon historique et son mot de passe mémorisé seront effacés de ce PC. Tu pourras toujours le reconnecter plus tard.')) return;
+  await api('/api/remove', { login: acc.login });
+  if (state.sel === acc.login) { state.sel = 'all'; state.month = null; state.view = null; }
+  await loadState();
 }
 
 async function loadData() {
@@ -859,11 +933,7 @@ $('#cancelBtn').onclick = closeLogin;
 $('#addBtn').onclick = () => openLogin();
 $('#prevM').onclick = () => shiftMonth(-1);
 $('#nextM').onclick = () => shiftMonth(1);
-$('#removeBtn').onclick = async () => {
-  const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
-  if (!confirm('Retirer « ' + acc.name + ' » du dashboard ? Le mot de passe mémorisé sera aussi effacé.')) return;
-  await api('/api/remove', { login: acc.login }); state.sel = 'all'; state.month = null; state.view = null; await loadState();
-};
+$('#removeBtn').onclick = () => { const acc = state.accounts.find(a => a.login === state.sel); if (acc) deleteAccount(acc); };
 $('#refreshBtn').onclick = async () => {
   const btn = $('#refreshBtn'); btn.disabled = true; btn.textContent = 'Actualisation…';
   try {
