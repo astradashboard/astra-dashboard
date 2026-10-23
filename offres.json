@@ -10,7 +10,8 @@
       "period": "par mois",
       "accounts": 1,
       "variant_id": null,
-      "checkout_url": ""
+      "checkout_url": "",
+      "perks": []
     },
     {
       "id": "pro",
@@ -20,7 +21,11 @@
       "accounts": 50,
       "badge": "Le plus complet",
       "variant_id": null,
-      "checkout_url": ""
+      "checkout_url": "",
+      "perks": [
+        "live",
+        "pdf"
+      ]
     }
   ],
   "features": [
@@ -39,6 +44,20 @@
       }
     },
     {
+      "label": "Suivi en direct des trades en cours",
+      "values": {
+        "essentiel": false,
+        "pro": true
+      }
+    },
+    {
+      "label": "Rapport PDF mensuel",
+      "values": {
+        "essentiel": false,
+        "pro": true
+      }
+    },
+    {
       "label": "Tableau de bord, capital et calendrier des résultats",
       "values": {
         "essentiel": true,
@@ -46,21 +65,7 @@
       }
     },
     {
-      "label": "Suivi en direct des trades en cours",
-      "values": {
-        "essentiel": true,
-        "pro": true
-      }
-    },
-    {
       "label": "Journal de trading détaillé",
-      "values": {
-        "essentiel": true,
-        "pro": true
-      }
-    },
-    {
-      "label": "Rapport PDF mensuel",
       "values": {
         "essentiel": true,
         "pro": true

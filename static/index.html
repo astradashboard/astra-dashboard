@@ -375,6 +375,8 @@
   .live-table .pnl { font-weight: 700; font-size: 15px; }
   .live-table tfoot td { border-top: 1px solid var(--line); border-bottom: none; font-weight: 650; }
   .live-empty { color: var(--muted); text-align: center; padding: 22px 10px; }
+  .perk-box { display: grid; justify-items: center; gap: 12px; }
+  .btn.perk-off { opacity: .6; }
   @media (max-width: 860px) { .live-table .hide-s { display: none; } }
   .chart-row { --split: 66.6667%; display: grid; grid-template-columns: minmax(0, calc(var(--split) - 9px)) 18px minmax(0, 1fr); align-items: stretch; }
   .split-handle { cursor: col-resize; display: grid; place-items: center; touch-action: none; user-select: none; }
@@ -1790,6 +1792,8 @@ let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); re
 // ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
+const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
+function perkUpsell(what) { toast(what + ' est inclus dans l\'offre Pro.'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
 function applyLock() { document.body.classList.toggle('locked', !licOk()); }
 function licenceLost() {
   if (state.lic && !state.lic.active) return;
@@ -1985,7 +1989,8 @@ function renderJournal() {
   for (const a of state.accounts) as.append(new Option(shownName(a.name), a.login));
   as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
   const pdfBtn = el('button', 'btn', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
-  pdfBtn.onclick = () => openPdf(months);
+  if (!hasPerk('pdf')) { pdfBtn.classList.add('perk-off'); pdfBtn.title = 'Inclus dans l\'offre Pro'; pdfBtn.textContent = '⤓ PDF du mois · Pro'; }
+  pdfBtn.onclick = () => hasPerk('pdf') ? openPdf(months) : perkUpsell('Le rapport PDF mensuel');
   tools.append(as, ms, fs, sum, pdfBtn); box.appendChild(tools);
 
   const card = el('div', 'card'); card.style.padding = '8px 4px';
@@ -2717,6 +2722,19 @@ function applyLive(r) {
 }
 async function liveTick() {
   clearTimeout(liveTimer);
+  if (state.lic && state.lic.active && !hasPerk('live')) { // offre sans suivi en direct
+    if (state.page === 'dash' && !$('#liveBody').querySelector('.perk-box')) {
+      if (state.live) { state.live = null; if (state.data) renderHero(); }
+      setLiveStatus([]);
+      const body = $('#liveBody'); body.innerHTML = '';
+      const bx = el('div', 'live-empty perk-box');
+      bx.append(el('div', null, 'Le suivi en direct des trades en cours est inclus dans l\'offre Pro.'));
+      const b = el('button', 'btn primary', 'Voir les offres'); b.type = 'button'; b.onclick = () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); };
+      bx.appendChild(b); body.appendChild(bx);
+    }
+    liveTimer = setTimeout(liveTick, 3000); return;
+  }
+  if ($('#liveBody').querySelector('.perk-box')) $('#liveBody').innerHTML = '';
   if (!liveActive()) {
     if (state.sel === 'all' && state.page === 'dash') {
       if (state.live) { state.live = null; if (state.data) renderHero(); }

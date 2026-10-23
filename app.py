@@ -870,6 +870,8 @@ def _demo_snapshot(c):
 def api_live():
     import time
 
+    if not has_perk("live"):
+        return _perk_refused("live")
     login = str(request.args.get("login", ""))
     accounts, cache = load_accounts(), load_cache()
     if login not in accounts:
@@ -1790,6 +1792,26 @@ def licence_active():
         return False
 
 
+PERK_NAMES = {"live": "Le suivi en direct des trades", "pdf": "Le rapport PDF mensuel"}
+
+
+def has_perk(name):
+    """Fonction réservée à certaines offres (suivi en direct, rapport PDF)."""
+    lic = licence()
+    if lic.get("owner"):
+        return True
+    plan = next((p for p in load_offers().get("plans", []) if p.get("id") == lic.get("plan")), None)
+    if plan is None or "perks" not in plan:
+        return True
+    return name in plan["perks"]
+
+
+def _perk_refused(name):
+    best = next((p for p in load_offers().get("plans", []) if name in (p.get("perks") or [])), {})
+    return jsonify({"error": f"{PERK_NAMES.get(name, 'Cette fonction')} est inclus dans l'offre {best.get('name', 'supérieure')}. "
+                             "Change d'offre dans « Tarification ».", "perk": name}), 403
+
+
 def max_accounts():
     lic = licence()
     if lic.get("owner"):
@@ -1824,6 +1846,7 @@ def api_licence():
     out = _lic_public(lic)
     accounts, cache = load_accounts(), load_cache()
     out["real_accounts"] = sum(1 for l in accounts if not cache.get(l, {}).get("demo"))
+    out["perks"] = {k: (has_perk(k) if out.get("active") else False) for k in PERK_NAMES}
     return jsonify(out)
 
 
@@ -2256,6 +2279,8 @@ def _valid_month(month):
 
 @app.get("/rapport")
 def report_page():
+    if not has_perk("pdf"):
+        return _perk_refused("pdf")
     login, month = str(request.args.get("login", "")), str(request.args.get("month", ""))
     if not _valid_month(month):
         return "Mois invalide", 400
@@ -2280,6 +2305,8 @@ def find_pdf_browser():
 
 @app.get("/api/report.pdf")
 def api_report_pdf():
+    if not has_perk("pdf"):
+        return _perk_refused("pdf")
     import shutil
     import subprocess
     import tempfile
