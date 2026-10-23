@@ -178,6 +178,14 @@
   .tv-tools select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
   .tv-tools select:focus { outline: none; border-color: var(--gold); }
   .tv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tv-grid.n1 { grid-template-columns: 1fr; }
+  .tv-grid.n1 .tv-box { height: 560px; }
+  .tv-grid.n2 .tv-box { height: 460px; }
+  .tv-grid.n3 .tv-panel:nth-child(3) { grid-column: 1 / -1; }
+  .tv-count { display: flex; align-items: center; gap: 6px; }
+  .tv-count span { color: var(--muted); font-size: 12px; margin-right: 2px; }
+  .tv-count .btn { width: 32px; height: 30px; padding: 0; font-size: 13px; }
+  .tv-count .btn.on { background: var(--gold-soft); border-color: rgba(196,138,69,.6); color: var(--gold); font-weight: 700; }
   .tv-panel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .tv-panel .tv-tools select { flex: 1; min-width: 0; }
   .tv-panel .tv-tools select:last-child { flex: 0 0 auto; }
@@ -371,6 +379,13 @@
       <section class="card">
         <div class="card-head">
           <h2>Graphiques TradingView</h2>
+          <div class="tv-count" id="tvCount" title="Nombre de graphiques">
+            <span>Graphiques</span>
+            <button type="button" class="btn" data-n="1">1</button>
+            <button type="button" class="btn" data-n="2">2</button>
+            <button type="button" class="btn" data-n="3">3</button>
+            <button type="button" class="btn" data-n="4">4</button>
+          </div>
         </div>
         <div class="tv-grid" id="tvGrid"></div>
       </section>
@@ -1072,6 +1087,7 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
   if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
   else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
+  if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
 
@@ -1605,10 +1621,13 @@ const TV_DEFAULT = [
   { symbol: 'OANDA:XAUUSD', interval: '15' }, { symbol: 'OANDA:EURUSD', interval: '15' },
 ];
 state.tv = TV_DEFAULT.map(x => ({ ...x }));
+state.tvCount = 4;
 const tvLoaded = [];
 function buildTvGrid() {
   const grid = $('#tvGrid'); grid.innerHTML = '';
-  state.tv.forEach((cfg, i) => {
+  grid.className = 'tv-grid n' + state.tvCount;
+  document.querySelectorAll('#tvCount .btn').forEach(b => b.classList.toggle('on', Number(b.dataset.n) === state.tvCount));
+  state.tv.slice(0, state.tvCount).forEach((cfg, i) => {
     const panel = el('div', 'tv-panel');
     const tools = el('div', 'tv-tools');
     const ss = el('select'); ss.title = 'Actif du graphique ' + (i + 1);
@@ -1649,7 +1668,12 @@ function renderTvPanel(i, force) {
   const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
   setTimeout(() => clearInterval(t), 30000);
 }
-function renderTv(force) { state.tv.forEach((_, i) => renderTvPanel(i, force)); }
+function renderTv(force) { for (let i = 0; i < state.tvCount; i++) renderTvPanel(i, force); }
+document.querySelectorAll('#tvCount .btn').forEach(b => b.onclick = () => {
+  const n = Number(b.dataset.n); if (n === state.tvCount) return;
+  state.tvCount = n; buildTvGrid(); renderTv(true);
+  api('/api/prefs', { tvCount: n }).catch(() => {});
+});
 function saveTv() { api('/api/prefs', { tv: state.tv }).catch(() => {}); }
 buildTvGrid();
 
