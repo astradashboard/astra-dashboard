@@ -272,6 +272,8 @@
   .na .vis.us { background-image: linear-gradient(135deg, #1b2a4a 0%, #2b1d2e 100%); }
   .na .vis.eu { background-image: linear-gradient(135deg, #14284a 0%, #2a2a14 100%); }
   .na .vis.crypto { background-image: linear-gradient(135deg, #3a2410 0%, #1a1f2e 100%); }
+  .na .vis.asia { background-image: linear-gradient(135deg, #3a1420 0%, #1a2a2e 100%); }
+  .na .vis.au { background-image: linear-gradient(135deg, #10304a 0%, #2e1a1a 100%); }
   .na .vis.search { background-image: linear-gradient(135deg, #242a38 0%, #1a1f2e 100%); }
   .na .txt { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 7px; flex: 1; min-height: 0; }
   .na .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
@@ -2062,9 +2064,11 @@ buildEcoFilters();
 const NEWS_THEMES = [
   ['us', '🇺🇸 Économie US', ['bus', 'us']],
   ['eu', '🇪🇺 Économie Europe', ['beu', 'eu', 'eumk', 'investing']],
+  ['asia', '🌏 Économie Asie', ['basia', 'asia']],
+  ['au', '🇦🇺 Économie Australie', ['bau', 'au', 'auen']],
   ['crypto', '₿ Crypto', ['bcrypto', 'gcrypto', 'cryptoast', 'jdc', 'ctfr', 'cointribune']],
 ];
-const NEWS_SOURCE_NAMES = { bus: 'Bing · US', beu: 'Bing · Europe', bcrypto: 'Bing · Crypto', us: 'Économie US', eu: 'Économie Europe', eumk: 'Marchés européens', lemonde: 'Le Monde', lesechos: 'Les Echos', figaro: 'Le Figaro',
+const NEWS_SOURCE_NAMES = { bus: 'Bing · US', beu: 'Bing · Europe', bcrypto: 'Bing · Crypto', basia: 'Bing · Asie', asia: 'Économie Asie', bau: 'Bing · Australie', au: 'Économie Australie', auen: 'Australie (anglais)', us: 'Économie US', eu: 'Économie Europe', eumk: 'Marchés européens', lemonde: 'Le Monde', lesechos: 'Les Echos', figaro: 'Le Figaro',
   bfm: 'BFM Business', investing: 'Investing.com', gcrypto: 'Crypto', cryptoast: 'Cryptoast', jdc: 'Journal du Coin',
   ctfr: 'Cointelegraph FR', cointribune: 'Cointribune' };
 state.news = { themes: ['us'], shown: 12 };
@@ -2134,9 +2138,9 @@ function highlight(node, text, terms) {
 const NEWS_WEIGHTS = [
   [3, ['fed', 'reserve federale', 'powell', 'fomc', 'bce', 'lagarde', 'taux directeur', 'baisse des taux', 'hausse des taux', 'inflation', 'cpi', 'ipc',
        'nfp', 'emplois', 'chomage', 'recession', 'pib', 'croissance', 'krach', 'effondre', 'plonge', 'flambe', 'record', 'historique',
-       'droits de douane', 'tarifs douaniers', 'faillite', 'banque centrale', 'shutdown', 'dette americaine', 'tresor', 'opep', 'etf bitcoin', 'sec ']],
+       'droits de douane', 'tarifs douaniers', 'faillite', 'banque centrale', 'banque du japon', 'rba', 'pboc', 'banque populaire de chine', 'shutdown', 'dette americaine', 'tresor', 'opep', 'etf bitcoin', 'sec ']],
   [1.5, ['wall street', 'nasdaq', 'dow jones', 's&p', 'cac 40', 'dax', 'euro stoxx', 'dollar', 'euro', 'petrole', 'brent', 'or ', 'bitcoin',
-         'ethereum', 'crypto', 'resultats', 'bourse', 'marches', 'obligations', 'rendement', 'chine', 'trump', 'europe']],
+         'ethereum', 'crypto', 'resultats', 'bourse', 'marches', 'obligations', 'rendement', 'chine', 'trump', 'europe', 'nikkei', 'hang seng', 'yen', 'yuan', 'asx', 'dollar australien']],
 ];
 function newsScore(it) {
   const t = ' ' + norm(it.title + ' ' + (it.summary || '')) + ' ';
@@ -2148,7 +2152,7 @@ function newsScore(it) {
   if (it.image) sc += .6;
   return sc;
 }
-const THEME_ICON = { us: '🇺🇸', eu: '🇪🇺', crypto: '₿', search: '📰' };
+const THEME_ICON = { us: '🇺🇸', eu: '🇪🇺', asia: '🌏', au: '🇦🇺', crypto: '₿', search: '📰' };
 const ogQueue = [], ogTried = new Set(); let ogActive = 0;
 function setVisualImage(v, src, it) {
   const probe = new Image(); probe.referrerPolicy = 'no-referrer';

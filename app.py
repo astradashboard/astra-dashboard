@@ -855,7 +855,7 @@ def api_prefs_set():
         prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:12]
         prefs["newsV"] = 3
     if isinstance(body.get("newsThemes"), list):
-        th = [x for x in body["newsThemes"] if x in ("us", "eu", "crypto")]
+        th = [x for x in body["newsThemes"] if x in ("us", "eu", "asia", "au", "crypto")]
         if th:
             prefs["newsThemes"] = th
     if isinstance(body.get("eco"), dict):
@@ -1090,12 +1090,23 @@ def _bing(query):
 B_US = '"économie américaine" OR "Réserve fédérale" OR Powell OR "Wall Street" OR Nasdaq OR "dollar américain" OR "inflation américaine"'
 B_EU = '"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "Bourses européennes" OR DAX OR "Euro Stoxx"'
 B_CRYPTO = 'bitcoin OR cryptomonnaie OR ethereum OR crypto'
+B_ASIA = '"économie chinoise" OR "Banque du Japon" OR Nikkei OR "Hang Seng" OR yuan OR yen OR "économie japonaise" OR "Bourses asiatiques"'
+B_AU = '"économie australienne" OR "Banque de réserve d\'Australie" OR "dollar australien" OR ASX OR RBA OR "Australie économie"'
+ASIA_QUERY = ('"économie chinoise" OR "Banque populaire de Chine" OR "Banque du Japon" OR Nikkei OR "Hang Seng" OR "Bourses asiatiques" '
+              'OR "économie japonaise" OR yuan OR yen OR "Corée du Sud" économie OR Inde économie when:3d')
+AU_QUERY = ('"économie australienne" OR "Banque de réserve d\'Australie" OR RBA OR "dollar australien" OR ASX OR "Australie" économie '
+            'OR "Nouvelle-Zélande" économie when:7d')
 
 NEWS_FEEDS = {  # id : (nom affiché, adresse du flux, thème)
     "us": ("Économie US", _gnews(US_QUERY), "us"),
     "bus": ("Économie US", _bing(B_US), "us"),
     "beu": ("Économie Europe", _bing(B_EU), "eu"),
     "bcrypto": ("Crypto", _bing(B_CRYPTO), "crypto"),
+    "basia": ("Économie Asie", _bing(B_ASIA), "asia"),
+    "asia": ("Économie Asie", _gnews(ASIA_QUERY), "asia"),
+    "bau": ("Économie Australie", _bing(B_AU), "au"),
+    "au": ("Économie Australie", _gnews(AU_QUERY), "au"),
+    "auen": ("Australie (anglais)", "https://news.google.com/rss/search?q=Australia+economy+OR+RBA+OR+ASX+OR+%22Australian+dollar%22+when:3d&hl=en-AU&gl=AU&ceid=AU:en", "au"),
     "eu": ("Économie Europe", _gnews(EU_QUERY), "eu"),
     "eumk": ("Marchés européens", _gnews(EU_MARKETS_QUERY), "eu"),
     "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eu"),
@@ -1301,14 +1312,14 @@ def api_news_search():
 def api_news():
     from concurrent.futures import ThreadPoolExecutor
 
-    ids = [x for x in str(request.args.get("sources", "")).split(",") if x in NEWS_FEEDS][:12] or list(NEWS_FEEDS)[:5]
+    ids = [x for x in str(request.args.get("sources", "")).split(",") if x in NEWS_FEEDS][:30] or list(NEWS_FEEDS)[:5]
     if request.args.get("fresh") == "1":
         for i in ids:
             hit = _news_cache.get(i)
             if hit and __import__("time").time() - hit["at"] > 60:
                 hit["at"] = 0  # « Actualiser » : relire le flux (au plus une fois par minute)
     items, failed = [], []
-    with ThreadPoolExecutor(max_workers=10) as pool:
+    with ThreadPoolExecutor(max_workers=12) as pool:
         futures = {i: pool.submit(_fetch_feed, i) for i in ids}
         for i, f in futures.items():
             try:
