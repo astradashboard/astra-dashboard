@@ -589,14 +589,32 @@ SERVER = {"port": None}
 _remote_cache = {"at": 0.0, "version": None}
 
 
+def latest_ref():
+    """Identifiant du dernier commit publié, via l'API GitHub (réponse immédiate, sans cache).
+    En cas d'échec (hors ligne, limite de l'API), on retombe sur le nom de la branche."""
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{UPDATE_REPO}/commits/{UPDATE_BRANCH}",
+            headers={"Accept": "application/vnd.github.sha", "User-Agent": APP_NAME, "Cache-Control": "no-cache"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            sha = r.read().decode("ascii", "ignore").strip()
+        if len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+            return sha
+    except Exception:
+        pass
+    return UPDATE_BRANCH
+
+
 def remote_version():
     """Dernière version publiée sur GitHub (gardée 60 s en mémoire)."""
     import time
     import urllib.request
 
-    if time.time() - _remote_cache["at"] < 60 and _remote_cache["version"]:
+    if time.time() - _remote_cache["at"] < 45 and _remote_cache["version"]:
         return _remote_cache["version"]
-    url = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{UPDATE_BRANCH}/version.json?t={int(time.time())}"
+    url = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{latest_ref()}/version.json?t={int(time.time())}"
     req = urllib.request.Request(url, headers={"Cache-Control": "no-cache", "User-Agent": APP_NAME})
     with urllib.request.urlopen(req, timeout=8) as r:
         v = json.loads(r.read().decode("utf-8")).get("version")
@@ -1223,7 +1241,7 @@ def check_for_update():
     import time
     import urllib.request
 
-    base = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{UPDATE_BRANCH}/"
+    base = f"https://raw.githubusercontent.com/{UPDATE_REPO}/{latest_ref()}/"
 
     def get(path):
         from urllib.parse import quote

@@ -1450,7 +1450,12 @@ async function checkUpdate() {
   };
   bar.append(t, btn); box.appendChild(bar);
 }
-checkUpdate(); setInterval(checkUpdate, 120000);
+checkUpdate(); setInterval(checkUpdate, 90000);
+// vérifier aussi dès que l'on revient sur la fenêtre
+let lastUpdCheck = Date.now();
+const checkSoon = () => { if (Date.now() - lastUpdCheck > 20000) { lastUpdCheck = Date.now(); checkUpdate(); } };
+window.addEventListener('focus', checkSoon);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkSoon(); });
 
 // signes de vie : l'application se ferme quand cette fenêtre est fermée
 const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
