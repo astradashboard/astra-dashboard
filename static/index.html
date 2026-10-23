@@ -212,6 +212,12 @@
   .field label { font-size: 12px; color: var(--muted); }
   .field input { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
   .field input:focus { outline: none; border-color: var(--gold); }
+  .modal.pdf-done { max-width: 920px; height: calc(100vh - 40px); display: flex; flex-direction: column; padding: 18px 20px; }
+  .pdf-done-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .pdf-done-head h2 { color: var(--win); }
+  .pdf-done-head .sub { margin: 4px 0 0; word-break: break-word; }
+  .pdf-done-head .right { display: flex; gap: 8px; }
+  #pdfPreview { flex: 1; width: 100%; min-height: 300px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
   .field-select { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
   .field-select:focus { outline: none; border-color: var(--gold); }
   .kpi[data-risk] { cursor: pointer; }
@@ -383,6 +389,22 @@
       </div>
     </div>
   </form>
+</div>
+
+<div class="modal-bg" id="pdfDoneBg">
+  <div class="modal pdf-done">
+    <div class="pdf-done-head">
+      <div>
+        <h2>✓ PDF enregistré</h2>
+        <p class="sub" id="pdfDoneName"></p>
+      </div>
+      <div class="right">
+        <button type="button" class="btn" id="pdfDoneOpen">Ouvrir en grand</button>
+        <button type="button" class="btn primary" id="pdfDoneClose">Fermer</button>
+      </div>
+    </div>
+    <iframe id="pdfPreview" title="Aperçu du PDF"></iframe>
+  </div>
 </div>
 
 <div class="modal-bg" id="customBg">
@@ -571,6 +593,16 @@ function openPdf(months) {
   $('#pdfBg').classList.add('open');
 }
 $('#pdfCancel').onclick = () => $('#pdfBg').classList.remove('open');
+let pdfDoneUrl = null;
+function showPdfDone(url, name) {
+  if (pdfDoneUrl) URL.revokeObjectURL(pdfDoneUrl);
+  pdfDoneUrl = url;
+  $('#pdfDoneName').textContent = name + ' · dans ton dossier Téléchargements';
+  $('#pdfPreview').src = url + '#toolbar=0&navpanes=0&view=FitH';
+  $('#pdfDoneBg').classList.add('open');
+}
+$('#pdfDoneOpen').onclick = () => { if (pdfDoneUrl) window.open(pdfDoneUrl, '_blank'); };
+$('#pdfDoneClose').onclick = () => { $('#pdfDoneBg').classList.remove('open'); $('#pdfPreview').src = 'about:blank'; };
 $('#pdfForm').addEventListener('submit', async ev => {
   ev.preventDefault();
   const month = $('#pdfMonth').value, login = state.sel, btn = $('#pdfGo');
@@ -589,9 +621,8 @@ $('#pdfForm').addEventListener('submit', async ev => {
     const name = m ? decodeURIComponent(m[1]) : 'Rapport ASTRA ' + month + '.pdf';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
     $('#pdfBg').classList.remove('open');
-    toast('PDF enregistré : ' + name);
+    showPdfDone(url, name);
   } catch (e) {
     $('#pdfErr').textContent = e.message; $('#pdfErr').style.display = 'block';
   } finally { btn.disabled = false; btn.textContent = 'Enregistrer en PDF'; }
