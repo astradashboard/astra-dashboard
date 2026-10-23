@@ -578,6 +578,8 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    if isinstance(body.get("layout"), list):
+        prefs["layout"] = [str(x)[:20] for x in body["layout"]][:10]
     if "heroCur" in body:
         cur = str(body.get("heroCur") or "")[:3].upper()
         prefs["heroCur"] = cur if cur in FX_CURRENCIES else ""
