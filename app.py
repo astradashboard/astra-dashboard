@@ -888,6 +888,7 @@ def month_report(login, month):
     pnl = sum(v["pnl"] for _, v in days)
     trades_n = sum(v.get("trades", 0) for _, v in days)
     wins = sum(v.get("wins", 0) for _, v in days)
+    losses = sum(v.get("losses", 0) for _, v in days)
     gain = sum(v["pnl"] for _, v in traded if v["pnl"] > 0)
     loss = -sum(v["pnl"] for _, v in traded if v["pnl"] < 0)
     bal, peak, max_dd = start_cap, start_cap, 0.0
@@ -903,12 +904,16 @@ def month_report(login, month):
         risk = risk_cfg["value"] if risk_cfg["mode"] == "amount" else risk_cfg["value"] / 100 * (c.get("start_balance") or 0)
     trades = [t for t in (c.get("trades") or []) if t.get("d", "").startswith(month)]
     trades.sort(key=lambda t: t.get("ct") or t["d"])
+    if trades:  # compteurs alignés sur la liste des positions du rapport
+        trades_n = len(trades)
+        wins = sum(1 for t in trades if t["n"] > 0)
+        losses = sum(1 for t in trades if t["n"] < 0)
     best = max(traded, key=lambda x: x[1]["pnl"]) if traded else None
     worst = min(traded, key=lambda x: x[1]["pnl"]) if traded else None
     return {
         "acc": acc, "cur": cur, "month": month, "start_cap": start_cap, "end_cap": start_cap + pnl, "pnl": pnl,
         "pct": pnl / start_cap * 100 if start_cap else 0.0, "r": pnl / risk if risk else None, "risk": risk,
-        "trades_n": trades_n, "wins": wins, "win_days": sum(1 for _, v in traded if v["pnl"] > 0),
+        "trades_n": trades_n, "wins": wins, "losses": losses, "win_days": sum(1 for _, v in traded if v["pnl"] > 0),
         "traded_days": len(traded), "pf": (gain / loss) if loss else None, "gain": gain, "loss": loss,
         "max_dd": max_dd, "max_dd_pct": max_dd / peak * 100 if peak else 0.0, "best": best, "worst": worst,
         "curve": curve, "days": dict(days), "trades": trades,
@@ -924,7 +929,7 @@ def report_html(rep, auto_print=False):
     acc = rep["acc"]
 
     # courbe du capital
-    W, H, L, B = 720, 190, 70, 22
+    W, H, L, B = 720, 170, 70, 22
     vals = [v for _, v in rep["curve"]]
     lo, hi = min(vals), max(vals)
     pad_ = (hi - lo) * 0.1 or max(50.0, abs(hi) * 0.002)
@@ -962,6 +967,9 @@ def report_html(rep, auto_print=False):
         card("Résultat en R", _fmt_r(rep["r"]) if rep["r"] is not None else "—",
              f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else "Risque par trade non défini",
              _cls(rep["r"] or 0)),
+        card("Trades gagnants", str(rep["wins"]), "", "pos" if rep["wins"] else ""),
+        card("Trades perdants", str(rep["losses"]), "", "neg" if rep["losses"] else ""),
+        card("Trades au total", str(rep["trades_n"]), ""),
         card("Taux de réussite", wr, f"{rep['wins']} gagnants sur {rep['trades_n']} trades"),
         card("Capital début → fin", _fmt_money(rep["start_cap"], cur) + "  →  " + _fmt_money(rep["end_cap"], cur), ""),
     ])
@@ -996,11 +1004,10 @@ body {{ margin: 0; padding: 0 3px; font: 11px/1.45 "Segoe UI", system-ui, sans-s
 .head p {{ margin: 3px 0 0; color: #9aa3b5; font-size: 11px; }}
 h2 {{ font-size: 13px; margin: 18px 0 8px; color: #0f1420; border-left: 3px solid #c48a45; padding-left: 8px; }}
 .kpis {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }}
-.kpis .kpi:nth-child(-n+3) {{ grid-column: span 2; }}
-.kpis .kpi:nth-child(n+4) {{ grid-column: span 3; }}
+.kpis .kpi:nth-child(-n+6) {{ grid-column: span 2; }}
+.kpis .kpi:nth-child(n+7) {{ grid-column: span 3; }}
 .kpi .v {{ font-size: 18px !important; }}
-.page2 {{ break-before: page; }}
-.page2 h2 {{ margin-top: 0; }}
+
 .kpi {{ border: 1px solid #e5e1da; border-radius: 9px; padding: 9px 11px; break-inside: avoid; }}
 .kpi .k {{ color: #6b7280; font-size: 10px; }}
 .kpi .v {{ font-size: 16px; font-weight: 700; margin-top: 2px; }}
