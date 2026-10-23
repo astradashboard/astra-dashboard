@@ -1017,7 +1017,8 @@ def report_html(rep, auto_print=False, preview=False):
 <style>
 @page {{ size: A4; margin: 12mm 12mm 14mm; }}
 * {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
-body {{ margin: 0; padding: 0 3px; font: 11px/1.45 "Segoe UI", system-ui, sans-serif; color: #1c2230; background: #fff; }}
+body {{ margin: 0; background: #fff; }}
+.rep {{ padding: 0 3px; font: 11px/1.45 "Segoe UI", system-ui, sans-serif; color: #1c2230; background: #fff; }}
 .head {{ background: #0f1420; color: #e8ebf2; border-radius: 12px; padding: 18px 20px; text-align: center; }}
 .head h1 {{ margin: 0; font-size: 22px; font-weight: 650; }}
 .head h1 span {{ color: #c48a45; }}
@@ -1050,13 +1051,13 @@ tr {{ break-inside: avoid; }}
 .badge {{ padding: 1px 7px; border-radius: 5px; font-size: 9.5px; font-weight: 600; }}
 .badge.buy {{ background: #e7f6ec; color: #15803d; }} .badge.sell {{ background: #fdeaea; color: #dc2626; }}
 .foot {{ margin-top: 16px; color: #9aa3b5; font-size: 9px; text-align: center; }}
-</style></head><body>
+</style></head><body><div class="rep">
 <div class="head"><h1>Rapport mensuel · <span>{title}</span></h1><p>{acc_line}</p><p>Généré le {now}</p></div>
 <h2>Synthèse du mois</h2><div class="kpis">{kpis}</div>
 <h2>Évolution du capital</h2><div class="chart">{chart}</div>
 <div class="page2"><h2>Trades du mois ({len(rep['trades'])})</h2>{table}</div>
 <div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else ''}</div>
-{script}{preview_css}</body></html>"""
+</div>{script}{preview_css}</body></html>"""
 
 
 def _valid_month(month):
