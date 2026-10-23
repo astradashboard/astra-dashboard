@@ -365,6 +365,26 @@
   </form>
 </div>
 
+<div class="modal-bg" id="pdfBg">
+  <form class="modal" id="pdfForm">
+    <h2>Rapport PDF du mois</h2>
+    <p class="sub" id="pdfSub"></p>
+    <div class="err" id="pdfErr"></div>
+    <div class="field">
+      <label for="pdfMonth">Mois</label>
+      <select id="pdfMonth" class="field-select"></select>
+    </div>
+    <p class="sub" style="margin:4px 0 16px">Le PDF contient la synthèse du mois, la courbe du capital, le calendrier et la liste des trades. Il est enregistré dans ton dossier Téléchargements.</p>
+    <div class="modal-actions">
+      <span></span>
+      <div class="right">
+        <button type="button" class="btn" id="pdfCancel">Annuler</button>
+        <button type="submit" class="btn primary" id="pdfGo">Enregistrer en PDF</button>
+      </div>
+    </div>
+  </form>
+</div>
+
 <div class="modal-bg" id="customBg">
   <div class="modal">
     <h2>Personnaliser les indicateurs</h2>
@@ -538,6 +558,44 @@ $('#riskValue').oninput = updateRiskHint;
 $('#riskCancel').onclick = () => $('#riskBg').classList.remove('open');
 $('#riskClear').onclick = () => saveRisk({ mode: null });
 $('#riskForm').addEventListener('submit', e => { e.preventDefault(); saveRisk({ mode: $('#riskMode').value, value: $('#riskValue').value }); });
+
+/* ---------- rapport PDF ---------- */
+function openPdf(months) {
+  const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
+  const sel = $('#pdfMonth'); sel.innerHTML = '';
+  const list = months.length ? months : [new Date().getFullYear() + '-' + pad(new Date().getMonth() + 1)];
+  for (const k of list) { const mn = MONTHS[Number(k.slice(5)) - 1]; sel.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
+  sel.value = state.jMonth !== 'all' && list.includes(state.jMonth) ? state.jMonth : list[0];
+  $('#pdfSub').textContent = acc.name; $('#pdfErr').style.display = 'none';
+  $('#pdfGo').disabled = false; $('#pdfGo').textContent = 'Enregistrer en PDF';
+  $('#pdfBg').classList.add('open');
+}
+$('#pdfCancel').onclick = () => $('#pdfBg').classList.remove('open');
+$('#pdfForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const month = $('#pdfMonth').value, login = state.sel, btn = $('#pdfGo');
+  const q = 'login=' + encodeURIComponent(login) + '&month=' + encodeURIComponent(month);
+  btn.disabled = true; btn.textContent = 'Création du PDF…';
+  try {
+    const r = await fetch('/api/report.pdf?' + q);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      if (j.fallback) { window.open('/rapport?' + q + '&print=1', '_blank'); $('#pdfBg').classList.remove('open'); return; }
+      throw new Error(j.error || 'Création du PDF impossible');
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+    const name = m ? decodeURIComponent(m[1]) : 'Rapport ASTRA ' + month + '.pdf';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    $('#pdfBg').classList.remove('open');
+    toast('PDF enregistré : ' + name);
+  } catch (e) {
+    $('#pdfErr').textContent = e.message; $('#pdfErr').style.display = 'block';
+  } finally { btn.disabled = false; btn.textContent = 'Enregistrer en PDF'; }
+});
 
 /* ---------- menu clic droit des comptes ---------- */
 function closeMenu() { document.querySelectorAll('.ctx').forEach(m => m.remove()); }
@@ -1247,7 +1305,9 @@ function renderJournal() {
   const as = el('select'); as.title = 'Compte du journal';
   for (const a of state.accounts) as.append(new Option(a.name, a.login));
   as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
-  tools.append(as, ms, fs, sum); box.appendChild(tools);
+  const pdfBtn = el('button', 'btn', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
+  pdfBtn.onclick = () => openPdf(months);
+  tools.append(as, ms, fs, sum, pdfBtn); box.appendChild(tools);
 
   const card = el('div', 'card'); card.style.padding = '8px 4px';
   if (!list.length) { const p = el('p', null, 'Aucun trade pour ce filtre.'); p.style.cssText = 'color:var(--muted);padding:12px 14px'; card.appendChild(p); box.appendChild(card); return; }

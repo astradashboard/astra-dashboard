@@ -841,6 +841,296 @@ def api_demo():
     return jsonify(account_summary(login, accounts[login], cache))
 
 
+# ---------------------------------------------------------------- rapport mensuel PDF
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+        "septembre", "octobre", "novembre", "décembre"]
+CUR_SYMBOL = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "CHF": "CHF", "AUD": "A$", "CAD": "C$"}
+
+
+def _fmt_money(v, cur, sign=False):
+    dec = 0 if cur == "JPY" else 2
+    txt = f"{abs(v):,.{dec}f}".replace(",", " ").replace(".", ",")
+    if float(txt.replace(" ", "").replace(",", ".")) == 0:
+        v = 0
+    s_ = "+" if sign and v > 0 else ("−" if v < 0 else "")
+    return f"{s_}{txt} {CUR_SYMBOL.get(cur, cur)}"
+
+
+def _fmt_num(v, dec=2):
+    return f"{v:,.{dec}f}".replace(",", " ").replace(".", ",")
+
+
+def _fmt_pct(v):
+    return ("+" if v > 0 else "−" if v < 0 else "") + _fmt_num(abs(v)) + " %"
+
+
+def _fmt_r(v):
+    if abs(v) < 0.005:
+        v = 0
+    return ("+" if v > 0 else "−" if v < 0 else "") + _fmt_num(abs(v)) + " R"
+
+
+def _cls(v):
+    return "pos" if v > 0 else "neg" if v < 0 else ""
+
+
+def month_report(login, month):
+    """Chiffres d'un mois pour un compte (même logique que le tableau de bord)."""
+    accounts, cache = load_accounts(), load_cache()
+    if login not in accounts or login not in cache:
+        raise KeyError("Compte introuvable.")
+    acc, c = accounts[login], cache[login]
+    cur = c.get("currency") or "USD"
+    daily = c.get("daily", {})
+    start_cap = (c.get("start_balance") or 0.0) + sum(v["pnl"] for d, v in daily.items() if d < month + "-01")
+    days = [(d, v) for d, v in sorted(daily.items()) if d.startswith(month)]
+    traded = [(d, v) for d, v in days if v.get("trades") or v.get("pnl")]
+    pnl = sum(v["pnl"] for _, v in days)
+    trades_n = sum(v.get("trades", 0) for _, v in days)
+    wins = sum(v.get("wins", 0) for _, v in days)
+    gain = sum(v["pnl"] for _, v in traded if v["pnl"] > 0)
+    loss = -sum(v["pnl"] for _, v in traded if v["pnl"] < 0)
+    bal, peak, max_dd = start_cap, start_cap, 0.0
+    curve = [("", start_cap)]
+    for d, v in days:
+        bal += v["pnl"]
+        peak = max(peak, bal)
+        max_dd = max(max_dd, peak - bal)
+        curve.append((d, bal))
+    risk_cfg = acc.get("risk")
+    risk = None
+    if risk_cfg:
+        risk = risk_cfg["value"] if risk_cfg["mode"] == "amount" else risk_cfg["value"] / 100 * (c.get("start_balance") or 0)
+    trades = [t for t in (c.get("trades") or []) if t.get("d", "").startswith(month)]
+    trades.sort(key=lambda t: t.get("ct") or t["d"])
+    best = max(traded, key=lambda x: x[1]["pnl"]) if traded else None
+    worst = min(traded, key=lambda x: x[1]["pnl"]) if traded else None
+    return {
+        "acc": acc, "cur": cur, "month": month, "start_cap": start_cap, "end_cap": start_cap + pnl, "pnl": pnl,
+        "pct": pnl / start_cap * 100 if start_cap else 0.0, "r": pnl / risk if risk else None, "risk": risk,
+        "trades_n": trades_n, "wins": wins, "win_days": sum(1 for _, v in traded if v["pnl"] > 0),
+        "traded_days": len(traded), "pf": (gain / loss) if loss else None, "gain": gain, "loss": loss,
+        "max_dd": max_dd, "max_dd_pct": max_dd / peak * 100 if peak else 0.0, "best": best, "worst": worst,
+        "curve": curve, "days": dict(days), "trades": trades,
+    }
+
+
+def report_html(rep, auto_print=False):
+    from html import escape as e
+
+    cur, month = rep["cur"], rep["month"]
+    y, m = int(month[:4]), int(month[5:7])
+    title = f"{MOIS[m - 1].capitalize()} {y}"
+    acc = rep["acc"]
+
+    # courbe du capital
+    W, H, L, B = 720, 190, 70, 22
+    vals = [v for _, v in rep["curve"]]
+    lo, hi = min(vals), max(vals)
+    pad_ = (hi - lo) * 0.1 or max(50.0, abs(hi) * 0.002)
+    lo, hi = lo - pad_, hi + pad_
+    n = max(1, len(vals) - 1)
+    X = lambda i: L + (W - L - 10) * i / n
+    Y = lambda v: 8 + (H - 8 - B) * (1 - (v - lo) / (hi - lo))
+    grid = "".join(
+        f'<line x1="{L}" x2="{W-10}" y1="{Y(lo+(hi-lo)*k/4):.1f}" y2="{Y(lo+(hi-lo)*k/4):.1f}" stroke="#e5e1da"/>'
+        f'<text x="{L-6}" y="{Y(lo+(hi-lo)*k/4)+4:.1f}" text-anchor="end" font-size="9" fill="#8a8f99">{e(_fmt_money(lo+(hi-lo)*k/4, cur).split(",")[0])}</text>'
+        for k in range(5))
+    path = " ".join(("M" if i == 0 else "L") + f"{X(i):.1f} {Y(v):.1f}" for i, v in enumerate(vals))
+    area = path + f" L{X(len(vals)-1):.1f} {H-B} L{X(0):.1f} {H-B} Z"
+    labels = ""
+    step = max(1, len(vals) // 7)
+    for i in range(1, len(vals), step):
+        d = rep["curve"][i][0]
+        labels += f'<text x="{X(i):.1f}" y="{H-6}" text-anchor="middle" font-size="9" fill="#8a8f99">{int(d[8:])}</text>'
+    base_y = Y(rep["start_cap"])
+    chart = (f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg">'
+             f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c48a45" stop-opacity=".30"/>'
+             f'<stop offset="1" stop-color="#c48a45" stop-opacity="0"/></linearGradient></defs>{grid}'
+             f'<line x1="{L}" x2="{W-10}" y1="{base_y:.1f}" y2="{base_y:.1f}" stroke="#8a8f99" stroke-dasharray="4 4"/>'
+             f'<path d="{area}" fill="url(#g)"/><path d="{path}" fill="none" stroke="#c48a45" stroke-width="2.2" stroke-linejoin="round"/>'
+             f'{labels}</svg>') if len(vals) > 1 else '<p class="muted">Aucun trade ce mois-ci.</p>'
+
+    # calendrier
+    first = dt.date(y, m, 1)
+    days_in = (dt.date(y + (m == 12), m % 12 + 1, 1) - first).days
+    cells = ['<div class="dow">' + d_ + "</div>" for d_ in ("Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim")]
+    cells += ['<div class="day empty"></div>'] * first.weekday()
+    for dn in range(1, days_in + 1):
+        key = f"{month}-{dn:02d}"
+        v = rep["days"].get(key)
+        if v and (v.get("trades") or v.get("pnl")):
+            c_ = _cls(v["pnl"])
+            nb = v.get("trades", 0)
+            cells.append(f'<div class="day {c_ and ("win" if c_ == "pos" else "loss")}"><span class="n">{dn}</span>'
+                         f'<span class="p {c_}">{e(_fmt_money(v["pnl"], cur, True))}</span>'
+                         f'<span class="t">{nb} trade{"s" if nb > 1 else ""}</span></div>')
+        else:
+            cells.append(f'<div class="day"><span class="n">{dn}</span></div>')
+    while len(cells) % 7:
+        cells.append('<div class="day empty"></div>')
+    calendar = '<div class="cal">' + "".join(cells) + "</div>"
+
+    # synthèse
+    def card(k, v, sub="", c_=""):
+        return f'<div class="kpi"><div class="k">{k}</div><div class="v {c_}">{e(v)}</div><div class="s">{e(sub)}</div></div>'
+
+    wr = f"{round(rep['wins'] / rep['trades_n'] * 100)} %" if rep["trades_n"] else "—"
+    wd = f"{round(rep['win_days'] / rep['traded_days'] * 100)} %" if rep["traded_days"] else "—"
+    best, worst = rep["best"], rep["worst"]
+    fmt_day = lambda x: f"{int(x[0][8:])} {MOIS[m - 1][:4]}." if x else ""
+    kpis = "".join([
+        card("Résultat du mois", _fmt_money(rep["pnl"], cur, True), _fmt_pct(rep["pct"]), _cls(rep["pnl"])),
+        card("Résultat en R", _fmt_r(rep["r"]) if rep["r"] is not None else "—",
+             f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else "Risque par trade non défini",
+             _cls(rep["r"] or 0)),
+        card("Capital début → fin", _fmt_money(rep["end_cap"], cur), "Début " + _fmt_money(rep["start_cap"], cur)),
+        card("Taux de réussite", wr, f"{rep['wins']} / {rep['trades_n']} trades"),
+        card("Jours gagnants", wd, f"{rep['win_days']} / {rep['traded_days']} jours"),
+        card("Profit factor", _fmt_num(rep["pf"]) if rep["pf"] else ("∞" if rep["gain"] else "—"),
+             "Gains " + _fmt_money(rep["gain"], cur) + " · Pertes " + _fmt_money(rep["loss"], cur)),
+        card("Meilleur jour", _fmt_money(best[1]["pnl"], cur, True) if best else "—", fmt_day(best), "pos" if best and best[1]["pnl"] > 0 else ""),
+        card("Pire jour", _fmt_money(worst[1]["pnl"], cur, True) if worst else "—", fmt_day(worst), "neg" if worst and worst[1]["pnl"] < 0 else ""),
+        card("Drawdown max", _fmt_money(-rep["max_dd"], cur) if rep["max_dd"] else "—",
+             _fmt_pct(-rep["max_dd_pct"]) if rep["max_dd"] else "aucun", "neg" if rep["max_dd"] else ""),
+    ])
+
+    # trades
+    rows = []
+    for t in rep["trades"]:
+        ct = t.get("ct") or t["d"]
+        when = f"{ct[8:10]}/{ct[5:7]}" + (f" {ct[11:16]}" if len(ct) > 10 else "")
+        side = {"buy": '<span class="badge buy">Long</span>', "sell": '<span class="badge sell">Short</span>'}.get(t.get("side"), "—")
+        r_txt = _fmt_r(t["n"] / rep["risk"]) if rep["risk"] else "—"
+        px = lambda v: _fmt_num(v, 2) if isinstance(v, (int, float)) else "—"
+        rows.append(f"<tr><td>{e(when)}</td><td><b>{e(t.get('s') or '—')}</b></td><td>{side}</td>"
+                    f"<td class='r'>{px(t.get('v'))}</td><td class='r'>{px(t.get('op'))}</td><td class='r'>{px(t.get('cp'))}</td>"
+                    f"<td class='r {_cls(t['n'])}'><b>{e(_fmt_money(t['n'], cur, True))}</b></td>"
+                    f"<td class='r {_cls(t['n']) if rep['risk'] else ''}'>{e(r_txt)}</td></tr>")
+    table = ("<table><thead><tr><th>Clôture</th><th>Symbole</th><th>Sens</th><th class='r'>Lots</th><th class='r'>Entrée</th>"
+             "<th class='r'>Sortie</th><th class='r'>PnL</th><th class='r'>R</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+             ) if rows else '<p class="muted">Aucun trade détaillé pour ce mois. Actualise le compte dans l\'app pour charger les trades.</p>'
+
+    now = dt.datetime.now().strftime("%d/%m/%Y à %H:%M")
+    acc_line = e(acc.get("name") or acc["login"]) + (f" · {e(acc['login'])} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
+    script = "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script>" if auto_print else ""
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '')} - {title}</title>
+<style>
+@page {{ size: A4; margin: 12mm 12mm 14mm; }}
+* {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+body {{ margin: 0; padding: 0 3px; font: 11px/1.45 "Segoe UI", system-ui, sans-serif; color: #1c2230; background: #fff; }}
+.head {{ background: #0f1420; color: #e8ebf2; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }}
+.head img {{ height: 54px; }}
+.head .t {{ text-align: right; }}
+.head h1 {{ margin: 0; font-size: 20px; font-weight: 650; }}
+.head h1 span {{ color: #c48a45; }}
+.head p {{ margin: 3px 0 0; color: #9aa3b5; font-size: 11px; }}
+h2 {{ font-size: 13px; margin: 18px 0 8px; color: #0f1420; border-left: 3px solid #c48a45; padding-left: 8px; }}
+.kpis {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }}
+.kpi {{ border: 1px solid #e5e1da; border-radius: 9px; padding: 9px 11px; break-inside: avoid; }}
+.kpi .k {{ color: #6b7280; font-size: 10px; }}
+.kpi .v {{ font-size: 16px; font-weight: 700; margin-top: 2px; }}
+.kpi .s {{ color: #6b7280; font-size: 9.5px; margin-top: 1px; }}
+.pos {{ color: #15803d; }} .neg {{ color: #dc2626; }} .muted {{ color: #6b7280; }}
+.chart {{ border: 1px solid #e5e1da; border-radius: 9px; padding: 8px 10px 2px; }}
+.cal {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; break-inside: avoid; }}
+.dow {{ text-align: center; color: #6b7280; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }}
+.day {{ border-radius: 6px; background: #f5f3ef; min-height: 44px; padding: 4px 5px; display: flex; flex-direction: column; justify-content: space-between; }}
+.day.empty {{ background: transparent; }}
+.day.win {{ background: #e7f6ec; }} .day.loss {{ background: #fdeaea; }}
+.day .n {{ color: #6b7280; font-size: 9px; }}
+.day .p {{ font-weight: 700; font-size: 10px; text-align: right; }}
+.day .t {{ color: #6b7280; font-size: 8.5px; text-align: right; }}
+table {{ width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }}
+th {{ text-align: left; color: #6b7280; font-weight: 600; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; padding: 6px; border-bottom: 1.5px solid #c48a45; }}
+td {{ padding: 5px 6px; border-bottom: 1px solid #eee9e1; }}
+tr {{ break-inside: avoid; }}
+.r {{ text-align: right; }}
+.badge {{ padding: 1px 7px; border-radius: 5px; font-size: 9.5px; font-weight: 600; }}
+.badge.buy {{ background: #e7f6ec; color: #15803d; }} .badge.sell {{ background: #fdeaea; color: #dc2626; }}
+.foot {{ margin-top: 16px; color: #9aa3b5; font-size: 9px; text-align: center; }}
+</style></head><body>
+<div class="head"><img src="/static/logo.png" alt="ASTRA CAPITAL">
+<div class="t"><h1>Rapport mensuel · <span>{title}</span></h1><p>{acc_line}</p><p>Généré le {now}</p></div></div>
+<h2>Synthèse du mois</h2><div class="kpis">{kpis}</div>
+<h2>Évolution du capital</h2><div class="chart">{chart}</div>
+<h2>Calendrier</h2>{calendar}
+<h2>Trades du mois ({len(rep['trades'])})</h2>{table}
+<div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else ''}</div>
+{script}</body></html>"""
+
+
+def _valid_month(month):
+    return isinstance(month, str) and len(month) == 7 and month[4] == "-" and month[:4].isdigit() and month[5:].isdigit() and 1 <= int(month[5:]) <= 12
+
+
+@app.get("/rapport")
+def report_page():
+    login, month = str(request.args.get("login", "")), str(request.args.get("month", ""))
+    if not _valid_month(month):
+        return "Mois invalide", 400
+    try:
+        rep = month_report(login, month)
+    except KeyError as ex:
+        return str(ex), 404
+    return report_html(rep, auto_print=request.args.get("print") == "1")
+
+
+def find_pdf_browser():
+    """Navigateur capable de produire un PDF (Edge est présent sur tous les Windows)."""
+    exe = find_app_browser()
+    if exe:
+        return exe
+    for p in ("/opt/pw-browsers/chromium", "/usr/bin/chromium", "/usr/bin/google-chrome"):
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+@app.get("/api/report.pdf")
+def api_report_pdf():
+    import shutil
+    import subprocess
+    import tempfile
+    from urllib.parse import quote
+
+    login, month = str(request.args.get("login", "")), str(request.args.get("month", ""))
+    if not _valid_month(month):
+        return jsonify({"error": "Mois invalide."}), 400
+    accounts = load_accounts()
+    if login not in accounts:
+        return jsonify({"error": "Compte introuvable."}), 404
+    exe = find_pdf_browser()
+    if not exe:
+        return jsonify({"error": "Aucun navigateur trouvé pour créer le PDF.", "fallback": True}), 501
+    tmp = tempfile.mkdtemp(prefix="astra-pdf-")
+    out = os.path.join(tmp, "rapport.pdf")
+    url = f"http://127.0.0.1:{SERVER['port'] or PREFERRED_PORT}/rapport?login={quote(login)}&month={month}"
+    profile = os.path.join(DATA_DIR, "profil-pdf")
+    cmd = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+           f"--user-data-dir={profile}", "--no-pdf-header-footer", "--print-to-pdf-no-header",
+           "--virtual-time-budget=4000", f"--print-to-pdf={out}", url]
+    if os.name != "nt":
+        cmd.insert(1, "--no-sandbox")
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=90,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        with open(out, "rb") as f:
+            pdf = f.read()
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return jsonify({"error": "La création du PDF a échoué.", "fallback": True}), 500
+    shutil.rmtree(tmp, ignore_errors=True)
+    if not pdf.startswith(b"%PDF"):
+        return jsonify({"error": "La création du PDF a échoué.", "fallback": True}), 500
+    y, m = int(month[:4]), int(month[5:])
+    safe = "".join(ch for ch in (accounts[login].get("name") or login) if ch not in '\\/:*?"<>|').strip() or login
+    filename = f"ASTRA CAPITAL - {safe} - {MOIS[m - 1].capitalize()} {y}.pdf"
+    resp = app.response_class(pdf, mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    return resp
+
+
 @app.get("/api/data")
 def api_data():
     target = request.args.get("login", "all")
