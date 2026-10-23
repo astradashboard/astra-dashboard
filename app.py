@@ -1414,48 +1414,160 @@ def _fetch_feed(source_id):
 _img_cache = {}
 
 
-@app.get("/api/news/image")
-def api_news_image():
-    """Lit l'image de partage (og:image) d'un article. Résultat gardé en mémoire."""
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+_gn_cache = {}
+
+
+def _is_private_host(host):
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return host in ("localhost",) or host.endswith(".local")
+
+
+def _google_news_real_url(link):
+    """Retrouve l'adresse réelle d'un article à partir d'un lien Google Actualités."""
+    import base64
+    import re
+    import urllib.request
+    from urllib.parse import quote, urlparse
+
+    path = urlparse(link).path.split("/")
+    if "articles" not in path:
+        return None
+    gid = path[path.index("articles") + 1] if path.index("articles") + 1 < len(path) else ""
+    if not gid:
+        return None
+    if gid in _gn_cache:
+        return _gn_cache[gid]
+    real = None
+    # 1) ancien format : l'adresse est directement dans l'identifiant
+    try:
+        raw = base64.urlsafe_b64decode(gid + "=" * (-len(gid) % 4))
+        m = re.search(rb"https?://[\x21-\x7e]+", raw)
+        if m and not raw.startswith(b"\x08\x13\x22\x00") and b"AU_yqL" not in raw[:12]:
+            real = m.group(0).decode("ascii", "ignore")
+    except Exception:
+        pass
+    # 2) nouveau format : on demande l'adresse à Google (signature et horodatage lus dans la page)
+    if not real:
+        try:
+            sg = ts = None
+            for page_url in (f"https://news.google.com/articles/{gid}", f"https://news.google.com/rss/articles/{gid}"):
+                req = urllib.request.Request(page_url, headers={"User-Agent": _UA, "Accept-Language": "fr-FR,fr;q=0.9"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    page = r.read(800_000).decode("utf-8", "ignore")
+                m1 = re.search(r'data-n-a-sg="([^"]+)"', page)
+                m2 = re.search(r'data-n-a-ts="([^"]+)"', page)
+                if m1 and m2:
+                    sg, ts = m1.group(1), m2.group(1)
+                    break
+            if sg and ts:
+                inner = ('["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],'
+                         f'"X","X",1,[1,1,1],1,1,null,0,0,null,0],"{gid}",{ts},"{sg}"]')
+                data = ("f.req=" + quote(json.dumps([[["Fbv4je", inner, None, "generic"]]]))).encode()
+                req = urllib.request.Request("https://news.google.com/_/DotsSplashUi/data/batchexecute", data=data, headers={
+                    "User-Agent": _UA, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    txt = r.read(400_000).decode("utf-8", "ignore")
+                part = txt.split("\n\n", 1)[1] if "\n\n" in txt else txt
+                arr = json.loads(part)
+                for row in arr:
+                    if isinstance(row, list) and len(row) > 2 and row[1] == "Fbv4je" and row[2]:
+                        cand = json.loads(row[2])[1]
+                        if isinstance(cand, str) and cand.startswith(("http://", "https://")):
+                            real = cand
+                        break
+        except Exception:
+            real = None
+    if real and _is_private_host(urlparse(real).hostname or ""):
+        real = None
+    if len(_gn_cache) > 3000:
+        _gn_cache.clear()
+    _gn_cache[gid] = real
+    return real
+
+
+def _og_image(url):
+    """Image de partage (og:image / twitter:image) d'une page d'article."""
     import html as _html
     import re
     import urllib.request
-    from urllib.parse import urljoin, urlparse
+    from urllib.parse import urljoin
 
-    url = str(request.args.get("u", ""))[:1000]
-    host = urlparse(url).hostname or ""
-    import ipaddress
-    try:
-        private = ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        private = host in ("localhost",) or host.endswith(".local")
-    if not url.startswith(("http://", "https://")) or host.endswith("news.google.com") or private:
+    req = urllib.request.Request(url, headers={"User-Agent": _UA, "Accept": "text/html", "Accept-Language": "fr-FR,fr;q=0.9"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        if "html" not in (r.headers.get("Content-Type") or "html"):
+            return None
+        page = r.read(700_000).decode("utf-8", "ignore")
+        final = r.geturl()
+    for pat in (r'<meta[^>]+(?:property|name)=["\'](?:og:image(?::url|:secure_url)?|twitter:image(?::src)?)["\'][^>]*content=["\']([^"\']+)',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*(?:property|name)=["\'](?:og:image(?::url|:secure_url)?|twitter:image(?::src)?)["\']',
+                r'<link[^>]+rel=["\']image_src["\'][^>]*href=["\']([^"\']+)'):
+        m = re.search(pat, page, re.I)
+        if m:
+            cand = urljoin(final, _html.unescape(m.group(1).strip()))
+            if cand.startswith(("http://", "https://")):
+                return cand
+    return None
+
+
+def _bing_image_for(title):
+    """Photo d'un article sur le même sujet, trouvée sur Bing Actualités à partir du titre."""
+    import re
+    import urllib.request
+
+    t = re.sub(r"\s+[-–|]\s+[^-–|]{2,40}$", "", title or "").strip()  # « Titre - Journal » → « Titre »
+    words = re.findall(r"[\w'’%$€.-]+", t)
+    for n in (12, 6):
+        q = " ".join(words[:n])
+        if len(q) < 8:
+            continue
+        try:
+            req = urllib.request.Request(_bing(q), headers={"User-Agent": _UA})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                items = _parse_feed(None, r.read(2_000_000), name="Bing", tag="search")
+        except Exception:
+            continue
+        for it in items:
+            if it.get("image"):
+                return it["image"]
+    return None
+
+
+@app.get("/api/news/image")
+def api_news_image():
+    """Trouve une photo pour un article : image de l'article, sinon photo Bing du même sujet. Résultat gardé en mémoire."""
+    from urllib.parse import urlparse
+
+    url = str(request.args.get("u", ""))[:1500]
+    title = str(request.args.get("t", ""))[:300]
+    if not url.startswith(("http://", "https://")) or _is_private_host(urlparse(url).hostname or ""):
         return jsonify({"image": None})  # pas de requête vers le réseau local
+    if request.args.get("alt"):  # la photo trouvée ne s'affiche pas : autre photo, via Bing
+        key = url + "#alt"
+        if key not in _img_cache:
+            _img_cache[key] = {"image": _bing_image_for(title) if title else None, "link": None}
+        return jsonify(_img_cache[key])
     if url in _img_cache:
-        return jsonify({"image": _img_cache[url]})
-    image = None
-    try:
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-            "Accept": "text/html", "Accept-Language": "fr-FR,fr;q=0.9"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            if "html" in (r.headers.get("Content-Type") or "html"):
-                page = r.read(600_000).decode("utf-8", "ignore")
-                final = r.geturl()
-                for pat in (r'<meta[^>]+(?:property|name)=["\'](?:og:image(?::url)?|twitter:image(?::src)?)["\'][^>]*content=["\']([^"\']+)',
-                            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*(?:property|name)=["\'](?:og:image(?::url)?|twitter:image)["\']'):
-                    m = re.search(pat, page, re.I)
-                    if m:
-                        cand = urljoin(final, _html.unescape(m.group(1).strip()))
-                        if cand.startswith(("http://", "https://")):
-                            image = cand
-                            break
-    except Exception:
-        image = None
+        return jsonify(_img_cache[url])
+    real, image = url, None
+    if (urlparse(url).hostname or "").endswith("news.google.com"):
+        real = _google_news_real_url(url)
+    if real:
+        try:
+            image = _og_image(real)
+        except Exception:
+            image = None
+    if not image and title:
+        image = _bing_image_for(title)
+    res = {"image": image, "link": real if real and real != url else None}
     if len(_img_cache) > 2000:
         _img_cache.clear()
-    _img_cache[url] = image
-    return jsonify({"image": image})
+    _img_cache[url] = res
+    return jsonify(res)
 
 
 _search_cache = {}

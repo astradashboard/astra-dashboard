@@ -2270,22 +2270,31 @@ function setVisualImage(v, src, it) {
   probe.src = src;
 }
 function pumpOg() {
-  while (ogActive < 4 && ogQueue.length) {
-    const [it, v] = ogQueue.shift(); ogActive++;
-    api('/api/news/image?u=' + encodeURIComponent(it.link)).then(r => {
-      if (r.image) { it.image = r.image; if (v.isConnected) setVisualImage(v, r.image, it); }
+  while (ogActive < 6 && ogQueue.length) {
+    const [it, v] = ogQueue.shift();
+    if (!v.isConnected) { ogTried.delete(it.link); continue; } // carte plus affichée : on la cherchera si elle revient
+    ogActive++;
+    api('/api/news/image?u=' + encodeURIComponent(it.link) + '&t=' + encodeURIComponent(it.title || '') + (it.imgRetry ? '&alt=1' : '')).then(r => {
+      if (r.link) it.link = r.link; // adresse réelle de l'article (lien Google Actualités décodé)
+      if (r.image) { it.image = r.image; newsImgByTitle.set(it.title, r.image); }
+      if (r.image && v.isConnected) setVisualImage(v, r.image, it);
     }).catch(() => {}).finally(() => { ogActive--; pumpOg(); });
   }
 }
+const newsImgByTitle = new Map();
 function newsVisual(it, cls) {
   const v = el('div', 'vis ' + (it.tag || 'search'));
-  if (!it.image && it.link && !/news\.google\./.test(it.link) && !ogTried.has(it.link)) {
+  if (!it.image && newsImgByTitle.has(it.title)) it.image = newsImgByTitle.get(it.title);
+  if (!it.image && it.link && !ogTried.has(it.link)) {
     ogTried.add(it.link); ogQueue.push([it, v]); setTimeout(pumpOg, 0);
   }
   if (it.image) {
     v.style.backgroundImage = 'url("' + it.image.replace(/["\\]/g, '') + '")';
     const probe = new Image(); probe.referrerPolicy = 'no-referrer';
-    probe.onerror = () => { v.style.backgroundImage = ''; v.classList.add('ph'); v.appendChild(el('span', null, THEME_ICON[it.tag] || '📰')); };
+    probe.onerror = () => {
+      v.style.backgroundImage = ''; v.classList.add('ph'); v.appendChild(el('span', null, THEME_ICON[it.tag] || '📰'));
+      if (!it.imgRetry && it.link) { it.imgRetry = true; it.image = null; ogTried.add(it.link); ogQueue.push([it, v]); setTimeout(pumpOg, 0); }
+    };
     probe.src = it.image;
   } else { v.classList.add('ph'); v.appendChild(el('span', null, THEME_ICON[it.tag] || '📰')); }
   return v;
