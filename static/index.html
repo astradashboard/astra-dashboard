@@ -212,7 +212,8 @@
   .field label { font-size: 12px; color: var(--muted); }
   .field input { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
   .field input:focus { outline: none; border-color: var(--gold); }
-  .modal.pdf-done { max-width: 440px; padding: 20px 22px; display: flex; flex-direction: column; }
+  .modal.pdf-done { max-width: 460px; padding: 22px 24px; display: flex; flex-direction: column; max-height: calc(100vh - 32px); }
+  .modal.pdf-done .field { margin-bottom: 14px; }
   .pdf-done-head h2 { color: var(--win); margin: 0; }
   .pdf-done-head .sub { margin: 4px 0 14px; word-break: break-word; }
   .pdf-thumb { position: relative; height: 230px; border-radius: 10px; overflow: hidden; background: #3a3f4b; cursor: zoom-in;
@@ -385,7 +386,7 @@
 </div>
 
 <div class="modal-bg" id="pdfBg">
-  <form class="modal" id="pdfForm">
+  <form class="modal pdf-done" id="pdfForm">
     <h2>Rapport PDF du mois</h2>
     <p class="sub" id="pdfSub"></p>
     <div class="err" id="pdfErr"></div>
@@ -393,34 +394,15 @@
       <label for="pdfMonth">Mois</label>
       <select id="pdfMonth" class="field-select"></select>
     </div>
-    <p class="sub" style="margin:4px 0 16px">Le PDF contient la synthèse du mois, la courbe du capital et la liste des trades. Il est enregistré dans ton dossier Téléchargements.</p>
-    <div class="modal-actions">
-      <span></span>
-      <div class="right">
-        <button type="button" class="btn" id="pdfCancel">Annuler</button>
-        <button type="submit" class="btn primary" id="pdfGo">Enregistrer en PDF</button>
-      </div>
-    </div>
-  </form>
-</div>
-
-<div class="modal-bg" id="pdfDoneBg">
-  <div class="modal pdf-done">
-    <div class="pdf-done-head">
-      <div>
-        <h2>✓ PDF enregistré</h2>
-        <p class="sub" id="pdfDoneName"></p>
-      </div>
-    </div>
     <div class="pdf-thumb" id="pdfThumb" title="Cliquer pour agrandir l'aperçu">
-      <div class="pdf-sheet" id="pdfSheet"><div class="pdf-loading">Chargement de l'aperçu…</div></div>
+      <div class="pdf-sheet" id="pdfSheet"></div>
     </div>
     <div class="pdf-done-actions">
-      <button type="button" class="btn" id="pdfDoneToggle">🔍 Aperçu</button>
-      <button type="button" class="btn" id="pdfDoneOpen">Ouvrir le PDF</button>
-      <button type="button" class="btn primary" id="pdfDoneClose">Fermer</button>
+      <button type="button" class="btn" id="pdfToggle" style="margin-right:auto">🔍 Aperçu</button>
+      <button type="button" class="btn" id="pdfCancel">Annuler</button>
+      <button type="submit" class="btn primary" id="pdfGo">Enregistrer en PDF</button>
     </div>
-  </div>
+  </form>
 </div>
 
 <div class="modal-bg" id="customBg">
@@ -598,6 +580,7 @@ $('#riskClear').onclick = () => saveRisk({ mode: null });
 $('#riskForm').addEventListener('submit', e => { e.preventDefault(); saveRisk({ mode: $('#riskMode').value, value: $('#riskValue').value }); });
 
 /* ---------- rapport PDF ---------- */
+const pdfQuery = () => 'login=' + encodeURIComponent(state.sel) + '&month=' + encodeURIComponent($('#pdfMonth').value);
 function openPdf(months) {
   const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
   const sel = $('#pdfMonth'); sel.innerHTML = '';
@@ -606,50 +589,42 @@ function openPdf(months) {
   sel.value = state.jMonth !== 'all' && list.includes(state.jMonth) ? state.jMonth : list[0];
   $('#pdfSub').textContent = acc.name; $('#pdfErr').style.display = 'none';
   $('#pdfGo').disabled = false; $('#pdfGo').textContent = 'Enregistrer en PDF';
+  setPdfBig(false);
   $('#pdfBg').classList.add('open');
+  fillPdfSheet();
 }
-$('#pdfCancel').onclick = () => $('#pdfBg').classList.remove('open');
-let pdfDoneUrl = null;
-async function fillPdfSheet(previewUrl) {
+let pdfFillId = 0;
+async function fillPdfSheet() {
+  const id = ++pdfFillId;
   const host = $('#pdfSheet');
   const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
   root.innerHTML = '<div style="color:#6b7280;font:28px sans-serif;text-align:center;padding-top:200px">Chargement de l\'aperçu…</div>';
   try {
-    const r = await fetch(previewUrl.replace('&apercu=1', ''), { headers: { 'X-Astra': '1' } });
+    const r = await fetch('/rapport?' + pdfQuery(), { headers: { 'X-Astra': '1' } });
     if (!r.ok) throw new Error();
     const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+    if (id !== pdfFillId) return; // un autre mois a été choisi entre-temps
     root.innerHTML = '';
     doc.querySelectorAll('style').forEach(st => root.appendChild(st.cloneNode(true)));
     doc.querySelectorAll('script').forEach(sc => sc.remove());
     const rep = doc.querySelector('.rep');
     if (rep) root.appendChild(document.importNode(rep, true));
   } catch (e) {
-    root.innerHTML = '<div style="color:#dc2626;font:24px sans-serif;text-align:center;padding-top:200px">Aperçu indisponible.<br>Utilise « Ouvrir le PDF ».</div>';
+    if (id === pdfFillId) root.innerHTML = '<div style="color:#dc2626;font:24px sans-serif;text-align:center;padding-top:200px">Aperçu indisponible.</div>';
   }
 }
-let pdfFullUrl = null;
-function showPdfDone(url, name, previewUrl, fullUrl) {
-  pdfFullUrl = fullUrl;
-  if (pdfDoneUrl) URL.revokeObjectURL(pdfDoneUrl);
-  pdfDoneUrl = url;
-  $('#pdfDoneName').textContent = name + ' — enregistré dans ton dossier Téléchargements';
-  setPdfBig(false);
-  fillPdfSheet(previewUrl);
-  $('#pdfDoneBg').classList.add('open');
-}
-$('#pdfDoneOpen').onclick = () => { if (pdfFullUrl) window.open(pdfFullUrl, '_blank'); };
 function setPdfBig(big) {
-  document.querySelector('.modal.pdf-done').classList.toggle('big', big);
-  $('#pdfDoneToggle').textContent = big ? '↙ Réduire' : '🔍 Aperçu';
+  $('#pdfForm').classList.toggle('big', big);
+  $('#pdfToggle').textContent = big ? '↙ Réduire' : '🔍 Aperçu';
 }
-$('#pdfDoneToggle').onclick = () => setPdfBig(!document.querySelector('.modal.pdf-done').classList.contains('big'));
-$('#pdfThumb').onclick = () => setPdfBig(true);
-$('#pdfDoneClose').onclick = () => { $('#pdfDoneBg').classList.remove('open'); const h = $('#pdfSheet'); if (h.shadowRoot) h.shadowRoot.innerHTML = ''; };
+$('#pdfMonth').onchange = fillPdfSheet;
+$('#pdfToggle').onclick = () => setPdfBig(!$('#pdfForm').classList.contains('big'));
+$('#pdfThumb').onclick = () => { if (!$('#pdfForm').classList.contains('big')) setPdfBig(true); };
+$('#pdfCancel').onclick = () => $('#pdfBg').classList.remove('open');
 $('#pdfForm').addEventListener('submit', async ev => {
   ev.preventDefault();
-  const month = $('#pdfMonth').value, login = state.sel, btn = $('#pdfGo');
-  const q = 'login=' + encodeURIComponent(login) + '&month=' + encodeURIComponent(month);
-  btn.disabled = true; btn.textContent = 'Création du PDF…';
+  const q = pdfQuery(), month = $('#pdfMonth').value, btn = $('#pdfGo');
+  btn.disabled = true; btn.textContent = 'Création du PDF…'; $('#pdfErr').style.display = 'none';
   try {
     const r = await fetch('/api/report.pdf?' + q);
     if (!r.ok) {
@@ -670,8 +645,9 @@ $('#pdfForm').addEventListener('submit', async ev => {
     const name = m ? decodeURIComponent(m[1]) : 'Rapport ASTRA ' + month + '.pdf';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
     $('#pdfBg').classList.remove('open');
-    showPdfDone(url, name, '/rapport?' + q + '&apercu=1', '/api/report.pdf?' + q + '&inline=1');
+    toast('✓ PDF enregistré dans Téléchargements : ' + name);
   } catch (e) {
     $('#pdfErr').textContent = e.message; $('#pdfErr').style.display = 'block';
   } finally { btn.disabled = false; btn.textContent = 'Enregistrer en PDF'; }
