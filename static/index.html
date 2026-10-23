@@ -213,6 +213,11 @@
   .eco-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
   .eco-tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 9px 12px; font-size: 14px; margin-bottom: -1px; }
   .eco-tabs button:hover { color: var(--fg); }
+  .eco-line-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; padding-bottom: 6px; flex-wrap: wrap; }
+  .eco-line-tools .seg button { padding: 6px 10px; border: none; margin: 0; font-size: 13px; }
+  .eco-line-tools .seg button.on { color: var(--gold); }
+  .eco-tz { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  .eco-tz select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; font: inherit; font-size: 13px; cursor: pointer; max-width: 230px; }
   .eco-tabs button.on { color: var(--fg); border-bottom-color: var(--gold); font-weight: 600; }
   .eco-upd { margin-left: auto; color: var(--muted); font-size: 12px; }
   .eco-card { padding: 0; overflow: hidden; }
@@ -657,13 +662,6 @@
           <h1>Calendrier économique</h1>
           <p id="ecoSub">Annonces économiques à l'heure de Bruxelles</p>
         </div>
-        <div class="eco-filters">
-          <div class="seg" id="ecoImp" title="Importance des annonces">
-            <button type="button" data-imp="-1,0,1">Toutes</button>
-            <button type="button" data-imp="0,1"><span class="bulls b2"><i></i></span> et plus</button>
-            <button type="button" data-imp="1"><span class="bulls b3"><i></i></span> seulement</button>
-          </div>
-        </div>
       </div>
       <div class="eco-tabs" id="ecoRange">
         <button type="button" data-range="yesterday">Hier</button>
@@ -671,7 +669,15 @@
         <button type="button" data-range="tomorrow">Demain</button>
         <button type="button" data-range="week">Cette semaine</button>
         <button type="button" data-range="nextweek">Semaine prochaine</button>
-        <span class="eco-upd" id="ecoUpd"></span>
+        <div class="eco-line-tools">
+          <div class="seg" id="ecoImp" title="Importance des annonces">
+            <button type="button" data-imp="-1,0,1" title="Toutes les annonces"><span class="bulls b1"><i></i></span></button>
+            <button type="button" data-imp="0,1" title="2 étoiles et plus"><span class="bulls b2"><i></i></span> et plus</button>
+            <button type="button" data-imp="1" title="3 étoiles seulement"><span class="bulls b3"><i></i></span></button>
+          </div>
+          <label class="eco-tz" title="Fuseau horaire des heures affichées">🕒 <select id="ecoTz"></select></label>
+          <span class="eco-upd" id="ecoUpd"></span>
+        </div>
       </div>
       <div class="chips" id="ecoCountries"></div>
       <div class="card eco-card">
@@ -1416,7 +1422,8 @@ api('/api/prefs').then(p => {
   if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
   if (p.eco && p.eco.imp && Array.isArray(p.eco.countries) && p.eco.countries.length) {
     const cs = p.eco.countries.map(c => String(c).toUpperCase()).filter(c => ECO_COUNTRIES.some(x => x[0] === c));
-    state.eco = { imp: p.eco.imp, countries: cs.length ? cs : state.eco.countries, range: p.eco.range || 'today' }; buildEcoFilters();
+    state.eco = { imp: p.eco.imp, countries: cs.length ? cs : state.eco.countries, range: p.eco.range || 'today', tz: p.eco.tz || ECO_TZ };
+    ECO_TZ = state.eco.tz; buildEcoTz(); buildEcoFilters();
     if (state.page === 'eco') renderEco(true);
   }
   if (Array.isArray(p.newsThemes) && p.newsThemes.length) {
@@ -2029,8 +2036,35 @@ const ECO_COUNTRIES = [
   ['JP', '🇯🇵', 'Japon', 'JPY'], ['CN', '🇨🇳', 'Chine', 'CNY'], ['CA', '🇨🇦', 'Canada', 'CAD'], ['AU', '🇦🇺', 'Australie', 'AUD'],
   ['NZ', '🇳🇿', 'Nouvelle-Zélande', 'NZD'],
 ];
-const ECO_TZ = 'Europe/Brussels';
-state.eco = { imp: '0,1', countries: ['US', 'EU', 'DE', 'FR', 'GB', 'CH', 'JP', 'CN'], range: 'today' };
+let ECO_TZ = 'Europe/Brussels';
+const ECO_TZS = [
+  ['Pacific/Honolulu', 'Honolulu'], ['America/Los_Angeles', 'Los Angeles'], ['America/Chicago', 'Chicago'], ['America/New_York', 'New York'],
+  ['America/Sao_Paulo', 'São Paulo'], ['UTC', 'UTC'], ['Europe/London', 'Londres'], ['Europe/Brussels', 'Bruxelles'], ['Europe/Paris', 'Paris'],
+  ['Europe/Luxembourg', 'Luxembourg'], ['Europe/Zurich', 'Zurich'], ['Europe/Athens', 'Athènes'], ['Europe/Moscow', 'Moscou'], ['Asia/Dubai', 'Dubaï'],
+  ['Asia/Kolkata', 'Mumbai'], ['Asia/Bangkok', 'Bangkok'], ['Asia/Singapore', 'Singapour'], ['Asia/Hong_Kong', 'Hong Kong'],
+  ['Asia/Shanghai', 'Shanghai'], ['Asia/Tokyo', 'Tokyo'], ['Australia/Sydney', 'Sydney'], ['Pacific/Auckland', 'Auckland'],
+];
+function tzOffset(tz) {
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date()).find(x => x.type === 'timeZoneName');
+    return (p ? p.value : 'GMT').replace('GMT', 'UTC').replace(/^UTC$/, 'UTC+0');
+  } catch (e) { return ''; }
+}
+const tzName = tz => (ECO_TZS.find(x => x[0] === tz) || [tz, tz.split('/').pop().replace(/_/g, ' ')])[1];
+function buildEcoTz() {
+  const sel = $('#ecoTz'); sel.innerHTML = '';
+  const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const list = ECO_TZS.slice();
+  if (local && !list.some(x => x[0] === local)) list.unshift([local, local.split('/').pop().replace(/_/g, ' ') + ' (ce PC)']);
+  if (!list.some(x => x[0] === ECO_TZ)) list.unshift([ECO_TZ, tzName(ECO_TZ)]);
+  for (const [tz, name] of list) {
+    const o = document.createElement('option'); o.value = tz; o.textContent = '(' + tzOffset(tz) + ') ' + name; sel.appendChild(o);
+  }
+  sel.value = ECO_TZ;
+  $('#ecoSub').textContent = 'Annonces économiques à l\'heure de ' + tzName(ECO_TZ) + ' (' + tzOffset(ECO_TZ) + ')';
+  sel.onchange = () => { ECO_TZ = sel.value; state.eco.tz = ECO_TZ; saveEco(); buildEcoTz(); renderEco(true); };
+}
+state.eco = { imp: '0,1', countries: ['US', 'EU', 'DE', 'FR', 'GB', 'CH', 'JP', 'CN'], range: 'today', tz: ECO_TZ };
 let ecoTimer = null, ecoReq = 0;
 const bxDate = d => new Intl.DateTimeFormat('en-CA', { timeZone: ECO_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 function ecoDays() {
@@ -2051,7 +2085,7 @@ function buildEcoFilters() {
     b.classList.toggle('on', b.dataset.imp === state.eco.imp);
     b.onclick = () => { state.eco.imp = b.dataset.imp; saveEco(); buildEcoFilters(); renderEco(true); };
   });
-  document.querySelectorAll('#ecoRange button').forEach(b => {
+  document.querySelectorAll('#ecoRange > button').forEach(b => {
     b.classList.toggle('on', b.dataset.range === state.eco.range);
     b.onclick = () => { state.eco.range = b.dataset.range; saveEco(); buildEcoFilters(); renderEco(true); };
   });
@@ -2134,7 +2168,7 @@ async function renderEco(force) {
   if (force && nextIdx > 0) { const r = body.querySelector('tr.next'); if (r) r.scrollIntoView({ block: 'center' }); }
 }
 function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
-buildEcoFilters();
+buildEcoFilters(); buildEcoTz();
 
 // ---------- actualité économique (flux RSS des sites d'information) ----------
 const NEWS_THEMES = [

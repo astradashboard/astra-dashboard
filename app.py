@@ -1046,6 +1046,9 @@ def api_prefs_set():
         if imp in ("-1,0,1", "0,1", "1") and countries:
             prefs["eco"] = {"imp": imp, "countries": countries,
                             "range": rng if rng in ("yesterday", "today", "tomorrow", "week", "nextweek") else "today"}
+            tz = str(eco.get("tz", ""))[:40]
+            if tz and all(c.isalnum() or c in "/_+-" for c in tz):
+                prefs["eco"]["tz"] = tz
     if isinstance(body.get("split"), (int, float)):
         prefs["split"] = min(0.8, max(0.35, float(body["split"])))
     if isinstance(body.get("quotes"), list):
