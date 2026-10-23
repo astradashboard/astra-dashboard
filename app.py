@@ -951,48 +951,19 @@ def report_html(rep, auto_print=False):
              f'<path d="{area}" fill="url(#g)"/><path d="{path}" fill="none" stroke="#c48a45" stroke-width="2.2" stroke-linejoin="round"/>'
              f'{labels}</svg>') if len(vals) > 1 else '<p class="muted">Aucun trade ce mois-ci.</p>'
 
-    # calendrier
-    first = dt.date(y, m, 1)
-    days_in = (dt.date(y + (m == 12), m % 12 + 1, 1) - first).days
-    cells = ['<div class="dow">' + d_ + "</div>" for d_ in ("Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim")]
-    cells += ['<div class="day empty"></div>'] * first.weekday()
-    for dn in range(1, days_in + 1):
-        key = f"{month}-{dn:02d}"
-        v = rep["days"].get(key)
-        if v and (v.get("trades") or v.get("pnl")):
-            c_ = _cls(v["pnl"])
-            nb = v.get("trades", 0)
-            cells.append(f'<div class="day {c_ and ("win" if c_ == "pos" else "loss")}"><span class="n">{dn}</span>'
-                         f'<span class="p {c_}">{e(_fmt_money(v["pnl"], cur, True))}</span>'
-                         f'<span class="t">{nb} trade{"s" if nb > 1 else ""}</span></div>')
-        else:
-            cells.append(f'<div class="day"><span class="n">{dn}</span></div>')
-    while len(cells) % 7:
-        cells.append('<div class="day empty"></div>')
-    calendar = '<div class="cal">' + "".join(cells) + "</div>"
-
     # synthèse
     def card(k, v, sub="", c_=""):
         return f'<div class="kpi"><div class="k">{k}</div><div class="v {c_}">{e(v)}</div><div class="s">{e(sub)}</div></div>'
 
     wr = f"{round(rep['wins'] / rep['trades_n'] * 100)} %" if rep["trades_n"] else "—"
-    wd = f"{round(rep['win_days'] / rep['traded_days'] * 100)} %" if rep["traded_days"] else "—"
-    best, worst = rep["best"], rep["worst"]
-    fmt_day = lambda x: f"{int(x[0][8:])} {MOIS[m - 1][:4]}." if x else ""
     kpis = "".join([
-        card("Résultat du mois", _fmt_money(rep["pnl"], cur, True), _fmt_pct(rep["pct"]), _cls(rep["pnl"])),
+        card("Résultat du mois", _fmt_money(rep["pnl"], cur, True), "", _cls(rep["pnl"])),
+        card("Résultat en %", _fmt_pct(rep["pct"]), "du capital en début de mois", _cls(rep["pnl"])),
         card("Résultat en R", _fmt_r(rep["r"]) if rep["r"] is not None else "—",
              f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else "Risque par trade non défini",
              _cls(rep["r"] or 0)),
-        card("Capital début → fin", _fmt_money(rep["end_cap"], cur), "Début " + _fmt_money(rep["start_cap"], cur)),
-        card("Taux de réussite", wr, f"{rep['wins']} / {rep['trades_n']} trades"),
-        card("Jours gagnants", wd, f"{rep['win_days']} / {rep['traded_days']} jours"),
-        card("Profit factor", _fmt_num(rep["pf"]) if rep["pf"] else ("∞" if rep["gain"] else "—"),
-             "Gains " + _fmt_money(rep["gain"], cur) + " · Pertes " + _fmt_money(rep["loss"], cur)),
-        card("Meilleur jour", _fmt_money(best[1]["pnl"], cur, True) if best else "—", fmt_day(best), "pos" if best and best[1]["pnl"] > 0 else ""),
-        card("Pire jour", _fmt_money(worst[1]["pnl"], cur, True) if worst else "—", fmt_day(worst), "neg" if worst and worst[1]["pnl"] < 0 else ""),
-        card("Drawdown max", _fmt_money(-rep["max_dd"], cur) if rep["max_dd"] else "—",
-             _fmt_pct(-rep["max_dd_pct"]) if rep["max_dd"] else "aucun", "neg" if rep["max_dd"] else ""),
+        card("Taux de réussite", wr, f"{rep['wins']} gagnants sur {rep['trades_n']} trades"),
+        card("Capital début → fin", _fmt_money(rep["start_cap"], cur) + "  →  " + _fmt_money(rep["end_cap"], cur), ""),
     ])
 
     # trades
@@ -1019,14 +990,17 @@ def report_html(rep, auto_print=False):
 @page {{ size: A4; margin: 12mm 12mm 14mm; }}
 * {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
 body {{ margin: 0; padding: 0 3px; font: 11px/1.45 "Segoe UI", system-ui, sans-serif; color: #1c2230; background: #fff; }}
-.head {{ background: #0f1420; color: #e8ebf2; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }}
-.head img {{ height: 54px; }}
-.head .t {{ text-align: right; }}
-.head h1 {{ margin: 0; font-size: 20px; font-weight: 650; }}
+.head {{ background: #0f1420; color: #e8ebf2; border-radius: 12px; padding: 18px 20px; text-align: center; }}
+.head h1 {{ margin: 0; font-size: 22px; font-weight: 650; }}
 .head h1 span {{ color: #c48a45; }}
 .head p {{ margin: 3px 0 0; color: #9aa3b5; font-size: 11px; }}
 h2 {{ font-size: 13px; margin: 18px 0 8px; color: #0f1420; border-left: 3px solid #c48a45; padding-left: 8px; }}
-.kpis {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }}
+.kpis {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }}
+.kpis .kpi:nth-child(-n+3) {{ grid-column: span 2; }}
+.kpis .kpi:nth-child(n+4) {{ grid-column: span 3; }}
+.kpi .v {{ font-size: 18px !important; }}
+.page2 {{ break-before: page; }}
+.page2 h2 {{ margin-top: 0; }}
 .kpi {{ border: 1px solid #e5e1da; border-radius: 9px; padding: 9px 11px; break-inside: avoid; }}
 .kpi .k {{ color: #6b7280; font-size: 10px; }}
 .kpi .v {{ font-size: 16px; font-weight: 700; margin-top: 2px; }}
@@ -1050,12 +1024,10 @@ tr {{ break-inside: avoid; }}
 .badge.buy {{ background: #e7f6ec; color: #15803d; }} .badge.sell {{ background: #fdeaea; color: #dc2626; }}
 .foot {{ margin-top: 16px; color: #9aa3b5; font-size: 9px; text-align: center; }}
 </style></head><body>
-<div class="head"><img src="/static/logo.png" alt="ASTRA CAPITAL">
-<div class="t"><h1>Rapport mensuel · <span>{title}</span></h1><p>{acc_line}</p><p>Généré le {now}</p></div></div>
+<div class="head"><h1>Rapport mensuel · <span>{title}</span></h1><p>{acc_line}</p><p>Généré le {now}</p></div>
 <h2>Synthèse du mois</h2><div class="kpis">{kpis}</div>
 <h2>Évolution du capital</h2><div class="chart">{chart}</div>
-<h2>Calendrier</h2>{calendar}
-<h2>Trades du mois ({len(rep['trades'])})</h2>{table}
+<div class="page2"><h2>Trades du mois ({len(rep['trades'])})</h2>{table}</div>
 <div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else ''}</div>
 {script}</body></html>"""
 
