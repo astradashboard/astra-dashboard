@@ -1076,12 +1076,15 @@ def _gnews(query):
 US_QUERY = ('"économie américaine" OR "Réserve fédérale" OR Fed OR Powell OR "Wall Street" OR "inflation aux États-Unis" '
             'OR "emploi américain" OR "dollar américain" OR "Trésor américain" OR Nasdaq when:3d')
 CRYPTO_QUERY = 'bitcoin OR crypto OR cryptomonnaie OR ethereum OR stablecoin when:3d'
-EU_QUERY = ('"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "économie française" OR "CAC 40" OR DAX '
-            'OR "inflation en zone euro" OR "Commission européenne" économie when:3d')
+EU_QUERY = ('"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "Union européenne" économie OR Eurostat '
+            'OR "inflation en zone euro" OR "croissance européenne" OR "Commission européenne" économie when:3d')
+EU_MARKETS_QUERY = ('"Bourses européennes" OR "Euro Stoxx" OR DAX OR "marchés européens" OR "économie allemande" '
+                    'OR "euro dollar" OR "EUR/USD" OR "Bundesbank" when:3d')
 
 NEWS_FEEDS = {  # id : (nom affiché, adresse du flux, thème)
     "us": ("Économie US", _gnews(US_QUERY), "us"),
     "eu": ("Économie Europe", _gnews(EU_QUERY), "eu"),
+    "eumk": ("Marchés européens", _gnews(EU_MARKETS_QUERY), "eu"),
     "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eu"),
     "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml", "eu"),
     "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml", "eu"),
