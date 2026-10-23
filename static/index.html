@@ -375,7 +375,7 @@
           </div>
         </div>
         <div id="chart"><div class="tip" id="tip"></div></div>
-        <div class="chart-hint">Molette pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
+        <div class="chart-hint">Boutons − / + pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
       </div>
       <div class="blk" data-block="tv" data-label="Graphiques TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
@@ -1200,16 +1200,6 @@ function renderChart() {
   });
   hit.addEventListener('mouseleave', () => { if (!state.drag) { tip.style.display = 'none'; dot.setAttribute('opacity', 0); } });
 
-  // zoom à la molette, centré sur la souris
-  hit.addEventListener('wheel', ev => {
-    ev.preventDefault();
-    const at = v0.i0 + idxAt(ev), span = v0.i1 - v0.i0;
-    const f = ev.deltaY < 0 ? 0.8 : 1.25;
-    const ns2 = Math.max(4, Math.min(n - 1, span * f));
-    const ratio = span ? (at - v0.i0) / span : 0.5;
-    const i0 = at - ns2 * ratio;
-    setView({ ...clampView(n, i0, i0 + ns2), preset: null });
-  }, { passive: false });
 
   // déplacement en cliquant-glissant (suivi au niveau de la fenêtre : le graphique se redessine pendant le geste)
   hit.addEventListener('pointerdown', ev => {
