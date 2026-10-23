@@ -184,6 +184,7 @@
   .tv-grid.n3 .tv-panel:nth-child(3) { grid-column: 1 / -1; }
   .tv-head-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   #tvAccount { padding: 6px 12px; font-size: 13px; }
+  .sub-mask { border-style: solid; }
   #maskBtn.on { background: var(--gold-soft); border-color: rgba(196,138,69,.6); color: var(--gold); }
   .tv-open { flex: 0 0 auto !important; width: 34px; padding: 0; font-size: 14px; }
   .tv-count { display: flex; align-items: center; gap: 6px; }
@@ -390,6 +391,7 @@
       <div class="sub" id="accSub">
         <div class="acc-list" id="accList"></div>
         <button class="sub-add" id="addBtn">+ Ajouter un compte</button>
+        <button class="sub-add sub-mask" id="maskBtn" title="Masquer ou afficher les numéros de compte (pratique pour les captures et les vidéos)">👁 Masquer les n° de compte</button>
       </div>
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span></button>
@@ -406,7 +408,6 @@
         <p id="subtitle"></p>
       </div>
       <div class="actions">
-        <button class="btn" id="maskBtn" title="Masquer ou afficher les numéros de compte (pratique pour les captures et les vidéos)">👁 Masquer les n° de compte</button>
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
