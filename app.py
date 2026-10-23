@@ -1106,23 +1106,35 @@ def api_report_pdf():
     tmp = tempfile.mkdtemp(prefix="astra-pdf-")
     out = os.path.join(tmp, "rapport.pdf")
     url = f"http://127.0.0.1:{SERVER['port'] or PREFERRED_PORT}/rapport?login={quote(login)}&month={month}"
-    profile = os.path.join(DATA_DIR, "profil-pdf")
-    cmd = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-           f"--user-data-dir={profile}", "--no-pdf-header-footer", "--print-to-pdf-no-header",
-           "--virtual-time-budget=4000", f"--print-to-pdf={out}", url]
-    if os.name != "nt":
-        cmd.insert(1, "--no-sandbox")
-    try:
-        subprocess.run(cmd, capture_output=True, timeout=90,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        with open(out, "rb") as f:
-            pdf = f.read()
-    except Exception:
-        shutil.rmtree(tmp, ignore_errors=True)
-        return jsonify({"error": "La création du PDF a échoué.", "fallback": True}), 500
+    pdf, detail = None, ""
+    for attempt in range(2):
+        # profil neuf à chaque fois : un Edge resté ouvert en arrière-plan ne peut pas bloquer la création
+        profile = os.path.join(tmp, f"profil-{attempt}")
+        cmd = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+               "--disable-extensions", "--disable-background-mode", "--disable-features=msEdgeStartupBoost",
+               f"--user-data-dir={profile}", "--no-pdf-header-footer", "--print-to-pdf-no-header",
+               "--virtual-time-budget=4000", f"--print-to-pdf={out}", url]
+        if os.name != "nt":
+            cmd.insert(1, "--no-sandbox")
+        try:
+            done = subprocess.run(cmd, capture_output=True, timeout=90,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if os.path.isfile(out):
+                with open(out, "rb") as f:
+                    data = f.read()
+                if data.startswith(b"%PDF"):
+                    pdf = data
+                    break
+            err = (done.stderr or b"").decode("utf-8", "ignore").strip().splitlines()
+            detail = f"code {done.returncode}" + (f" · {err[-1][:160]}" if err else "")
+        except subprocess.TimeoutExpired:
+            detail = "délai dépassé"
+        except Exception as ex:
+            detail = f"{type(ex).__name__} : {ex}"[:200]
     shutil.rmtree(tmp, ignore_errors=True)
-    if not pdf.startswith(b"%PDF"):
-        return jsonify({"error": "La création du PDF a échoué.", "fallback": True}), 500
+    if pdf is None:
+        return jsonify({"error": "La création du PDF a échoué" + (f" ({detail})" if detail else "") + ".",
+                        "fallback": True, "browser": os.path.basename(exe)}), 500
     y, m = int(month[:4]), int(month[5:])
     safe = "".join(ch for ch in (accounts[login].get("name") or login) if ch not in '\\/:*?"<>|').strip() or login
     filename = f"ASTRA CAPITAL - {safe} - {MOIS[m - 1].capitalize()} {y}.pdf"

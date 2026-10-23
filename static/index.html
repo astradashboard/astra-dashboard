@@ -393,7 +393,7 @@
       <label for="pdfMonth">Mois</label>
       <select id="pdfMonth" class="field-select"></select>
     </div>
-    <p class="sub" style="margin:4px 0 16px">Le PDF contient la synthèse du mois, la courbe du capital, le calendrier et la liste des trades. Il est enregistré dans ton dossier Téléchargements.</p>
+    <p class="sub" style="margin:4px 0 16px">Le PDF contient la synthèse du mois, la courbe du capital et la liste des trades. Il est enregistré dans ton dossier Téléchargements.</p>
     <div class="modal-actions">
       <span></span>
       <div class="right">
@@ -654,8 +654,15 @@ $('#pdfForm').addEventListener('submit', async ev => {
     const r = await fetch('/api/report.pdf?' + q);
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      if (j.fallback) { window.open('/rapport?' + q + '&print=1', '_blank'); $('#pdfBg').classList.remove('open'); return; }
-      throw new Error(j.error || 'Création du PDF impossible');
+      const err = $('#pdfErr'); err.innerHTML = ''; err.append(j.error || 'Création du PDF impossible.');
+      if (j.fallback) {
+        err.append(document.createElement('br'));
+        const b = el('button', 'linklike', 'Imprimer le rapport et choisir « Enregistrer au format PDF »');
+        b.type = 'button'; b.onclick = () => window.open('/rapport?' + q + '&print=1', '_blank');
+        err.append(b);
+      }
+      err.style.display = 'block';
+      return;
     }
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
