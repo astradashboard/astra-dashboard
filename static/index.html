@@ -240,6 +240,14 @@
   .news-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: 28px 0 12px; }
   .news-head h2 { margin: 0; font-size: 19px; font-weight: 650; }
   .news-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .news-filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .news-filters .chips { margin-bottom: 0; flex: 1; min-width: 0; }
+  .news-search { position: relative; flex: 0 0 280px; max-width: 100%; }
+  .news-search input { width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 999px;
+    padding: 8px 14px 8px 34px; font: inherit; font-size: 13.5px; }
+  .news-search input:focus { outline: none; border-color: var(--gold); }
+  .news-search .ns-ic { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 15px; pointer-events: none; }
+  .news-card mark { background: rgba(196,138,69,.3); color: inherit; border-radius: 3px; padding: 0 1px; }
   .news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
   .news-card { display: flex; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
     cursor: pointer; text-align: left; color: var(--fg); transition: border-color .15s, transform .15s; min-width: 0; }
@@ -506,7 +514,13 @@
         </div>
         <button type="button" class="btn" id="newsRefresh">↻ Actualiser</button>
       </div>
-      <div class="chips" id="newsSources"></div>
+      <div class="news-filters">
+        <div class="chips" id="newsSources"></div>
+        <div class="news-search">
+          <span class="ns-ic">⌕</span>
+          <input type="search" id="newsSearch" placeholder="Rechercher : crypto, BCE, pétrole…" autocomplete="off">
+        </div>
+      </div>
       <div class="news-grid" id="newsGrid"></div>
       <div class="news-more"><button type="button" class="btn" id="newsMore" hidden>Afficher plus d'articles</button></div>
     </div>
@@ -1938,17 +1952,55 @@ function timeAgo(d) {
   if (h < 24) return 'il y a ' + h + ' h';
   return d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
 }
+const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// mots proches : une recherche « crypto » trouve aussi Bitcoin, Ethereum…
+const NEWS_SYNONYMS = [
+  ['crypto', 'cryptomonnaie', 'cryptoactif', 'bitcoin', 'btc', 'ethereum', 'ether', 'blockchain', 'stablecoin', 'binance', 'coinbase', 'solana', 'xrp'],
+  ['or', 'gold', 'metal jaune', 'metaux precieux', 'xau'],
+  ['petrole', 'oil', 'brent', 'wti', 'opep', 'opec', 'baril', 'brut'],
+  ['bce', 'banque centrale europeenne', 'lagarde', 'ecb'],
+  ['fed', 'reserve federale', 'powell', 'fomc'],
+  ['inflation', 'ipc', 'cpi', 'prix a la consommation'],
+  ['nasdaq', 'us100', 'tech', 'wall street'],
+  ['emploi', 'chomage', 'nfp', 'payrolls', 'jobs'],
+];
+function searchTerms(q) {
+  const n = norm(q).trim(); if (!n) return [];
+  const group = NEWS_SYNONYMS.find(g => g.includes(n));
+  return group || [n];
+}
+function matches(it, terms) {
+  if (!terms.length) return true;
+  const text = ' ' + norm(it.title + ' ' + it.summary) + ' ';
+  return terms.some(t => t.length <= 3 ? new RegExp('[^a-z0-9]' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^a-z0-9]').test(text) : text.includes(t));
+}
+function highlight(node, text, terms) {
+  if (!terms.length) { node.textContent = text; return; }
+  const n = norm(text); let i = 0; const parts = [];
+  while (i < text.length) {
+    let hit = null;
+    for (const t of terms) { const j = n.indexOf(t, i); if (j !== -1 && (!hit || j < hit[0])) hit = [j, t.length]; }
+    if (!hit) { parts.push(document.createTextNode(text.slice(i))); break; }
+    if (hit[0] > i) parts.push(document.createTextNode(text.slice(i, hit[0])));
+    const m = document.createElement('mark'); m.textContent = text.slice(hit[0], hit[0] + hit[1]); parts.push(m);
+    i = hit[0] + hit[1];
+  }
+  node.replaceChildren(...parts);
+}
 function renderNews() {
   const grid = $('#newsGrid'); grid.innerHTML = '';
-  const list = newsItems.slice(0, state.news.shown);
-  if (!list.length) { grid.appendChild(el('div', 'news-empty', 'Aucun article pour le moment.')); }
+  const q = $('#newsSearch').value, terms = searchTerms(q);
+  const found = newsItems.filter(it => matches(it, terms));
+  const list = found.slice(0, state.news.shown);
+  if (!list.length) grid.appendChild(el('div', 'news-empty', q.trim() ? 'Aucun article récent sur « ' + q.trim() + ' ».' : 'Aucun article pour le moment.'));
+  else if (terms.length) { const info = el('div', null, found.length + ' article' + (found.length > 1 ? 's' : '') + ' sur « ' + q.trim() + ' »'); info.style.cssText = 'grid-column:1/-1;color:var(--muted);font-size:13px'; grid.appendChild(info); }
   for (const it of list) {
     const card = el('button', 'news-card'); card.type = 'button'; card.title = 'Ouvrir l\'article';
     const bodyEl = el('div', 'nc-body');
     const meta = el('div', 'nc-meta'); meta.append(el('span', 'nc-src', it.source));
     if (it.date) meta.append(el('span', null, '· ' + timeAgo(new Date(it.date))));
-    bodyEl.append(meta, el('div', 'nc-title', it.title));
-    if (it.summary) bodyEl.append(el('div', 'nc-sum', it.summary));
+    const tEl = el('div', 'nc-title'); highlight(tEl, it.title, terms); bodyEl.append(meta, tEl);
+    if (it.summary) { const sEl = el('div', 'nc-sum'); highlight(sEl, it.summary, terms); bodyEl.append(sEl); }
     card.appendChild(bodyEl);
     if (it.image) {
       const img = document.createElement('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
@@ -1957,7 +2009,7 @@ function renderNews() {
     card.onclick = () => { if (/^https?:\/\//.test(it.link)) window.open(it.link, '_blank', 'noopener'); };
     grid.appendChild(card);
   }
-  $('#newsMore').hidden = newsItems.length <= state.news.shown;
+  $('#newsMore').hidden = found.length <= state.news.shown;
 }
 async function loadNews(force) {
   if (!force && Date.now() - newsLoadedAt < 5 * 60000 && newsItems.length) { renderNews(); return; }
@@ -1977,6 +2029,8 @@ async function loadNews(force) {
   newsTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) loadNews(true); }, 10 * 60000);
 }
 $('#newsMore').onclick = () => { state.news.shown += 24; renderNews(); };
+let newsSearchT;
+$('#newsSearch').addEventListener('input', () => { clearTimeout(newsSearchT); newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150); });
 $('#newsRefresh').onclick = () => loadNews(true);
 buildNewsSources();
 

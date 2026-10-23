@@ -907,7 +907,7 @@ def api_news():
             continue
         seen.add(key)
         out.append(it)
-    return jsonify({"items": out[:120], "failed": failed})
+    return jsonify({"items": out[:250], "failed": failed})
 
 
 @app.get("/api/version")
