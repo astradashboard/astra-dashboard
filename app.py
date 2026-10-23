@@ -853,7 +853,9 @@ def api_prefs_set():
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
     if isinstance(body.get("news"), list):
         prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:12]
-        prefs["newsV"] = 2
+        prefs["newsV"] = 3
+    if body.get("newsTab") in ("us", "crypto", "eco", "all"):
+        prefs["newsTab"] = body["newsTab"]
     if isinstance(body.get("eco"), dict):
         eco = body["eco"]
         imp = str(eco.get("imp", "0,1"))
@@ -1063,19 +1065,30 @@ def api_eco():
     return jsonify(data)
 
 
-NEWS_FEEDS = {
-    "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml"),
-    "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml"),
-    "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml"),
-    "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/"),
-    "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss"),
-    "cnbc": ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
-    # crypto
-    "cryptoast": ("Cryptoast", "https://cryptoast.fr/feed/"),
-    "jdc": ("Journal du Coin", "https://journalducoin.com/feed/"),
-    "ctfr": ("Cointelegraph FR", "https://fr.cointelegraph.com/rss"),
-    "cointribune": ("Cointribune", "https://www.cointribune.com/feed/"),
-    "coindesk": ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+def _gnews(query):
+    """Flux RSS de Google Actualités pour une recherche, en français."""
+    from urllib.parse import urlencode
+    return "https://news.google.com/rss/search?" + urlencode({"q": query, "hl": "fr", "gl": "FR", "ceid": "FR:fr"})
+
+
+US_QUERY = ('"économie américaine" OR "Réserve fédérale" OR Fed OR Powell OR "Wall Street" OR "inflation aux États-Unis" '
+            'OR "emploi américain" OR "dollar américain" OR "Trésor américain" OR Nasdaq when:3d')
+CRYPTO_QUERY = 'bitcoin OR crypto OR cryptomonnaie OR ethereum OR stablecoin when:3d'
+
+NEWS_FEEDS = {  # id : (nom affiché, adresse du flux, thème)
+    "us": ("Économie US", _gnews(US_QUERY), "us"),
+    "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eco"),
+    "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml", "eco"),
+    "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml", "eco"),
+    "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/", "eco"),
+    "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss", "eco"),
+    "cnbc": ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html", "us"),
+    "gcrypto": ("Crypto", _gnews(CRYPTO_QUERY), "crypto"),
+    "cryptoast": ("Cryptoast", "https://cryptoast.fr/feed/", "crypto"),
+    "jdc": ("Journal du Coin", "https://journalducoin.com/feed/", "crypto"),
+    "ctfr": ("Cointelegraph FR", "https://fr.cointelegraph.com/rss", "crypto"),
+    "cointribune": ("Cointribune", "https://www.cointribune.com/feed/", "crypto"),
+    "coindesk": ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/", "crypto"),
 }
 _news_cache = {}
 
@@ -1088,7 +1101,7 @@ def _strip_html(text):
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
-def _parse_feed(source_id, raw):
+def _parse_feed(source_id, raw, name=None, tag=None):
     """Lit un flux RSS ou Atom et renvoie des articles simples (titre, lien, date, résumé, image)."""
     import email.utils
     import xml.etree.ElementTree as ET
@@ -1096,7 +1109,8 @@ def _parse_feed(source_id, raw):
     if b"<!ENTITY" in raw[:4096]:
         return []  # entités XML refusées
     root = ET.fromstring(raw)
-    name = NEWS_FEEDS[source_id][0]
+    if name is None:
+        name, _url, tag = NEWS_FEEDS[source_id]
     items = []
 
     def local(tag):
@@ -1105,7 +1119,8 @@ def _parse_feed(source_id, raw):
     for node in root.iter():
         if local(node.tag) not in ("item", "entry"):
             continue
-        it = {"source": name, "title": "", "link": "", "date": None, "summary": "", "image": None}
+        it = {"source": name, "title": "", "link": "", "date": None, "summary": "", "image": None, "tag": tag}
+        origin = None
         for ch in node:
             t = local(ch.tag)
             if t == "title":
@@ -1133,10 +1148,18 @@ def _parse_feed(source_id, raw):
                 it["image"] = ch.get("url")
             elif t == "enclosure" and (ch.get("type") or "").startswith("image") and not it["image"]:
                 it["image"] = ch.get("url")
+            elif t == "source" and (ch.text or "").strip():
+                origin = ch.text.strip()  # journal d'origine (Google Actualités)
             elif t == "group":
                 for g in ch:
                     if local(g.tag) in ("content", "thumbnail") and g.get("url") and not it["image"]:
                         it["image"] = g.get("url")
+        if origin:
+            it["source"] = origin
+            if it["title"].endswith(" - " + origin):
+                it["title"] = it["title"][: -len(origin) - 3].strip()
+            if it["summary"].startswith(it["title"][:40]):
+                it["summary"] = ""  # le résumé de Google ne fait que répéter le titre
         if it["title"] and it["link"].startswith(("http://", "https://")):
             if it["image"] and not str(it["image"]).startswith(("http://", "https://")):
                 it["image"] = None
@@ -1159,6 +1182,32 @@ def _fetch_feed(source_id):
     items = _parse_feed(source_id, raw)
     _news_cache[source_id] = {"at": time.time(), "items": items}
     return items
+
+
+_search_cache = {}
+
+
+@app.get("/api/news/search")
+def api_news_search():
+    import time
+    import urllib.request
+
+    q = " ".join(str(request.args.get("q", "")).split())[:80]
+    if len(q) < 2:
+        return jsonify({"items": []})
+    hit = _search_cache.get(q.lower())
+    if hit and time.time() - hit["at"] < 300:
+        return jsonify({"items": hit["items"]})
+    req = urllib.request.Request(_gnews(q + " when:14d"), headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            items = _parse_feed(None, r.read(3_000_000), name="Google Actualités", tag="search")
+    except Exception as ex:
+        return jsonify({"error": f"recherche indisponible ({type(ex).__name__})"}), 502
+    items.sort(key=lambda x: x["date"] or "", reverse=True)
+    _search_cache[q.lower()] = {"at": time.time(), "items": items[:60]}
+    return jsonify({"items": items[:60]})
 
 
 @app.get("/api/news")

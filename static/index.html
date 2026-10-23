@@ -245,8 +245,10 @@
   .news-filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .news-filters .chips { margin-bottom: 0; flex: 1; min-width: 0; }
   #newsSources { flex-direction: column; gap: 8px; }
-  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .chip-group { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; width: 78px; flex: 0 0 auto; }
+  .chip-row { display: flex; gap: 6px; align-items: flex-start; }
+  .chip-row .chip-group { padding-top: 8px; }
+  .chip-list { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+  .chip-group { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; width: 96px; flex: 0 0 auto; }
   .news-search { position: relative; flex: 0 0 280px; max-width: 100%; }
   .news-search input { width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 999px;
     padding: 8px 14px 8px 34px; font: inherit; font-size: 13.5px; }
@@ -558,6 +560,12 @@
           <span class="ns-ic">⌕</span>
           <input type="search" id="newsSearch" placeholder="Rechercher : crypto, BCE, pétrole…" autocomplete="off">
         </div>
+      </div>
+      <div class="eco-tabs" id="newsTabs">
+        <button type="button" data-tab="us">🇺🇸 Économie US</button>
+        <button type="button" data-tab="crypto">₿ Crypto</button>
+        <button type="button" data-tab="eco">Économie</button>
+        <button type="button" data-tab="all">Tout</button>
       </div>
       <div class="news-grid" id="newsGrid"></div>
       <div class="news-more"><button type="button" class="btn" id="newsMore" hidden>Afficher plus d'articles</button></div>
@@ -1285,11 +1293,13 @@ api('/api/prefs').then(p => {
   }
   if (Array.isArray(p.news) && p.news.length) {
     let ns = p.news.filter(id => NEWS_SOURCES.some(x => x[0] === id));
-    if (p.newsV !== 2) { // nouvelles sources crypto : activées une fois pour les réglages existants
-      ns = ns.concat(NEWS_CRYPTO_DEFAULT.filter(id => !ns.includes(id)));
+    if ((p.newsV || 0) < 3) { // nouvelles sources (Économie US, crypto) : activées une fois pour les réglages existants
+      ns = ns.concat(NEWS_NEW_DEFAULT.filter(id => !ns.includes(id)));
       api('/api/prefs', { news: ns }).catch(() => {});
     }
     if (ns.length) { state.news.sources = ns; buildNewsSources(); if (state.page === 'eco') loadNews(true); }
+  }
+  if (['us', 'crypto', 'eco', 'all'].includes(p.newsTab)) { state.news.tab = p.newsTab; buildNewsTabs(); if (newsItems.length) renderNews();
   }
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
@@ -2006,20 +2016,23 @@ buildEcoFilters();
 
 // ---------- actualité économique (flux RSS des sites d'information) ----------
 const NEWS_SOURCES = [
+  ['us', 'Économie US (Google Actualités)', 'us'], ['cnbc', 'CNBC (anglais)', 'us'],
   ['lemonde', 'Le Monde Économie', 'eco'], ['lesechos', 'Les Echos', 'eco'], ['figaro', 'Le Figaro Économie', 'eco'],
-  ['bfm', 'BFM Business', 'eco'], ['investing', 'Investing.com France', 'eco'], ['cnbc', 'CNBC (anglais)', 'eco'],
-  ['cryptoast', 'Cryptoast', 'crypto'], ['jdc', 'Journal du Coin', 'crypto'], ['ctfr', 'Cointelegraph FR', 'crypto'],
-  ['cointribune', 'Cointribune', 'crypto'], ['coindesk', 'CoinDesk (anglais)', 'crypto'],
+  ['bfm', 'BFM Business', 'eco'], ['investing', 'Investing.com France', 'eco'],
+  ['gcrypto', 'Crypto (Google Actualités)', 'crypto'], ['cryptoast', 'Cryptoast', 'crypto'], ['jdc', 'Journal du Coin', 'crypto'],
+  ['ctfr', 'Cointelegraph FR', 'crypto'], ['cointribune', 'Cointribune', 'crypto'], ['coindesk', 'CoinDesk (anglais)', 'crypto'],
 ];
-const NEWS_CRYPTO_DEFAULT = ['cryptoast', 'jdc', 'ctfr'];
-state.news = { sources: ['lemonde', 'lesechos', 'figaro', 'bfm', 'investing'].concat(NEWS_CRYPTO_DEFAULT), shown: 24 };
+const NEWS_NEW_DEFAULT = ['us', 'gcrypto', 'cryptoast', 'jdc', 'ctfr'];
+const NEWS_GROUPS = { us: 'Économie US', eco: 'Économie', crypto: 'Crypto' };
+state.news = { sources: ['us', 'lemonde', 'lesechos', 'figaro', 'bfm', 'investing', 'gcrypto', 'cryptoast', 'jdc', 'ctfr'], shown: 24, tab: 'us' };
 let newsItems = [], newsTimer = null, newsLoadedAt = 0;
 function buildNewsSources() {
   const box = $('#newsSources'); box.innerHTML = '';
   let group = null, row = null;
   for (const [id, label, g] of NEWS_SOURCES) {
     if (g !== group) {
-      group = g; row = el('div', 'chip-row'); row.appendChild(el('span', 'chip-group', g === 'crypto' ? 'Crypto' : 'Économie')); box.appendChild(row);
+      group = g; const line = el('div', 'chip-row'); line.appendChild(el('span', 'chip-group', NEWS_GROUPS[g]));
+      row = el('div', 'chip-list'); line.appendChild(row); box.appendChild(line);
     }
     const c = el('button', 'chip' + (state.news.sources.includes(id) ? ' on' : ''), label); c.type = 'button';
     c.onclick = () => {
@@ -2051,6 +2064,7 @@ const NEWS_SYNONYMS = [
   ['inflation', 'ipc', 'cpi', 'prix a la consommation'],
   ['nasdaq', 'us100', 'tech', 'wall street'],
   ['emploi', 'chomage', 'nfp', 'payrolls', 'jobs'],
+  ['dollar', 'usd', 'billet vert', 'dxy', 'greenback'],
 ];
 function searchTerms(q) {
   const n = norm(q).trim(); if (!n) return [];
@@ -2078,9 +2092,19 @@ function highlight(node, text, terms) {
 function renderNews() {
   const grid = $('#newsGrid'); grid.innerHTML = '';
   const q = $('#newsSearch').value, terms = searchTerms(q);
-  const found = newsItems.filter(it => matches(it, terms));
+  let found;
+  if (terms.length) { // recherche : tous les thèmes + résultats de Google Actualités
+    const local = newsItems.filter(it => matches(it, terms));
+    const seen = new Set(local.map(it => norm(it.title).slice(0, 80)));
+    const remote = (newsSearch.q === q.trim() ? newsSearch.items : []).filter(it => !seen.has(norm(it.title).slice(0, 80)));
+    found = local.concat(remote).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  } else {
+    found = state.news.tab === 'all' ? newsItems : newsItems.filter(it => it.tag === state.news.tab);
+  }
   const list = found.slice(0, state.news.shown);
-  if (!list.length) grid.appendChild(el('div', 'news-empty', q.trim() ? 'Aucun article récent sur « ' + q.trim() + ' ».' : 'Aucun article pour le moment.'));
+  if (!list.length) grid.appendChild(el('div', 'news-empty', q.trim()
+    ? (newsSearch.loading ? 'Recherche dans Google Actualités…' : 'Aucun article récent sur « ' + q.trim() + ' ».' + (newsSearch.error ? ' (' + newsSearch.error + ')' : ''))
+    : 'Aucun article dans cet onglet pour le moment.'));
   else if (terms.length) { const info = el('div', null, found.length + ' article' + (found.length > 1 ? 's' : '') + ' sur « ' + q.trim() + ' »'); info.style.cssText = 'grid-column:1/-1;color:var(--muted);font-size:13px'; grid.appendChild(info); }
   for (const it of list) {
     const card = el('button', 'news-card'); card.type = 'button'; card.title = 'Ouvrir l\'article';
@@ -2117,8 +2141,33 @@ async function loadNews(force) {
   newsTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) loadNews(true); }, 10 * 60000);
 }
 $('#newsMore').onclick = () => { state.news.shown += 24; renderNews(); };
-let newsSearchT;
-$('#newsSearch').addEventListener('input', () => { clearTimeout(newsSearchT); newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150); });
+let newsSearchT, newsRemoteT;
+const newsSearch = { q: '', items: [], loading: false, error: null };
+async function searchRemote(q) {
+  newsSearch.q = q; newsSearch.items = []; newsSearch.loading = true; newsSearch.error = null; renderNews();
+  try { const r = await api('/api/news/search?q=' + encodeURIComponent(q)); if (newsSearch.q === q) newsSearch.items = r.items || []; }
+  catch (e) { if (newsSearch.q === q) newsSearch.error = e.message; }
+  if (newsSearch.q === q) { newsSearch.loading = false; renderNews(); }
+}
+$('#newsSearch').addEventListener('input', () => {
+  clearTimeout(newsSearchT); clearTimeout(newsRemoteT);
+  const q = $('#newsSearch').value.trim();
+  $('#newsTabs').style.opacity = q ? '.45' : '';
+  newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150);
+  if (q.length >= 2) newsRemoteT = setTimeout(() => searchRemote(q), 600);
+  else { newsSearch.q = ''; newsSearch.items = []; }
+});
+function buildNewsTabs() {
+  document.querySelectorAll('#newsTabs button').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === state.news.tab);
+    b.onclick = () => {
+      state.news.tab = b.dataset.tab; state.news.shown = 24;
+      if ($('#newsSearch').value) { $('#newsSearch').value = ''; newsSearch.q = ''; $('#newsTabs').style.opacity = ''; }
+      buildNewsTabs(); renderNews(); api('/api/prefs', { newsTab: state.news.tab }).catch(() => {});
+    };
+  });
+}
+buildNewsTabs();
 $('#newsRefresh').onclick = () => loadNews(true);
 buildNewsSources();
 
