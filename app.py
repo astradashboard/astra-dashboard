@@ -440,42 +440,131 @@ def build_account_data(info, deals, orders):
     }
 
 
+class Mt5Session:
+    """Une seule copie cachée de MT5, gardée ouverte : on change de compte à l'intérieur
+    (quelques secondes) au lieu de relancer le terminal à chaque lecture."""
+
+    IDLE_CLOSE = 90  # secondes sans utilisation avant de fermer MT5
+
+    def __init__(self):
+        self.exe = self.term = self.login = None
+        self.used = 0.0
+
+    def _close_locked(self):
+        try:
+            mt5.shutdown()
+        except Exception:
+            pass
+        if self.term is not None:
+            try:
+                self.term.__exit__(None, None, None)
+            except Exception:
+                pass
+        self.exe = self.term = self.login = None
+
+    def close(self):
+        with mt5_lock:
+            self._close_locked()
+
+    def ensure(self, acc, password):
+        """À appeler avec mt5_lock : renvoie account_info du compte demandé, connecté."""
+        import time
+
+        self.used = time.time()
+        exe = private_terminal(acc)
+        login = int(acc["login"])
+        if self.term is not None and self.exe == exe:
+            try:
+                info = mt5.account_info()
+            except Exception:
+                info = None
+            if info is not None and info.login == login:
+                self.login = acc["login"]
+                return info
+            if info is not None:  # terminal en vie, autre compte : simple changement de compte
+                if mt5.login(login, password=password, server=acc["server"], timeout=60000):
+                    info = mt5.account_info()
+                    if info is not None and info.login == login:
+                        self.login = acc["login"]
+                        return info
+                code, msg = mt5.last_error()
+                if code == -6:
+                    raise RuntimeError(f"Connexion refusée ({msg}). Vérifie le numéro de compte, "
+                                       "le mot de passe et le nom exact du serveur.")
+            self._close_locked()  # terminal bloqué ou fermé : on repart proprement
+        elif self.term is not None:
+            self._close_locked()  # autre broker : autre terminal
+        term = HiddenTerminal(exe)
+        term.__enter__()
+        try:
+            info = _connect(acc, password, exe)
+        except Exception:
+            term.__exit__(None, None, None)
+            raise
+        self.exe, self.term, self.login = exe, term, acc["login"]
+        self.used = time.time()
+        return info
+
+
+SESSION = Mt5Session()
+
+
 def fetch_mt5(acc, password):
-    """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
+    """Lit le compte via la copie cachée de MT5 et calcule le P&L par jour."""
+    import time
+
     if mt5 is None:
         raise RuntimeError(
             "Le module MetaTrader5 n'est pas disponible. L'application fonctionne "
             "uniquement sur Windows avec le terminal MetaTrader 5 installé."
         )
-    live_stop()  # le suivi en direct utilise le même terminal : on le met en pause
+    _start_mt5_threads()
     with mt5_lock:
         try:
-            exe = private_terminal(acc)
+            info = SESSION.ensure(acc, password)
         except OSError as e:
             raise RuntimeError(f"Impossible de préparer le terminal MT5 de l'application : {e}")
-        with HiddenTerminal(exe):
-            info = _connect(acc, password, exe)
-            try:
-                deals = wait_for_full_history(info)
-                orders = _history_orders()
-            finally:
-                mt5.shutdown()
+        deals = wait_for_full_history(info)
+        orders = _history_orders()
+        SESSION.used = time.time()
     return build_account_data(info, deals, orders)
 
 
 # ---------------------------------------------------------------- suivi en direct
-LIVE = {"login": None, "thread": None, "stop": None, "snap": None, "status": "off", "error": None,
-        "error_at": 0.0, "seen": 0.0, "hist_at": 0.0, "hist_rev": 0}
+LIVE = {"login": None, "snap": None, "status": "off", "error": None, "error_at": 0.0, "seen": 0.0,
+        "hist_rev": 0, "hist": {}}
 live_lock = threading.Lock()
+_threads = {"started": False}
 
 
 def live_stop():
     with live_lock:
-        ev, th = LIVE["stop"], LIVE["thread"]
-        if ev:
-            ev.set()
-    if th and th.is_alive() and th is not threading.current_thread():
-        th.join(timeout=8)
+        LIVE["login"] = None
+        LIVE["seen"] = 0.0
+
+
+def _start_mt5_threads():
+    with live_lock:
+        if _threads["started"]:
+            return
+        _threads["started"] = True
+    threading.Thread(target=_live_loop, daemon=True).start()
+    threading.Thread(target=_idle_closer, daemon=True).start()
+
+
+def _idle_closer():
+    import time
+
+    while True:
+        time.sleep(10)
+        watching = time.time() - LIVE["seen"] < 30
+        if SESSION.term is not None and not watching and time.time() - SESSION.used > Mt5Session.IDLE_CLOSE:
+            if mt5_lock.acquire(timeout=1):
+                try:
+                    if time.time() - SESSION.used > Mt5Session.IDLE_CLOSE:
+                        SESSION._close_locked()
+                finally:
+                    mt5_lock.release()
 
 
 def _server_iso(ts):
@@ -511,74 +600,59 @@ def _live_snapshot(info, positions):
     }
 
 
-def _live_worker(acc, password, stop):
+def _live_loop():
+    """Toutes les secondes : équité et positions du compte suivi.
+    L'historique est relu en arrière-plan, sans bloquer l'affichage des trades en cours."""
     import time
 
-    login = acc["login"]
-    term = None
-    try:
-        with mt5_lock:
-            exe = private_terminal(acc)
-            term = HiddenTerminal(exe)
-            term.__enter__()
-            info = _connect(acc, password, exe)
-            first_deals = wait_for_full_history(info)  # historique complet avant le premier calcul
-            first_orders = _history_orders()
-        data = build_account_data(info, first_deals, first_orders)
-        cache = load_cache()
-        cache[login] = data
-        save_cache(cache)
+    while True:
+        time.sleep(1.0)
         with live_lock:
-            if LIVE["stop"] is stop:
-                LIVE["status"], LIVE["error"] = "running", None
-                LIVE["hist_at"] = time.time()
-                LIVE["hist_rev"] += 1
-        last_count = None
-        while not stop.is_set():
-            if time.time() - LIVE["seen"] > 30:
-                break  # plus personne ne regarde : on libère MT5
+            login = LIVE["login"]
+            watching = login and time.time() - LIVE["seen"] < 30
+            in_error = LIVE["status"] == "error" and time.time() - LIVE["error_at"] < 15
+        if not watching or in_error:
+            continue
+        acc = load_accounts().get(login)
+        password = get_saved_password(login)
+        if not acc or not password:
+            with live_lock:
+                if LIVE["login"] == login:
+                    LIVE["status"] = "need_password"
+            continue
+        hist = LIVE["hist"].setdefault(login, {"at": 0.0, "tries": 0, "count": None, "pending": True})
+        try:
             with mt5_lock:
-                info = mt5.account_info()
+                info = SESSION.ensure(acc, password)
                 positions = list(mt5.positions_get() or [])
-                snap = _live_snapshot(info, positions) if info else None
-                need_hist = info is not None and (last_count is not None and len(positions) != last_count
-                                                 or time.time() - LIVE["hist_at"] > 120)
+                snap = _live_snapshot(info, positions)
+                if hist["count"] is not None and len(positions) != hist["count"]:
+                    hist["pending"] = True  # un trade s'est ouvert ou fermé
+                hist["count"] = len(positions)
                 deals = orders = None
-                if need_hist:
+                if hist["pending"] or time.time() - hist["at"] > 120:
                     deals = list(mt5.history_deals_get(dt.datetime(2000, 1, 1),
                                                        dt.datetime.now() + dt.timedelta(days=2)) or [])
                     orders = _history_orders()
-            if snap:
-                last_count = len(positions)
-                with live_lock:
-                    if LIVE["stop"] is stop:
-                        LIVE["snap"] = snap
-            if need_hist and deals is not None:
-                data = build_account_data(info, deals, orders)
-                cache = load_cache()
-                cache[login] = data
-                save_cache(cache)
-                with live_lock:
-                    LIVE["hist_at"] = time.time()
-                    LIVE["hist_rev"] += 1
-            stop.wait(1.0)
-    except Exception as ex:
-        with live_lock:
-            if LIVE["stop"] is stop:
-                LIVE["status"], LIVE["error"], LIVE["error_at"] = "error", str(ex), time.time()
-    finally:
-        with mt5_lock:
-            try:
-                mt5.shutdown()
-            except Exception:
-                pass
-            if term is not None:
-                term.__exit__(None, None, None)
-        with live_lock:
-            if LIVE["stop"] is stop:
-                if LIVE["status"] != "error":
-                    LIVE["status"] = "off"
-                LIVE["thread"] = None
+            with live_lock:
+                if LIVE["login"] == login:
+                    LIVE["snap"], LIVE["status"], LIVE["error"] = snap, "running", None
+            if deals is not None:
+                total = sum(d.profit + d.commission + d.swap + getattr(d, "fee", 0.0) for d in deals)
+                complete = deals and abs(total - info.balance) < 0.01
+                hist["tries"] += 1
+                if complete or hist["tries"] >= 20:  # historique complet (ou stable depuis ~20 s)
+                    data = build_account_data(info, deals, orders)
+                    cache = load_cache()
+                    cache[login] = data
+                    save_cache(cache)
+                    hist.update(at=time.time(), tries=0, pending=False)
+                    with live_lock:
+                        LIVE["hist_rev"] += 1
+        except Exception as ex:
+            with live_lock:
+                if LIVE["login"] == login:
+                    LIVE["status"], LIVE["error"], LIVE["error_at"] = "error", str(ex), time.time()
 
 
 # démo : positions fictives qui bougent à chaque seconde
@@ -620,27 +694,19 @@ def api_live():
     accounts, cache = load_accounts(), load_cache()
     if login not in accounts:
         return jsonify({"status": "error", "error": "Compte introuvable."}), 404
-    LIVE["seen"] = time.time()
     if cache.get(login, {}).get("demo"):
+        LIVE["seen"] = time.time()
         return jsonify({"status": "running", "snap": _demo_snapshot(cache[login]), "rev": 0})
     if mt5 is None:
         return jsonify({"status": "unavailable", "error": "MetaTrader 5 n'est pas disponible sur cet ordinateur."})
-    with live_lock:
-        same = LIVE["login"] == login
-        if same and LIVE["thread"] is not None and LIVE["thread"].is_alive():
-            return jsonify({"status": LIVE["status"], "snap": LIVE["snap"], "rev": LIVE["hist_rev"], "error": LIVE["error"]})
-        if same and LIVE["status"] == "error" and time.time() - LIVE["error_at"] < 30:
-            return jsonify({"status": "error", "error": LIVE["error"]})
-    password = get_saved_password(login)
-    if not password:
+    if not get_saved_password(login):
         return jsonify({"status": "need_password"})
-    live_stop()
-    stop = threading.Event()
-    th = threading.Thread(target=_live_worker, args=(accounts[login], password, stop), daemon=True)
+    _start_mt5_threads()
     with live_lock:
-        LIVE.update(login=login, thread=th, stop=stop, snap=None, status="starting", error=None, hist_at=time.time())
-    th.start()
-    return jsonify({"status": "starting"})
+        if LIVE["login"] != login:  # nouveau compte suivi
+            LIVE.update(login=login, snap=None, status="starting", error=None)
+        LIVE["seen"] = time.time()
+        return jsonify({"status": LIVE["status"], "snap": LIVE["snap"], "rev": LIVE["hist_rev"], "error": LIVE["error"]})
 
 
 def make_demo_data(size=100000.0):
@@ -741,6 +807,8 @@ def shutdown_app():
     """Ferme le MT5 caché du suivi en direct, puis quitte."""
     try:
         live_stop()
+        if SESSION.term is not None and mt5_lock.acquire(timeout=3):
+            SESSION._close_locked()
         if os.name == "nt":
             _kill_private_terminals()
     except Exception:
