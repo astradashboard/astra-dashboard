@@ -852,7 +852,8 @@ def api_prefs_set():
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
     if isinstance(body.get("news"), list):
-        prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:10]
+        prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:12]
+        prefs["newsV"] = 2
     if isinstance(body.get("eco"), dict):
         eco = body["eco"]
         imp = str(eco.get("imp", "0,1"))
@@ -1069,6 +1070,12 @@ NEWS_FEEDS = {
     "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/"),
     "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss"),
     "cnbc": ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
+    # crypto
+    "cryptoast": ("Cryptoast", "https://cryptoast.fr/feed/"),
+    "jdc": ("Journal du Coin", "https://journalducoin.com/feed/"),
+    "ctfr": ("Cointelegraph FR", "https://fr.cointelegraph.com/rss"),
+    "cointribune": ("Cointribune", "https://www.cointribune.com/feed/"),
+    "coindesk": ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
 }
 _news_cache = {}
 
@@ -1158,14 +1165,14 @@ def _fetch_feed(source_id):
 def api_news():
     from concurrent.futures import ThreadPoolExecutor
 
-    ids = [x for x in str(request.args.get("sources", "")).split(",") if x in NEWS_FEEDS] or list(NEWS_FEEDS)[:5]
+    ids = [x for x in str(request.args.get("sources", "")).split(",") if x in NEWS_FEEDS][:12] or list(NEWS_FEEDS)[:5]
     if request.args.get("fresh") == "1":
         for i in ids:
             hit = _news_cache.get(i)
             if hit and __import__("time").time() - hit["at"] > 60:
                 hit["at"] = 0  # « Actualiser » : relire le flux (au plus une fois par minute)
     items, failed = [], []
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=10) as pool:
         futures = {i: pool.submit(_fetch_feed, i) for i in ids}
         for i, f in futures.items():
             try:

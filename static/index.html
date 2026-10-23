@@ -244,6 +244,9 @@
   .news-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .news-filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .news-filters .chips { margin-bottom: 0; flex: 1; min-width: 0; }
+  #newsSources { flex-direction: column; gap: 8px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip-group { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; width: 78px; flex: 0 0 auto; }
   .news-search { position: relative; flex: 0 0 280px; max-width: 100%; }
   .news-search input { width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 999px;
     padding: 8px 14px 8px 34px; font: inherit; font-size: 13.5px; }
@@ -1281,7 +1284,11 @@ api('/api/prefs').then(p => {
     if (state.page === 'eco') renderEco(true);
   }
   if (Array.isArray(p.news) && p.news.length) {
-    const ns = p.news.filter(id => NEWS_SOURCES.some(x => x[0] === id));
+    let ns = p.news.filter(id => NEWS_SOURCES.some(x => x[0] === id));
+    if (p.newsV !== 2) { // nouvelles sources crypto : activées une fois pour les réglages existants
+      ns = ns.concat(NEWS_CRYPTO_DEFAULT.filter(id => !ns.includes(id)));
+      api('/api/prefs', { news: ns }).catch(() => {});
+    }
     if (ns.length) { state.news.sources = ns; buildNewsSources(); if (state.page === 'eco') loadNews(true); }
   }
   buildTvGrid(); renderTv(true);
@@ -1999,14 +2006,21 @@ buildEcoFilters();
 
 // ---------- actualité économique (flux RSS des sites d'information) ----------
 const NEWS_SOURCES = [
-  ['lemonde', 'Le Monde Économie'], ['lesechos', 'Les Echos'], ['figaro', 'Le Figaro Économie'],
-  ['bfm', 'BFM Business'], ['investing', 'Investing.com France'], ['cnbc', 'CNBC (anglais)'],
+  ['lemonde', 'Le Monde Économie', 'eco'], ['lesechos', 'Les Echos', 'eco'], ['figaro', 'Le Figaro Économie', 'eco'],
+  ['bfm', 'BFM Business', 'eco'], ['investing', 'Investing.com France', 'eco'], ['cnbc', 'CNBC (anglais)', 'eco'],
+  ['cryptoast', 'Cryptoast', 'crypto'], ['jdc', 'Journal du Coin', 'crypto'], ['ctfr', 'Cointelegraph FR', 'crypto'],
+  ['cointribune', 'Cointribune', 'crypto'], ['coindesk', 'CoinDesk (anglais)', 'crypto'],
 ];
-state.news = { sources: ['lemonde', 'lesechos', 'figaro', 'bfm', 'investing'], shown: 24 };
+const NEWS_CRYPTO_DEFAULT = ['cryptoast', 'jdc', 'ctfr'];
+state.news = { sources: ['lemonde', 'lesechos', 'figaro', 'bfm', 'investing'].concat(NEWS_CRYPTO_DEFAULT), shown: 24 };
 let newsItems = [], newsTimer = null, newsLoadedAt = 0;
 function buildNewsSources() {
   const box = $('#newsSources'); box.innerHTML = '';
-  for (const [id, label] of NEWS_SOURCES) {
+  let group = null, row = null;
+  for (const [id, label, g] of NEWS_SOURCES) {
+    if (g !== group) {
+      group = g; row = el('div', 'chip-row'); row.appendChild(el('span', 'chip-group', g === 'crypto' ? 'Crypto' : 'Économie')); box.appendChild(row);
+    }
     const c = el('button', 'chip' + (state.news.sources.includes(id) ? ' on' : ''), label); c.type = 'button';
     c.onclick = () => {
       const on = state.news.sources.includes(id);
@@ -2015,7 +2029,7 @@ function buildNewsSources() {
       api('/api/prefs', { news: state.news.sources }).catch(() => {});
       buildNewsSources(); loadNews(true);
     };
-    box.appendChild(c);
+    row.appendChild(c);
   }
 }
 function timeAgo(d) {
