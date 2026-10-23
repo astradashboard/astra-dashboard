@@ -158,17 +158,31 @@
   .j-rows span:last-child { font-weight: 600; text-align: right; }
   .j-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 18px; }
   .linklike { background: none; border: none; color: var(--gold); padding: 0; font: inherit; font-weight: 600; text-decoration: underline; }
-  .blk { position: relative; margin-bottom: 22px; border-radius: 16px; transition: opacity .15s; }
+  #content { position: relative; }
+  .blk { position: relative; margin-bottom: 22px; border-radius: 16px; }
   .blk > section, .blk > .kpis { margin-bottom: 0; }
-  .blk-handle { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 3; width: 44px; height: 20px;
-    border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); font-size: 14px; line-height: 1;
-    padding: 0; cursor: grab; opacity: 0; transition: opacity .15s; letter-spacing: 1px; }
-  .blk:hover > .blk-handle, .blk-handle:focus-visible { opacity: 1; }
+  .blk-handle { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); z-index: 3; width: 52px; height: 22px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); font-size: 15px; line-height: 20px;
+    text-align: center; cursor: grab; opacity: 0; transition: opacity .15s, color .15s, border-color .15s; user-select: none; touch-action: none; }
+  .blk:hover > .blk-handle { opacity: 1; }
   .blk-handle:hover { color: var(--gold); border-color: var(--gold); }
-  .blk.blk-drag { opacity: .35; }
-  .blk.drop-above::before, .blk.drop-below::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: var(--gold); }
-  .blk.drop-above::before { top: -13px; }
-  .blk.drop-below::after { bottom: -13px; }
+  .blk-label { display: none; }
+  /* mode déplacement : blocs repliés en bandeaux */
+  #content.reordering .blk { margin-bottom: 10px; }
+  #content.reordering .blk > :not(.blk-label) { display: none !important; }
+  #content.reordering .blk-label { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; border-radius: 12px;
+    background: var(--panel); border: 1px dashed #34405a; font-weight: 600; font-size: 15px; color: var(--fg); }
+  #content.reordering .blk-label .g { color: var(--muted); }
+  #content.reordering .blk.moving .blk-label { opacity: .35; border: 1px solid var(--gold); }
+  body.reordering, body.reordering * { cursor: grabbing !important; user-select: none !important; }
+  .reorder-ghost { position: fixed; z-index: 60; pointer-events: none; transform: translate(-50%, -50%); padding: 11px 18px;
+    border-radius: 11px; background: var(--gold); color: #0a0d14; font-weight: 700; font-size: 14px; white-space: nowrap;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .reorder-ghost small { display: block; font-weight: 500; font-size: 11px; opacity: .75; margin-top: 2px; }
+  .reorder-line { position: absolute; left: 0; right: 0; height: 4px; margin-top: -2px; border-radius: 3px; background: var(--gold);
+    box-shadow: 0 0 0 5px var(--gold-soft); pointer-events: none; z-index: 5; transition: top .08s; }
+  .reorder-line::before, .reorder-line::after { content: ''; position: absolute; top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--gold); }
+  .reorder-line::before { left: -7px; } .reorder-line::after { right: -7px; }
   @media (hover: none) { .blk-handle { opacity: .8; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
@@ -299,7 +313,7 @@
     <div id="notices"></div>
 
     <div id="content">
-      <div class="blk" data-block="hero"><div class="blk-handle" draggable="true" title="Glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="hero" data-label="Capital du compte"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div><div class="blk-label"><span class="g">⠿</span>Capital du compte</div>
       <section class="hero" id="hero">
         <div class="h-top">
           <div class="h-label">Capital du compte</div>
@@ -317,7 +331,7 @@
         <div class="h-fx" id="heroFx"></div>
       </section>
       </div>
-      <div class="blk" data-block="kpis"><div class="blk-handle" draggable="true" title="Glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="kpis" data-label="Indicateurs"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div><div class="blk-label"><span class="g">⠿</span>Indicateurs</div>
       <div class="kpis-head">
         <div class="left">
           <h2>Indicateurs</h2>
@@ -331,7 +345,7 @@
       </div>
       <section class="kpis" id="kpis"></section>
       </div>
-      <div class="blk" data-block="chart"><div class="blk-handle" draggable="true" title="Glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="chart" data-label="Évolution du capital"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div><div class="blk-label"><span class="g">⠿</span>Évolution du capital</div>
       <section class="card">
         <div class="card-head">
           <div><h2>Évolution du capital</h2><span id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
@@ -351,7 +365,7 @@
         <div class="chart-hint">Molette pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
       </div>
-      <div class="blk" data-block="cal"><div class="blk-handle" draggable="true" title="Glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="cal" data-label="Calendrier des profits et pertes"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div><div class="blk-label"><span class="g">⠿</span>Calendrier des profits et pertes</div>
       <section class="card">
         <div class="card-head">
           <h2>Calendrier des profits et pertes</h2>
@@ -1477,34 +1491,79 @@ function applyLayout() {
   const order = state.layout.filter(id => BLOCKS.includes(id)).concat(BLOCKS.filter(id => !state.layout.includes(id)));
   for (const id of order) { const b = box.querySelector('.blk[data-block="' + id + '"]'); if (b) box.appendChild(b); }
 }
-let blkDrag = null;
-const clearDrop = () => document.querySelectorAll('#content .blk').forEach(b => b.classList.remove('drop-above', 'drop-below'));
-document.querySelectorAll('#content .blk').forEach(blk => {
-  const handle = blk.querySelector('.blk-handle');
-  handle.addEventListener('dragstart', ev => {
-    ev.stopPropagation();
-    blkDrag = blk; blk.classList.add('blk-drag');
-    ev.dataTransfer.effectAllowed = 'move';
-    try { ev.dataTransfer.setData('text/plain', 'bloc:' + blk.dataset.block); ev.dataTransfer.setDragImage(blk, 40, 20); } catch (_) {}
-  });
-  handle.addEventListener('dragend', () => { blk.classList.remove('blk-drag'); blkDrag = null; clearDrop(); });
-  blk.addEventListener('dragover', ev => {
-    if (!blkDrag || blkDrag === blk) return;
-    ev.preventDefault(); ev.dataTransfer.dropEffect = 'move';
-    const r = blk.getBoundingClientRect(), below = ev.clientY > r.top + r.height / 2;
-    clearDrop(); blk.classList.add(below ? 'drop-below' : 'drop-above');
-  });
-  blk.addEventListener('drop', ev => {
-    if (!blkDrag || blkDrag === blk) return;
-    ev.preventDefault(); ev.stopPropagation();
-    const below = blk.classList.contains('drop-below');
-    blk.parentNode.insertBefore(blkDrag, below ? blk.nextSibling : blk);
-    blkDrag.classList.remove('blk-drag'); blkDrag = null; clearDrop();
-    state.layout = [...document.querySelectorAll('#content .blk')].map(b => b.dataset.block);
+let reorder = null;
+function startReorder(blk, ev) {
+  ev.preventDefault();
+  const box = $('#content');
+  box.classList.add('reordering'); document.body.classList.add('reordering');
+  blk.classList.add('moving');
+  window.scrollTo(0, Math.max(0, box.getBoundingClientRect().top + window.scrollY - 90));
+  const ghost = el('div', 'reorder-ghost'); ghost.append('⠿ ' + blk.dataset.label);
+  ghost.appendChild(el('small', null, 'Relâche pour déposer · Échap pour annuler'));
+  const line = el('div', 'reorder-line');
+  document.body.appendChild(ghost); box.appendChild(line);
+  reorder = { blk, ghost, line, slot: null, x: ev.clientX, y: ev.clientY, raf: null };
+  moveReorder(ev);
+  window.addEventListener('pointermove', moveReorder);
+  window.addEventListener('pointerup', endReorder);
+  window.addEventListener('keydown', escReorder);
+  reorder.raf = requestAnimationFrame(autoScroll);
+}
+function slotTargets() { return [...document.querySelectorAll('#content .blk')].filter(b => b !== reorder.blk); }
+function moveReorder(ev) {
+  if (!reorder) return;
+  reorder.x = ev.clientX; reorder.y = ev.clientY;
+  reorder.ghost.style.left = ev.clientX + 'px'; reorder.ghost.style.top = ev.clientY + 'px';
+  placeLine();
+}
+function placeLine() {
+  const others = slotTargets(), box = $('#content'), boxTop = box.getBoundingClientRect().top;
+  let slot = others.length;
+  for (let i = 0; i < others.length; i++) {
+    const r = others[i].getBoundingClientRect();
+    if (reorder.y < r.top + r.height / 2) { slot = i; break; }
+  }
+  reorder.slot = slot;
+  let y;
+  if (!others.length) y = 0;
+  else if (slot === 0) y = others[0].getBoundingClientRect().top - 5;
+  else y = others[slot - 1].getBoundingClientRect().bottom + 5;
+  reorder.line.style.top = (y - boxTop) + 'px';
+}
+function autoScroll() {
+  if (!reorder) return;
+  const edge = 70, h = window.innerHeight;
+  if (reorder.y < edge) window.scrollBy(0, -Math.ceil((edge - reorder.y) / 4));
+  else if (reorder.y > h - edge) window.scrollBy(0, Math.ceil((reorder.y - (h - edge)) / 4));
+  placeLine();
+  reorder.raf = requestAnimationFrame(autoScroll);
+}
+function stopReorder(apply) {
+  if (!reorder) return;
+  const { blk, ghost, line, slot, raf } = reorder;
+  cancelAnimationFrame(raf);
+  window.removeEventListener('pointermove', moveReorder);
+  window.removeEventListener('pointerup', endReorder);
+  window.removeEventListener('keydown', escReorder);
+  ghost.remove(); line.remove();
+  const box = $('#content');
+  if (apply && slot !== null) {
+    const others = slotTargets();
+    box.insertBefore(blk, slot < others.length ? others[slot] : null);
+    state.layout = [...box.querySelectorAll('.blk')].map(b => b.dataset.block);
     api('/api/prefs', { layout: state.layout }).catch(() => {});
-    if (state.data) renderChart();
-  });
-});
+  }
+  box.classList.remove('reordering'); document.body.classList.remove('reordering'); blk.classList.remove('moving');
+  reorder = null;
+  if (state.data) renderChart();
+  blk.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function endReorder() { stopReorder(true); }
+function escReorder(ev) { if (ev.key === 'Escape') stopReorder(false); }
+document.querySelectorAll('#content .blk-handle').forEach(h => h.addEventListener('pointerdown', ev => {
+  if (ev.button !== 0) return;
+  startReorder(h.closest('.blk'), ev);
+}));
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
