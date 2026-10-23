@@ -6,7 +6,7 @@
     {
       "id": "essentiel",
       "name": "Essentiel",
-      "price": "19,95 €",
+      "price": "24,95 €",
       "period": "par mois",
       "accounts": 1,
       "variant_id": null,
@@ -22,17 +22,18 @@
       ]
     },
     {
-      "id": "duo",
-      "name": "Duo",
-      "price": "24,95 €",
+      "id": "pro",
+      "name": "Pro",
+      "price": "34,95 €",
       "period": "par mois",
-      "accounts": 2,
+      "accounts": 50,
       "badge": "Le plus complet",
       "variant_id": null,
       "checkout_url": "",
       "features": [
-        "Jusqu'à 2 comptes de trading connectés",
+        "Jusqu'à 50 comptes de trading connectés",
         "Vue « Tous les comptes » cumulée",
+        "Idéal pour gérer plusieurs challenges et comptes financés",
         "Tout ce qui est inclus dans l'offre Essentiel",
         "Mises à jour automatiques"
       ]

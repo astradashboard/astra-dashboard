@@ -1720,7 +1720,7 @@ def _plan_from_meta(meta):
             return p
     name = (str(meta.get("variant_name", "")) + " " + str(meta.get("product_name", ""))).lower()
     for p in sorted(plans, key=lambda x: -int(x.get("accounts", 1))):  # repli : d'après le nom de l'offre
-        if p.get("name", "").lower() in name or (int(p.get("accounts", 1)) >= 2 and ("duo" in name or "2 comptes" in name)):
+        if p.get("name", "").lower() in name or (int(p.get("accounts", 1)) >= 2 and ("pro" in name or "50" in name)):
             return p
     return min(plans, key=lambda x: int(x.get("accounts", 1))) if plans else {"id": "essentiel", "name": "Essentiel", "accounts": 1}
 
@@ -1914,8 +1914,10 @@ def api_connect():
     limit = max_accounts()
     real = [l for l in accounts0 if not cache0.get(l, {}).get("demo")]
     if limit is not None and login not in accounts0 and len(real) >= limit:
-        more = ("Passe à l'offre Duo dans « Nos offres » pour en ajouter un autre, ou retire d'abord un compte."
-                if limit < 2 else "Retire d'abord un compte pour en connecter un autre.")
+        bigger = max(load_offers().get("plans") or [{}], key=lambda x: int(x.get("accounts", 1)))
+        more = (f"Passe à l'offre {bigger.get('name', 'supérieure')} dans « Nos offres » pour en connecter jusqu'à "
+                f"{bigger.get('accounts')}, ou retire d'abord un compte." if int(bigger.get("accounts", 1)) > limit
+                else "Retire d'abord un compte pour en connecter un autre.")
         return jsonify({"error": f"Ton offre permet de connecter {limit} compte{'s' if limit > 1 else ''}. " + more,
                         "limit": limit}), 403
 
