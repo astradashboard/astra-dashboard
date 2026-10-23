@@ -361,57 +361,48 @@ def closed_trades(deals, orders=None):
     return trades
 
 
-def fetch_mt5(acc, password):
-    """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
-    if mt5 is None:
-        raise RuntimeError(
-            "Le module MetaTrader5 n'est pas disponible. L'application fonctionne "
-            "uniquement sur Windows avec le terminal MetaTrader 5 installé."
-        )
+def _connect(acc, password, exe):
+    """Démarre la connexion MT5 sur le terminal privé (déjà lancé) et renvoie account_info."""
     login = int(acc["login"])
+    ok = mt5.initialize(path=exe, portable=True, login=login, password=password,
+                        server=acc["server"], timeout=90000)
+    if not ok:
+        code, msg = mt5.last_error()
+        mt5.shutdown()
+        if code == -6:  # autorisation refusée
+            raise RuntimeError(
+                f"Connexion refusée ({msg}). Vérifie le numéro de compte, "
+                "le mot de passe et le nom exact du serveur."
+            )
+        raise RuntimeError(
+            f"Impossible de se connecter via MetaTrader 5 ({code} : {msg}). "
+            "Vérifie le nom exact du serveur et réessaie."
+        )
+    info = mt5.account_info()
+    if info is None or info.login != login:
+        if not mt5.login(login, password=password, server=acc["server"], timeout=60000):
+            code, msg = mt5.last_error()
+            mt5.shutdown()
+            raise RuntimeError(
+                f"Connexion refusée ({code} : {msg}). Vérifie le numéro de compte, "
+                "le mot de passe et le nom exact du serveur."
+            )
+        info = mt5.account_info()
+    if info is None:
+        mt5.shutdown()
+        raise RuntimeError("Impossible de lire les informations du compte.")
+    return info
 
-    with mt5_lock:
-        try:
-            exe = private_terminal(acc)
-        except OSError as e:
-            raise RuntimeError(f"Impossible de préparer le terminal MT5 de l'application : {e}")
 
-        with HiddenTerminal(exe):
-            ok = mt5.initialize(path=exe, portable=True, login=login, password=password,
-                                server=acc["server"], timeout=90000)
-            if not ok:
-                code, msg = mt5.last_error()
-                mt5.shutdown()
-                if code == -6:  # autorisation refusée
-                    raise RuntimeError(
-                        f"Connexion refusée ({msg}). Vérifie le numéro de compte, "
-                        "le mot de passe et le nom exact du serveur."
-                    )
-                raise RuntimeError(
-                    f"Impossible de se connecter via MetaTrader 5 ({code} : {msg}). "
-                    "Vérifie le nom exact du serveur et réessaie."
-                )
-            try:
-                info = mt5.account_info()
-                if info is None or info.login != login:
-                    if not mt5.login(login, password=password, server=acc["server"], timeout=60000):
-                        code, msg = mt5.last_error()
-                        raise RuntimeError(
-                            f"Connexion refusée ({code} : {msg}). Vérifie le numéro de compte, "
-                            "le mot de passe et le nom exact du serveur."
-                        )
-                    info = mt5.account_info()
-                if info is None:
-                    raise RuntimeError("Impossible de lire les informations du compte.")
-                deals = wait_for_full_history(info)
-                try:  # ordres d'ouverture : SL et TP des trades
-                    orders = list(mt5.history_orders_get(dt.datetime(2000, 1, 1),
-                                                         dt.datetime.now() + dt.timedelta(days=2)) or [])
-                except Exception:
-                    orders = []
-            finally:
-                mt5.shutdown()
+def _history_orders():
+    try:  # ordres d'ouverture : SL et TP des trades
+        return list(mt5.history_orders_get(dt.datetime(2000, 1, 1), dt.datetime.now() + dt.timedelta(days=2)) or [])
+    except Exception:
+        return []
 
+
+def build_account_data(info, deals, orders):
+    """Calcule le P&L par jour, le capital de départ et la liste des trades à partir de l'historique MT5."""
     daily = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0, "losses": 0})
     start_balance = 0.0
     exits = {getattr(mt5, n) for n in ("DEAL_ENTRY_OUT", "DEAL_ENTRY_INOUT", "DEAL_ENTRY_OUT_BY") if hasattr(mt5, n)}
@@ -447,6 +438,209 @@ def fetch_mt5(acc, password):
         "daily": {k: {**v, "pnl": round(v["pnl"], 2)} for k, v in sorted(daily.items())},
         "demo": False,
     }
+
+
+def fetch_mt5(acc, password):
+    """Se connecte au compte via un terminal MT5 privé et caché, et calcule le P&L par jour."""
+    if mt5 is None:
+        raise RuntimeError(
+            "Le module MetaTrader5 n'est pas disponible. L'application fonctionne "
+            "uniquement sur Windows avec le terminal MetaTrader 5 installé."
+        )
+    live_stop()  # le suivi en direct utilise le même terminal : on le met en pause
+    with mt5_lock:
+        try:
+            exe = private_terminal(acc)
+        except OSError as e:
+            raise RuntimeError(f"Impossible de préparer le terminal MT5 de l'application : {e}")
+        with HiddenTerminal(exe):
+            info = _connect(acc, password, exe)
+            try:
+                deals = wait_for_full_history(info)
+                orders = _history_orders()
+            finally:
+                mt5.shutdown()
+    return build_account_data(info, deals, orders)
+
+
+# ---------------------------------------------------------------- suivi en direct
+LIVE = {"login": None, "thread": None, "stop": None, "snap": None, "status": "off", "error": None,
+        "error_at": 0.0, "seen": 0.0, "hist_at": 0.0, "hist_rev": 0}
+live_lock = threading.Lock()
+
+
+def live_stop():
+    with live_lock:
+        ev, th = LIVE["stop"], LIVE["thread"]
+        if ev:
+            ev.set()
+    if th and th.is_alive() and th is not threading.current_thread():
+        th.join(timeout=8)
+
+
+def _server_iso(ts):
+    return dt.datetime.utcfromtimestamp(ts).isoformat(timespec="seconds")
+
+
+def _live_snapshot(info, positions):
+    now_srv = None
+    out = []
+    for p_ in positions:
+        tick = None
+        try:
+            tick = mt5.symbol_info_tick(p_.symbol)
+        except Exception:
+            pass
+        if tick is not None and getattr(tick, "time", 0):
+            now_srv = max(now_srv or 0, tick.time)
+        out.append({
+            "ticket": int(p_.ticket), "symbol": p_.symbol,
+            "side": "buy" if p_.type == mt5.POSITION_TYPE_BUY else "sell",
+            "volume": p_.volume, "open": p_.price_open, "current": p_.price_current,
+            "sl": p_.sl or None, "tp": p_.tp or None, "profit": round(p_.profit + p_.swap, 2),
+            "opened": _server_iso(p_.time),
+        })
+    for o in out:
+        open_ts = dt.datetime.fromisoformat(o["opened"]).replace(tzinfo=dt.timezone.utc).timestamp()
+        o["duration"] = max(0, int((now_srv or open_ts) - open_ts)) if now_srv else None
+    return {
+        "balance": info.balance, "equity": info.equity, "profit": round(info.profit, 2),
+        "margin": info.margin, "free_margin": info.margin_free, "currency": info.currency,
+        "positions": sorted(out, key=lambda x: x["opened"]),
+        "at": dt.datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def _live_worker(acc, password, stop):
+    import time
+
+    login = acc["login"]
+    term = None
+    try:
+        with mt5_lock:
+            exe = private_terminal(acc)
+            term = HiddenTerminal(exe)
+            term.__enter__()
+            info = _connect(acc, password, exe)
+            first_deals = wait_for_full_history(info)  # historique complet avant le premier calcul
+            first_orders = _history_orders()
+        data = build_account_data(info, first_deals, first_orders)
+        cache = load_cache()
+        cache[login] = data
+        save_cache(cache)
+        with live_lock:
+            if LIVE["stop"] is stop:
+                LIVE["status"], LIVE["error"] = "running", None
+                LIVE["hist_at"] = time.time()
+                LIVE["hist_rev"] += 1
+        last_count = None
+        while not stop.is_set():
+            if time.time() - LIVE["seen"] > 30:
+                break  # plus personne ne regarde : on libère MT5
+            with mt5_lock:
+                info = mt5.account_info()
+                positions = list(mt5.positions_get() or [])
+                snap = _live_snapshot(info, positions) if info else None
+                need_hist = info is not None and (last_count is not None and len(positions) != last_count
+                                                 or time.time() - LIVE["hist_at"] > 120)
+                deals = orders = None
+                if need_hist:
+                    deals = list(mt5.history_deals_get(dt.datetime(2000, 1, 1),
+                                                       dt.datetime.now() + dt.timedelta(days=2)) or [])
+                    orders = _history_orders()
+            if snap:
+                last_count = len(positions)
+                with live_lock:
+                    if LIVE["stop"] is stop:
+                        LIVE["snap"] = snap
+            if need_hist and deals is not None:
+                data = build_account_data(info, deals, orders)
+                cache = load_cache()
+                cache[login] = data
+                save_cache(cache)
+                with live_lock:
+                    LIVE["hist_at"] = time.time()
+                    LIVE["hist_rev"] += 1
+            stop.wait(1.0)
+    except Exception as ex:
+        with live_lock:
+            if LIVE["stop"] is stop:
+                LIVE["status"], LIVE["error"], LIVE["error_at"] = "error", str(ex), time.time()
+    finally:
+        with mt5_lock:
+            try:
+                mt5.shutdown()
+            except Exception:
+                pass
+            if term is not None:
+                term.__exit__(None, None, None)
+        with live_lock:
+            if LIVE["stop"] is stop:
+                if LIVE["status"] != "error":
+                    LIVE["status"] = "off"
+                LIVE["thread"] = None
+
+
+# démo : positions fictives qui bougent à chaque seconde
+_demo_live = {"positions": None, "rnd": random.Random(7)}
+
+
+def _demo_snapshot(c):
+    import time
+
+    rnd = _demo_live["rnd"]
+    if _demo_live["positions"] is None:
+        now = time.time()
+        _demo_live["positions"] = [
+            {"ticket": 175000001, "symbol": "US100.cash", "side": "buy", "volume": 5.0, "open": 20850.5,
+             "current": 20850.5, "sl": 20810.5, "tp": 20930.5, "t": now - 760},
+            {"ticket": 175000002, "symbol": "US100.cash", "side": "sell", "volume": 3.0, "open": 20878.0,
+             "current": 20878.0, "sl": 20918.0, "tp": None, "t": now - 190},
+        ]
+    out, floating = [], 0.0
+    for p_ in _demo_live["positions"]:
+        p_["current"] = round(p_["current"] + rnd.gauss(0, 1.6), 2)
+        move = p_["current"] - p_["open"] if p_["side"] == "buy" else p_["open"] - p_["current"]
+        profit = round(move * p_["volume"], 2)
+        floating += profit
+        out.append({**{k: v for k, v in p_.items() if k != "t"}, "profit": profit,
+                    "opened": dt.datetime.utcfromtimestamp(p_["t"]).isoformat(timespec="seconds"),
+                    "duration": int(time.time() - p_["t"])})
+    bal = c.get("balance") or 0.0
+    return {"balance": bal, "equity": round(bal + floating, 2), "profit": round(floating, 2), "margin": 1200.0,
+            "free_margin": round(bal + floating - 1200, 2), "currency": c.get("currency") or "USD",
+            "positions": out, "at": dt.datetime.now().isoformat(timespec="seconds")}
+
+
+@app.get("/api/live")
+def api_live():
+    import time
+
+    login = str(request.args.get("login", ""))
+    accounts, cache = load_accounts(), load_cache()
+    if login not in accounts:
+        return jsonify({"status": "error", "error": "Compte introuvable."}), 404
+    LIVE["seen"] = time.time()
+    if cache.get(login, {}).get("demo"):
+        return jsonify({"status": "running", "snap": _demo_snapshot(cache[login]), "rev": 0})
+    if mt5 is None:
+        return jsonify({"status": "unavailable", "error": "MetaTrader 5 n'est pas disponible sur cet ordinateur."})
+    with live_lock:
+        same = LIVE["login"] == login
+        if same and LIVE["thread"] is not None and LIVE["thread"].is_alive():
+            return jsonify({"status": LIVE["status"], "snap": LIVE["snap"], "rev": LIVE["hist_rev"], "error": LIVE["error"]})
+        if same and LIVE["status"] == "error" and time.time() - LIVE["error_at"] < 30:
+            return jsonify({"status": "error", "error": LIVE["error"]})
+    password = get_saved_password(login)
+    if not password:
+        return jsonify({"status": "need_password"})
+    live_stop()
+    stop = threading.Event()
+    th = threading.Thread(target=_live_worker, args=(accounts[login], password, stop), daemon=True)
+    with live_lock:
+        LIVE.update(login=login, thread=th, stop=stop, snap=None, status="starting", error=None, hist_at=time.time())
+    th.start()
+    return jsonify({"status": "starting"})
 
 
 def make_demo_data(size=100000.0):
@@ -543,9 +737,20 @@ def api_bye():
     return ("", 204)
 
 
+def shutdown_app():
+    """Ferme le MT5 caché du suivi en direct, puis quitte."""
+    try:
+        live_stop()
+        if os.name == "nt":
+            _kill_private_terminals()
+    except Exception:
+        pass
+    os._exit(0)
+
+
 @app.post("/api/quit")
 def api_quit():
-    threading.Timer(0.3, lambda: os._exit(0)).start()
+    threading.Timer(0.3, shutdown_app).start()
     return jsonify({"ok": True})
 
 
@@ -559,9 +764,9 @@ def lifetime_watchdog():
         now = time.time()
         closing = _life["closing_since"]
         if closing and now - closing > 5:
-            os._exit(0)
+            shutdown_app()
         if now - _life["last_ping"] > 600:
-            os._exit(0)
+            shutdown_app()
 
 
 PREFS_FILE = os.path.join(DATA_DIR, "preferences.json")
@@ -661,7 +866,7 @@ def api_update_apply():
         return jsonify({"error": "Aucune nouvelle version à installer."}), 400
     # relancer la nouvelle version sur le même port : la fenêtre ouverte se recharge simplement
     subprocess.Popen([sys.executable, os.path.abspath(__file__), "--sans-maj", f"--relance={SERVER['port']}"], cwd=APP_DIR)
-    threading.Timer(0.6, lambda: os._exit(0)).start()
+    threading.Timer(0.6, shutdown_app).start()
     return jsonify({"ok": True, "version": _load(VERSION_FILE, {}).get("version")})
 
 

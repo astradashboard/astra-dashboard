@@ -260,6 +260,27 @@
   .news-card img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; flex: 0 0 auto; background: var(--panel-2); }
   .news-more { display: flex; justify-content: center; margin: 14px 0 8px; }
   .news-empty { color: var(--muted); padding: 30px; text-align: center; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .h-label-wrap { display: flex; align-items: center; gap: 10px; }
+  .live-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--win); background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); border-radius: 999px; padding: 2px 9px; }
+  .live-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--win); animation: livePulse 1.4s ease-in-out infinite; }
+  @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+  .hero .h-value { transition: color .4s; }
+  .hero .h-value.flash-up { color: var(--win); } .hero .h-value.flash-down { color: var(--loss); }
+  .h-float { font-size: 14px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .h-float b { font-weight: 650; }
+  .live-status { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+  .live-status .ok { color: var(--win); font-weight: 600; }
+  .live-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  .live-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+    padding: 0 10px 8px; border-bottom: 1px solid var(--line); }
+  .live-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); }
+  .live-table tr:last-child td { border-bottom: none; }
+  .live-table .r { text-align: right; }
+  .live-table .pnl { font-weight: 700; font-size: 15px; }
+  .live-table tfoot td { border-top: 1px solid var(--line); border-bottom: none; font-weight: 650; }
+  .live-empty { color: var(--muted); text-align: center; padding: 22px 10px; }
+  @media (max-width: 860px) { .live-table .hide-s { display: none; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -393,7 +414,7 @@
       <div class="blk" data-block="hero" data-label="Capital du compte"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <section class="hero" id="hero">
         <div class="h-top">
-          <div class="h-label">Capital du compte</div>
+          <div class="h-label-wrap"><div class="h-label">Capital du compte</div><span class="live-dot" id="heroLive" hidden>En direct</span></div>
           <select id="heroCur" title="Devise d'affichage">
             <option value="">Devise du compte</option>
             <option value="EUR">EUR · Euro €</option>
@@ -405,7 +426,17 @@
         </div>
         <div class="h-value" id="heroValue">—</div>
         <div class="h-month" id="heroMonth"></div>
+        <div class="h-float" id="heroFloat"></div>
         <div class="h-fx" id="heroFx"></div>
+      </section>
+      </div>
+      <div class="blk" data-block="live" data-label="Trades en cours"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <section class="card">
+        <div class="card-head">
+          <h2>Trades en cours</h2>
+          <span class="live-status" id="liveStatus"></span>
+        </div>
+        <div id="liveBody"></div>
       </section>
       </div>
       <div class="blk" data-block="kpis" data-label="Indicateurs"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
@@ -711,7 +742,7 @@ function renderAccounts() {
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
     b.append(left, bal);
-    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.page = 'dash'; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = ''; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     if (a.login !== 'all') {
       b.title = 'Clic droit : renommer, actualiser ou supprimer';
       b.addEventListener('contextmenu', ev => { ev.preventDefault(); openAccountMenu(a, ev.clientX, ev.clientY, b); });
@@ -1122,7 +1153,24 @@ async function renderHero() {
     } catch (e) { target = cur; rate = 1; fxNote = 'Conversion impossible : ' + e.message + '. Montants affichés en ' + cur + '.'; }
   }
   if (state.data !== d) return; // un autre compte a été choisi entre-temps
-  $('#heroValue').textContent = money(d.balance * rate, target);
+  const live = state.live && state.live.login === state.sel ? state.live.snap : null;
+  const shown = live ? live.equity : d.balance;
+  const hv = $('#heroValue');
+  if (live && state.heroPrev !== undefined && state.heroPrev !== shown) {
+    hv.classList.remove('flash-up', 'flash-down'); void hv.offsetWidth;
+    hv.classList.add(shown > state.heroPrev ? 'flash-up' : 'flash-down');
+    clearTimeout(state.heroFlashT); state.heroFlashT = setTimeout(() => hv.classList.remove('flash-up', 'flash-down'), 700);
+  }
+  state.heroPrev = live ? shown : undefined;
+  hv.textContent = money(shown * rate, target);
+  $('#heroLive').hidden = !live;
+  $('#hero .h-label').textContent = live ? 'Capital en direct (équité)' : (acc ? 'Capital du compte' : 'Capital total des comptes');
+  const fl = $('#heroFloat'); fl.innerHTML = '';
+  if (live) {
+    fl.append('Balance ' + money(live.balance * rate, target) + '  ·  Flottant ');
+    fl.append(el('b', cls(live.profit), money(live.profit * rate, target, true)));
+    fl.append('  ·  ' + live.positions.length + ' trade' + (live.positions.length > 1 ? 's' : '') + ' en cours');
+  }
   const box = $('#heroMonth'); box.innerHTML = ''; box.className = 'h-month ' + cls(pnl);
   const v = document.createElement('span'); v.textContent = money(pnl * rate, target, true);
   const t = document.createElement('span'); t.className = 'muted'; t.textContent = ' ce mois-ci  ·  ';
@@ -1634,11 +1682,16 @@ function renderTradeDetail(box, t, acc, cur) {
 }
 
 // ---------- blocs du tableau de bord déplaçables ----------
-const BLOCKS = ['hero', 'kpis', 'chart', 'tv', 'cal'];
+const BLOCKS = ['hero', 'live', 'kpis', 'chart', 'tv', 'cal'];
 state.layout = BLOCKS.slice();
 function applyLayout() {
   const box = $('#content');
-  const order = state.layout.filter(id => BLOCKS.includes(id)).concat(BLOCKS.filter(id => !state.layout.includes(id)));
+  const order = state.layout.filter(id => BLOCKS.includes(id));
+  BLOCKS.forEach((id, i) => { // bloc ajouté dans une mise à jour : on le place après son voisin habituel
+    if (order.includes(id)) return;
+    const prev = BLOCKS.slice(0, i).reverse().find(x => order.includes(x));
+    order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, id);
+  });
   for (const id of order) { const b = box.querySelector('.blk[data-block="' + id + '"]'); if (b) box.appendChild(b); }
 }
 let reorder = null;
@@ -2033,6 +2086,99 @@ let newsSearchT;
 $('#newsSearch').addEventListener('input', () => { clearTimeout(newsSearchT); newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150); });
 $('#newsRefresh').onclick = () => loadNews(true);
 buildNewsSources();
+
+// ---------- suivi en direct (trades en cours, capital à la seconde) ----------
+state.live = null;
+let liveTimer = null, liveRev = null, liveReload = null;
+function liveActive() {
+  return state.page === 'dash' && !document.hidden && state.accounts.length > 0 && state.sel !== 'all' && !!state.data;
+}
+function fmtDur(sec) {
+  if (sec === null || sec === undefined) return '—';
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60;
+  if (d) return d + 'j ' + h + 'h'; if (h) return h + 'h ' + pad(m) + 'm'; if (m) return m + 'm ' + pad(s2) + 's'; return s2 + 's';
+}
+function renderLiveTable(snap) {
+  const body = $('#liveBody'); body.innerHTML = '';
+  if (!snap) return;
+  if (!snap.positions.length) { body.appendChild(el('div', 'live-empty', 'Aucun trade en cours sur ce compte.')); return; }
+  const acc = (state.data && state.data.per_account || {})[state.sel];
+  const risk = riskAmount(acc), cur = snap.currency;
+  const t = el('table', 'live-table'); const hr = el('tr');
+  [['Symbole'], ['Sens'], ['Lots', 'r'], ['Ouverture', 'r'], ['Actuel', 'r'], ['SL', 'r hide-s'], ['TP', 'r hide-s'], ['Durée', 'r hide-s'], ['R', 'r'], ['PnL', 'r']]
+    .forEach(([h, c]) => hr.appendChild(el('th', c || null, h)));
+  const th = el('thead'); th.appendChild(hr); t.appendChild(th);
+  const tb = el('tbody'); let total = 0;
+  for (const p of snap.positions) {
+    total += p.profit;
+    const tr = el('tr');
+    const sym = el('td'); sym.appendChild(el('b', null, p.symbol));
+    const side = el('td'); side.appendChild(el('span', 'badge ' + p.side, p.side === 'buy' ? 'Long' : 'Short'));
+    tr.append(sym, side, el('td', 'r', p.volume.toLocaleString('fr-BE', { maximumFractionDigits: 2 })), el('td', 'r', fmtPx(p.open)), el('td', 'r', fmtPx(p.current)),
+      el('td', 'r hide-s', p.sl ? fmtPx(p.sl) : '—'), el('td', 'r hide-s', p.tp ? fmtPx(p.tp) : '—'), el('td', 'r hide-s', fmtDur(p.duration)),
+      el('td', 'r ' + (risk ? cls(p.profit) : ''), risk ? fmtR2(p.profit / risk) : '—'), el('td', 'r pnl ' + cls(p.profit), money(p.profit, cur, true)));
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  if (snap.positions.length > 1) {
+    const tf = el('tfoot'); const fr = el('tr'); const lab = el('td', null, 'Total'); lab.colSpan = 8;
+    fr.append(lab, el('td', 'r ' + (risk ? cls(total) : ''), risk ? fmtR2(total / risk) : ''), el('td', 'r pnl ' + cls(total), money(total, cur, true)));
+    tf.appendChild(fr); t.appendChild(tf);
+  }
+  body.appendChild(t);
+}
+function setLiveStatus(nodes) { const st = $('#liveStatus'); st.innerHTML = ''; nodes.forEach(n => st.append(n)); }
+function applyLive(r) {
+  const body = $('#liveBody');
+  if (r.status === 'running' && r.snap) {
+    state.live = { login: state.sel, snap: r.snap };
+    setLiveStatus([el('span', 'ok', '● En direct'), ' · ' + new Date().toLocaleTimeString('fr-BE')]);
+    renderLiveTable(r.snap);
+    if (state.data) {
+      state.data.equity = r.snap.equity; state.data.balance = r.snap.balance;
+      renderHero();
+      if (!dragId && !reorder) renderKpis();
+    }
+    if (liveRev !== null && r.rev !== liveRev) { clearTimeout(liveReload); liveReload = setTimeout(() => loadData(), 400); }
+    liveRev = r.rev;
+    return;
+  }
+  const hadLive = !!state.live; state.live = null;
+  if (hadLive && state.data) renderHero();
+  if (r.status === 'starting' || (r.status === 'running' && !r.snap)) {
+    setLiveStatus(['Connexion à MT5…']);
+    if (!body.children.length) body.appendChild(el('div', 'live-empty', 'Démarrage du suivi en direct… (quelques secondes la première fois)'));
+  } else if (r.status === 'need_password') {
+    setLiveStatus(['Suivi en direct indisponible']);
+    body.innerHTML = '';
+    const box = el('div', 'live-empty');
+    box.append('Pour le suivi en direct, le mot de passe de ce compte doit être mémorisé. ');
+    const b = el('button', 'linklike', 'Mémoriser le mot de passe'); b.type = 'button';
+    b.onclick = () => { const a = state.accounts.find(x => x.login === state.sel); if (a) { openLogin(a); $('#fRemember').checked = true; } };
+    box.appendChild(b); body.appendChild(box);
+  } else if (r.status === 'unavailable' || r.status === 'error') {
+    setLiveStatus(['Suivi en direct indisponible']);
+    body.innerHTML = ''; body.appendChild(el('div', 'live-empty', r.error || 'Erreur inconnue.'));
+  }
+}
+async function liveTick() {
+  clearTimeout(liveTimer);
+  if (!liveActive()) {
+    if (state.sel === 'all' && state.page === 'dash') {
+      if (state.live) { state.live = null; if (state.data) renderHero(); }
+      setLiveStatus([]);
+      const body = $('#liveBody'); body.innerHTML = '';
+      body.appendChild(el('div', 'live-empty', 'Choisis un compte dans la colonne de gauche pour suivre ses trades en direct.'));
+    }
+    liveTimer = setTimeout(liveTick, 1500); return;
+  }
+  const login = state.sel; let r;
+  try { r = await api('/api/live?login=' + encodeURIComponent(login)); } catch (e) { r = { status: 'error', error: e.message }; }
+  if (login === state.sel && liveActive()) applyLive(r);
+  liveTimer = setTimeout(liveTick, r && r.status === 'running' && r.snap ? 1000 : 2500);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });
+liveTick();
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
