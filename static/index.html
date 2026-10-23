@@ -387,6 +387,13 @@
   .q-pick-add { display: flex; gap: 8px; margin-top: 14px; }
   .q-pick-add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13px; }
   .q-pick-foot { display: flex; justify-content: space-between; margin-top: 14px; }
+  .q-table tbody tr[data-key] { cursor: grab; }
+  .q-table tbody tr[data-key]:hover td { background: rgba(255,255,255,.025); }
+  .q-grip { color: var(--muted); opacity: 0; margin: 0 6px 0 -12px; width: 6px; display: inline-block; transition: opacity .15s; }
+  .q-table tr:hover .q-grip, .q-table tr.q-drag .q-grip { opacity: .8; }
+  .q-table tr.q-drag td { background: var(--gold-soft) !important; color: var(--fg); }
+  .q-table tr.q-drag td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+  body.q-sorting, body.q-sorting * { cursor: grabbing !important; user-select: none; }
   .q-table tr.q-miss td { color: var(--muted); font-style: italic; }
   .q-empty { color: var(--muted); text-align: center; padding: 26px 12px !important; white-space: normal !important; }
   .quotes-card { container-type: inline-size; }
@@ -2477,7 +2484,9 @@ function quoteLabel(k) {
   const it = quotesCatalog && quotesCatalog.items.find(x => x.key === k);
   return it ? it.name : k;
 }
+let quotesDragging = false;
 function renderQuotes(r) {
+  if (quotesDragging) return; // ne pas redessiner pendant qu'on déplace une ligne
   const body = $('#quotesBody');
   const st = $('#quotesStatus'); st.innerHTML = '';
   if (r.status === 'running' || r.status === 'demo') st.append(el('span', 'ok', '● En direct'), r.status === 'demo' ? ' · démo' : ' · MT5');
@@ -2494,12 +2503,13 @@ function renderQuotes(r) {
     const q = rows.get(key);
     const tr = el('tr');
     if (!q) {
-      tr.className = 'q-miss';
-      const nm = el('td', 'q-name', quoteLabel(key)); const td = el('td', 'r', 'non proposé par ton broker'); td.colSpan = 7;
+      tr.className = 'q-miss'; tr.dataset.key = key;
+      const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), quoteLabel(key)); const td = el('td', 'r', 'non proposé par ton broker'); td.colSpan = 7;
       tr.append(nm, td); body.appendChild(tr); continue;
     }
     const dg = Math.min(q.digits ?? 2, 5);
-    const nm = el('td', 'q-name'); nm.append(el('span', 'fl', q.flag), q.name);
+    tr.dataset.key = key;
+    const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), el('span', 'fl', q.flag), q.name);
     const last = el('td', 'r q-last', fmtQ(q.last, dg));
     const prevLast = quotesPrev[q.key];
     if (prevLast !== undefined && prevLast !== q.last) {
@@ -2585,6 +2595,30 @@ $('#quotesExtra').onkeydown = e => { if (e.key === 'Enter') addExtraQuote(); };
 document.addEventListener('pointerdown', e => {
   const p = $('#quotesPick');
   if (!p.hidden && !p.contains(e.target) && e.target.id !== 'quotesPickBtn') p.hidden = true;
+});
+// déplacer une ligne pour changer l'ordre des marchés
+$('#quotesBody').addEventListener('pointerdown', e => {
+  const tr = e.target.closest('tr[data-key]'); if (!tr || e.button !== 0) return;
+  const body = $('#quotesBody'), y0 = e.clientY; let started = false;
+  const move = ev => {
+    if (!started) {
+      if (Math.abs(ev.clientY - y0) < 4) return;
+      started = true; quotesDragging = true; tr.classList.add('q-drag'); document.body.classList.add('q-sorting');
+    }
+    ev.preventDefault();
+    const rows = [...body.querySelectorAll('tr[data-key]')].filter(r => r !== tr);
+    const after = rows.find(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    if (after) { if (tr.nextSibling !== after) body.insertBefore(tr, after); }
+    else if (body.lastElementChild !== tr) body.appendChild(tr);
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+    if (!started) return;
+    tr.classList.remove('q-drag'); document.body.classList.remove('q-sorting'); quotesDragging = false;
+    const order = [...body.querySelectorAll('tr[data-key]')].map(r => r.dataset.key);
+    if (order.join() !== state.quotes.join()) { state.quotes = order; api('/api/prefs', { quotes: state.quotes }).catch(() => {}); }
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) quotesTick(); });
 api('/api/prefs').then(p => { if (Array.isArray(p.quotes)) state.quotes = p.quotes; if (typeof p.split === 'number') { state.split = Math.min(0.8, Math.max(0.35, p.split)); applySplit(); } }).catch(() => {}).finally(quotesTick);
