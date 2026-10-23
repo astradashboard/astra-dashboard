@@ -182,13 +182,16 @@
   .tv-grid.n1 .tv-box { height: 560px; }
   .tv-grid.n2 .tv-box { height: 460px; }
   .tv-grid.n3 .tv-panel:nth-child(3) { grid-column: 1 / -1; }
+  .tv-head-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  #tvAccount { padding: 6px 12px; font-size: 13px; }
+  .tv-open { flex: 0 0 auto !important; width: 34px; padding: 0; font-size: 14px; }
   .tv-count { display: flex; align-items: center; gap: 6px; }
   .tv-count span { color: var(--muted); font-size: 12px; margin-right: 2px; }
   .tv-count .btn { width: 32px; height: 30px; padding: 0; font-size: 13px; }
   .tv-count .btn.on { background: var(--gold-soft); border-color: rgba(196,138,69,.6); color: var(--gold); font-weight: 700; }
   .tv-panel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .tv-panel .tv-tools select { flex: 1; min-width: 0; }
-  .tv-panel .tv-tools select:last-child { flex: 0 0 auto; }
+  .tv-panel .tv-tools select:nth-child(2) { flex: 0 0 auto; }
   .tv-box { position: relative; height: 400px; border-radius: 10px; overflow: hidden; background: var(--panel-2); }
   .tv-box > .tradingview-widget-container, .tv-box .tradingview-widget-container__widget { height: 100%; width: 100%; }
   .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
@@ -379,12 +382,15 @@
       <section class="card">
         <div class="card-head">
           <h2>Graphiques TradingView</h2>
+          <div class="tv-head-right">
+          <button type="button" class="btn" id="tvAccount" title="Ouvre tradingview.com dans sa propre fenêtre : tu t'y connectes une fois, la session reste enregistrée">👤 Mon compte TradingView ↗</button>
           <div class="tv-count" id="tvCount" title="Nombre de graphiques">
             <span>Graphiques</span>
             <button type="button" class="btn" data-n="1">1</button>
             <button type="button" class="btn" data-n="2">2</button>
             <button type="button" class="btn" data-n="3">3</button>
             <button type="button" class="btn" data-n="4">4</button>
+          </div>
           </div>
         </div>
         <div class="tv-grid" id="tvGrid"></div>
@@ -1639,7 +1645,10 @@ function buildTvGrid() {
     si.value = cfg.interval;
     ss.onchange = () => { cfg.symbol = ss.value; renderTvPanel(i); saveTv(); };
     si.onchange = () => { cfg.interval = si.value; renderTvPanel(i); saveTv(); };
-    tools.append(ss, si);
+    const op = el('button', 'btn tv-open', '↗'); op.type = 'button';
+    op.title = 'Ouvrir ce graphique dans ton compte TradingView';
+    op.onclick = () => openTradingView(cfg.symbol, cfg.interval);
+    tools.append(ss, si, op);
     const box = el('div', 'tv-box'); box.id = 'tvBox' + i;
     panel.append(tools, box); grid.appendChild(panel);
     tvLoaded[i] = null;
@@ -1668,6 +1677,14 @@ function renderTvPanel(i, force) {
   const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
   setTimeout(() => clearInterval(t), 30000);
 }
+function openTradingView(symbol, interval) {
+  let url = 'https://fr.tradingview.com/chart/';
+  if (symbol) url += '?symbol=' + encodeURIComponent(symbol) + '&interval=' + encodeURIComponent(interval || '15');
+  const w = Math.min(1500, screen.availWidth - 40), h = Math.min(950, screen.availHeight - 40);
+  const win = window.open(url, 'astra_tradingview', 'width=' + w + ',height=' + h + ',left=20,top=20');
+  if (win) win.focus(); else location.href = url;
+}
+$('#tvAccount').onclick = () => openTradingView();
 function renderTv(force) { for (let i = 0; i < state.tvCount; i++) renderTvPanel(i, force); }
 document.querySelectorAll('#tvCount .btn').forEach(b => b.onclick = () => {
   const n = Number(b.dataset.n); if (n === state.tvCount) return;
