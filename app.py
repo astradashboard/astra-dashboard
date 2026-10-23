@@ -1081,8 +1081,21 @@ EU_QUERY = ('"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "Union 
 EU_MARKETS_QUERY = ('"Bourses européennes" OR "Euro Stoxx" OR DAX OR "marchés européens" OR "économie allemande" '
                     'OR "euro dollar" OR "EUR/USD" OR "Bundesbank" when:3d')
 
+def _bing(query):
+    """Flux RSS de Bing Actualités (avec une photo pour la plupart des articles), en français."""
+    from urllib.parse import urlencode
+    return "https://www.bing.com/news/search?" + urlencode({"q": query, "format": "rss", "setlang": "fr", "cc": "FR", "mkt": "fr-FR"})
+
+
+B_US = '"économie américaine" OR "Réserve fédérale" OR Powell OR "Wall Street" OR Nasdaq OR "dollar américain" OR "inflation américaine"'
+B_EU = '"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "Bourses européennes" OR DAX OR "Euro Stoxx"'
+B_CRYPTO = 'bitcoin OR cryptomonnaie OR ethereum OR crypto'
+
 NEWS_FEEDS = {  # id : (nom affiché, adresse du flux, thème)
     "us": ("Économie US", _gnews(US_QUERY), "us"),
+    "bus": ("Économie US", _bing(B_US), "us"),
+    "beu": ("Économie Europe", _bing(B_EU), "eu"),
+    "bcrypto": ("Crypto", _bing(B_CRYPTO), "crypto"),
     "eu": ("Économie Europe", _gnews(EU_QUERY), "eu"),
     "eumk": ("Marchés européens", _gnews(EU_MARKETS_QUERY), "eu"),
     "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eu"),
@@ -1156,8 +1169,11 @@ def _parse_feed(source_id, raw, name=None, tag=None):
                 it["image"] = ch.get("url")
             elif t == "enclosure" and (ch.get("type") or "").startswith("image") and not it["image"]:
                 it["image"] = ch.get("url")
-            elif t == "source" and (ch.text or "").strip():
-                origin = ch.text.strip()  # journal d'origine (Google Actualités)
+            elif t in ("source", "Source") and (ch.text or "").strip():
+                origin = ch.text.strip()  # journal d'origine (Google / Bing Actualités)
+            elif t == "Image" and (ch.text or "").strip() and not it["image"]:
+                img = ch.text.strip().replace("http://www.bing.com/", "https://www.bing.com/")
+                it["image"] = img + ("&" if "?" in img else "?") + "w=720&h=405&c=7"  # photo Bing en bonne taille
             elif t == "group":
                 for g in ch:
                     if local(g.tag) in ("content", "thumbnail") and g.get("url") and not it["image"]:
@@ -1168,6 +1184,11 @@ def _parse_feed(source_id, raw, name=None, tag=None):
                 it["title"] = it["title"][: -len(origin) - 3].strip()
             if it["summary"].startswith(it["title"][:40]):
                 it["summary"] = ""  # le résumé de Google ne fait que répéter le titre
+        if "bing.com/news/apiclick" in it["link"]:  # lien Bing : on garde l'adresse directe de l'article
+            from urllib.parse import urlparse, parse_qs
+            real = parse_qs(urlparse(it["link"]).query).get("url", [""])[0]
+            if real.startswith(("http://", "https://")):
+                it["link"] = real
         if it["title"] and it["link"].startswith(("http://", "https://")):
             if it["image"] and not str(it["image"]).startswith(("http://", "https://")):
                 it["image"] = None
@@ -1192,6 +1213,53 @@ def _fetch_feed(source_id):
     return items
 
 
+_img_cache = {}
+
+
+@app.get("/api/news/image")
+def api_news_image():
+    """Lit l'image de partage (og:image) d'un article. Résultat gardé en mémoire."""
+    import html as _html
+    import re
+    import urllib.request
+    from urllib.parse import urljoin, urlparse
+
+    url = str(request.args.get("u", ""))[:1000]
+    host = urlparse(url).hostname or ""
+    import ipaddress
+    try:
+        private = ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        private = host in ("localhost",) or host.endswith(".local")
+    if not url.startswith(("http://", "https://")) or host.endswith("news.google.com") or private:
+        return jsonify({"image": None})  # pas de requête vers le réseau local
+    if url in _img_cache:
+        return jsonify({"image": _img_cache[url]})
+    image = None
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept": "text/html", "Accept-Language": "fr-FR,fr;q=0.9"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            if "html" in (r.headers.get("Content-Type") or "html"):
+                page = r.read(600_000).decode("utf-8", "ignore")
+                final = r.geturl()
+                for pat in (r'<meta[^>]+(?:property|name)=["\'](?:og:image(?::url)?|twitter:image(?::src)?)["\'][^>]*content=["\']([^"\']+)',
+                            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*(?:property|name)=["\'](?:og:image(?::url)?|twitter:image)["\']'):
+                    m = re.search(pat, page, re.I)
+                    if m:
+                        cand = urljoin(final, _html.unescape(m.group(1).strip()))
+                        if cand.startswith(("http://", "https://")):
+                            image = cand
+                            break
+    except Exception:
+        image = None
+    if len(_img_cache) > 2000:
+        _img_cache.clear()
+    _img_cache[url] = image
+    return jsonify({"image": image})
+
+
 _search_cache = {}
 
 
@@ -1206,13 +1274,24 @@ def api_news_search():
     hit = _search_cache.get(q.lower())
     if hit and time.time() - hit["at"] < 300:
         return jsonify({"items": hit["items"]})
-    req = urllib.request.Request(_gnews(q + " when:14d"), headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            items = _parse_feed(None, r.read(3_000_000), name="Google Actualités", tag="search")
-    except Exception as ex:
-        return jsonify({"error": f"recherche indisponible ({type(ex).__name__})"}), 502
+    items, errors = [], []
+    for url in (_bing(q), _gnews(q + " when:14d")):
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                items += _parse_feed(None, r.read(3_000_000), name="Actualités", tag="search")
+        except Exception as ex:
+            errors.append(type(ex).__name__)
+    if not items and errors:
+        return jsonify({"error": f"recherche indisponible ({errors[0]})"}), 502
+    seen, uniq = set(), []
+    for it in items:
+        k = it["title"].lower()[:70]
+        if k not in seen:
+            seen.add(k)
+            uniq.append(it)
+    items = uniq
     items.sort(key=lambda x: x["date"] or "", reverse=True)
     _search_cache[q.lower()] = {"at": time.time(), "items": items[:60]}
     return jsonify({"items": items[:60]})

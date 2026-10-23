@@ -294,7 +294,13 @@
   .news-subhead { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; color: var(--muted); font-size: 12px; font-weight: 700;
     text-transform: uppercase; letter-spacing: .1em; }
   .news-subhead::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-  .news-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .news-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .na.sm .vis { height: 108px; }
+  .na.sm .vis.ph span { font-size: 34px; }
+  .na.sm .txt { padding: 10px 12px 12px; gap: 5px; }
+  .na.sm .meta { font-size: 11px; }
+  .na.sm .ttl { font-size: 13.5px; -webkit-line-clamp: 2; }
+  .na.sm .sum { display: none; }
   .nl { display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: start; padding: 11px 4px; border: none; border-bottom: 1px solid var(--line);
     background: none; color: var(--fg); text-align: left; cursor: pointer; min-width: 0; }
   .nl:hover .nl-t { color: var(--gold); }
@@ -303,7 +309,8 @@
   .nl .nl-s { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .nl .nl-s b { color: var(--gold); font-weight: 600; }
   .news-info { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-  @media (max-width: 1100px) { .news-lead { grid-template-columns: 1fr; } .news-row3 { grid-template-columns: 1fr 1fr; } .news-list { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .news-lead { grid-template-columns: 1fr; } .news-row3 { grid-template-columns: 1fr 1fr; } .news-list { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 860px) { .news-list { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 700px) { .news-row3 { grid-template-columns: 1fr; } .na.lead .ttl { font-size: 20px; } }
   .news-card { display: flex; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
     cursor: pointer; text-align: left; color: var(--fg); transition: border-color .15s, transform .15s; min-width: 0; }
@@ -2053,14 +2060,14 @@ buildEcoFilters();
 
 // ---------- actualité économique (flux RSS des sites d'information) ----------
 const NEWS_THEMES = [
-  ['us', '🇺🇸 Économie US', ['us']],
-  ['eu', '🇪🇺 Économie Europe', ['eu', 'eumk', 'investing']],
-  ['crypto', '₿ Crypto', ['gcrypto', 'cryptoast', 'jdc', 'ctfr', 'cointribune']],
+  ['us', '🇺🇸 Économie US', ['bus', 'us']],
+  ['eu', '🇪🇺 Économie Europe', ['beu', 'eu', 'eumk', 'investing']],
+  ['crypto', '₿ Crypto', ['bcrypto', 'gcrypto', 'cryptoast', 'jdc', 'ctfr', 'cointribune']],
 ];
-const NEWS_SOURCE_NAMES = { us: 'Économie US', eu: 'Économie Europe', eumk: 'Marchés européens', lemonde: 'Le Monde', lesechos: 'Les Echos', figaro: 'Le Figaro',
+const NEWS_SOURCE_NAMES = { bus: 'Bing · US', beu: 'Bing · Europe', bcrypto: 'Bing · Crypto', us: 'Économie US', eu: 'Économie Europe', eumk: 'Marchés européens', lemonde: 'Le Monde', lesechos: 'Les Echos', figaro: 'Le Figaro',
   bfm: 'BFM Business', investing: 'Investing.com', gcrypto: 'Crypto', cryptoast: 'Cryptoast', jdc: 'Journal du Coin',
   ctfr: 'Cointelegraph FR', cointribune: 'Cointribune' };
-state.news = { themes: ['us'], shown: 24 };
+state.news = { themes: ['us'], shown: 12 };
 let newsItems = [], newsTimer = null, newsLoadedAt = 0;
 const newsSourcesFor = themes => [...new Set(NEWS_THEMES.filter(t => themes.includes(t[0])).flatMap(t => t[2]))];
 function buildNewsThemes() {
@@ -2074,7 +2081,7 @@ function buildNewsThemes() {
       if (on && state.news.themes.length === 1) return; // au moins un thème
       state.news.themes = on ? state.news.themes.filter(x => x !== id) : NEWS_THEMES.map(t => t[0]).filter(x => x === id || state.news.themes.includes(x));
       api('/api/prefs', { newsThemes: state.news.themes }).catch(() => {});
-      buildNewsThemes(); state.news.shown = 24; loadNews(true);
+      buildNewsThemes(); state.news.shown = 12; loadNews(true);
     };
     box.appendChild(c);
   }
@@ -2142,8 +2149,25 @@ function newsScore(it) {
   return sc;
 }
 const THEME_ICON = { us: '🇺🇸', eu: '🇪🇺', crypto: '₿', search: '📰' };
+const ogQueue = [], ogTried = new Set(); let ogActive = 0;
+function setVisualImage(v, src, it) {
+  const probe = new Image(); probe.referrerPolicy = 'no-referrer';
+  probe.onload = () => { v.classList.remove('ph'); v.innerHTML = ''; v.style.backgroundImage = 'url("' + src.replace(/["\\]/g, '') + '")'; };
+  probe.src = src;
+}
+function pumpOg() {
+  while (ogActive < 4 && ogQueue.length) {
+    const [it, v] = ogQueue.shift(); ogActive++;
+    api('/api/news/image?u=' + encodeURIComponent(it.link)).then(r => {
+      if (r.image) { it.image = r.image; if (v.isConnected) setVisualImage(v, r.image, it); }
+    }).catch(() => {}).finally(() => { ogActive--; pumpOg(); });
+  }
+}
 function newsVisual(it, cls) {
   const v = el('div', 'vis ' + (it.tag || 'search'));
+  if (!it.image && it.link && !/news\.google\./.test(it.link) && !ogTried.has(it.link)) {
+    ogTried.add(it.link); ogQueue.push([it, v]); setTimeout(pumpOg, 0);
+  }
   if (it.image) {
     v.style.backgroundImage = 'url("' + it.image.replace(/["\\]/g, '') + '")';
     const probe = new Image(); probe.referrerPolicy = 'no-referrer';
@@ -2213,7 +2237,7 @@ function renderNews() {
   if (rest.length) {
     grid.appendChild(el('div', 'news-subhead', 'Toutes les actualités'));
     const list = el('div', 'news-list');
-    rest.slice(0, state.news.shown).forEach(it => list.appendChild(newsLine(it, terms)));
+    rest.slice(0, state.news.shown).forEach(it => list.appendChild(newsCard(it, 'sm', terms)));
     grid.appendChild(list);
   }
   $('#newsMore').hidden = rest.length <= state.news.shown;
@@ -2224,7 +2248,7 @@ async function loadNews(force) {
   if (!newsItems.length || force) { grid.innerHTML = ''; grid.appendChild(el('div', 'news-empty', 'Chargement des articles…')); }
   try {
     const r = await api('/api/news?sources=' + encodeURIComponent(newsSourcesFor(state.news.themes).join(',')) + (force ? '&fresh=1' : ''));
-    newsItems = r.items || []; newsLoadedAt = Date.now(); state.news.shown = 24;
+    newsItems = r.items || []; newsLoadedAt = Date.now(); state.news.shown = 12;
     const failed = (r.failed || []).map(id => NEWS_SOURCE_NAMES[id] || id);
     $('#newsSub').textContent = 'Les derniers articles · mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })
       + (failed.length ? ' · indisponible : ' + failed.join(', ') : '');
@@ -2235,7 +2259,7 @@ async function loadNews(force) {
   clearTimeout(newsTimer);
   newsTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) loadNews(true); }, 10 * 60000);
 }
-$('#newsMore').onclick = () => { state.news.shown += 24; renderNews(); };
+$('#newsMore').onclick = () => { state.news.shown += 12; renderNews(); };
 let newsSearchT, newsRemoteT;
 const newsSearch = { q: '', items: [], loading: false, error: null };
 async function searchRemote(q) {
@@ -2247,7 +2271,7 @@ async function searchRemote(q) {
 $('#newsSearch').addEventListener('input', () => {
   clearTimeout(newsSearchT); clearTimeout(newsRemoteT);
   const q = $('#newsSearch').value.trim();
-  newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150);
+  newsSearchT = setTimeout(() => { state.news.shown = 12; renderNews(); }, 150);
   if (q.length >= 2) newsRemoteT = setTimeout(() => searchRemote(q), 600);
   else { newsSearch.q = ''; newsSearch.items = []; }
 });
