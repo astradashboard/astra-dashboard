@@ -578,6 +578,8 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    if isinstance(body.get("news"), list):
+        prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:10]
     if isinstance(body.get("eco"), dict):
         eco = body["eco"]
         imp = str(eco.get("imp", "0,1"))
@@ -783,6 +785,129 @@ def api_eco():
     data = {"events": events}
     _eco_cache[key] = {"at": time.time(), "data": data}
     return jsonify(data)
+
+
+NEWS_FEEDS = {
+    "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml"),
+    "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml"),
+    "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml"),
+    "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/"),
+    "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss"),
+    "cnbc": ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
+}
+_news_cache = {}
+
+
+def _strip_html(text):
+    import html
+    import re
+
+    text = re.sub(r"<[^>]+>", " ", text or "")
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def _parse_feed(source_id, raw):
+    """Lit un flux RSS ou Atom et renvoie des articles simples (titre, lien, date, résumé, image)."""
+    import email.utils
+    import xml.etree.ElementTree as ET
+
+    if b"<!ENTITY" in raw[:4096]:
+        return []  # entités XML refusées
+    root = ET.fromstring(raw)
+    name = NEWS_FEEDS[source_id][0]
+    items = []
+
+    def local(tag):
+        return tag.rsplit("}", 1)[-1]
+
+    for node in root.iter():
+        if local(node.tag) not in ("item", "entry"):
+            continue
+        it = {"source": name, "title": "", "link": "", "date": None, "summary": "", "image": None}
+        for ch in node:
+            t = local(ch.tag)
+            if t == "title":
+                it["title"] = _strip_html("".join(ch.itertext()))
+            elif t == "link":
+                href = ch.get("href") or (ch.text or "").strip()
+                if href and (not it["link"] or ch.get("rel") in (None, "alternate")):
+                    it["link"] = href
+            elif t in ("pubDate", "published", "updated", "date") and not it["date"]:
+                val = (ch.text or "").strip()
+                try:
+                    d = email.utils.parsedate_to_datetime(val)
+                except (TypeError, ValueError):
+                    try:
+                        d = dt.datetime.fromisoformat(val.replace("Z", "+00:00"))
+                    except ValueError:
+                        d = None
+                if d is not None:
+                    if d.tzinfo is None:
+                        d = d.replace(tzinfo=dt.timezone.utc)
+                    it["date"] = d.astimezone(dt.timezone.utc).isoformat()  # même fuseau pour trier
+            elif t in ("description", "summary", "content") and not it["summary"]:
+                it["summary"] = _strip_html("".join(ch.itertext()))[:300]
+            elif t in ("content", "thumbnail") and ch.get("url") and not it["image"]:
+                it["image"] = ch.get("url")
+            elif t == "enclosure" and (ch.get("type") or "").startswith("image") and not it["image"]:
+                it["image"] = ch.get("url")
+            elif t == "group":
+                for g in ch:
+                    if local(g.tag) in ("content", "thumbnail") and g.get("url") and not it["image"]:
+                        it["image"] = g.get("url")
+        if it["title"] and it["link"].startswith(("http://", "https://")):
+            if it["image"] and not str(it["image"]).startswith(("http://", "https://")):
+                it["image"] = None
+            items.append(it)
+    return items
+
+
+def _fetch_feed(source_id):
+    import time
+    import urllib.request
+
+    hit = _news_cache.get(source_id)
+    if hit and time.time() - hit["at"] < 600:
+        return hit["items"]
+    req = urllib.request.Request(NEWS_FEEDS[source_id][1], headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        raw = r.read(3_000_000)
+    items = _parse_feed(source_id, raw)
+    _news_cache[source_id] = {"at": time.time(), "items": items}
+    return items
+
+
+@app.get("/api/news")
+def api_news():
+    from concurrent.futures import ThreadPoolExecutor
+
+    ids = [x for x in str(request.args.get("sources", "")).split(",") if x in NEWS_FEEDS] or list(NEWS_FEEDS)[:5]
+    if request.args.get("fresh") == "1":
+        for i in ids:
+            hit = _news_cache.get(i)
+            if hit and __import__("time").time() - hit["at"] > 60:
+                hit["at"] = 0  # « Actualiser » : relire le flux (au plus une fois par minute)
+    items, failed = [], []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {i: pool.submit(_fetch_feed, i) for i in ids}
+        for i, f in futures.items():
+            try:
+                items.extend(f.result(timeout=15))
+            except Exception:
+                hit = _news_cache.get(i)
+                if hit:
+                    items.extend(hit["items"])
+                failed.append(i)
+    seen, out = set(), []
+    for it in sorted(items, key=lambda x: x["date"] or "", reverse=True):
+        key = it["title"].lower()[:90]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return jsonify({"items": out[:120], "failed": failed})
 
 
 @app.get("/api/version")

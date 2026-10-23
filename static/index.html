@@ -237,6 +237,21 @@
   .bulls i { display: inline-block; }
   .bulls.b1::before, .bulls.b2::before, .bulls.b2 i, .bulls.b3::before, .bulls.b3 i, .bulls.b3::after { background: var(--gold); }
   @media (max-width: 860px) { .eco-table .c-val:nth-child(7) { display: none; } .eco-table th.c-val:nth-child(7) { display: none; } }
+  .news-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: 28px 0 12px; }
+  .news-head h2 { margin: 0; font-size: 19px; font-weight: 650; }
+  .news-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .news-card { display: flex; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+    cursor: pointer; text-align: left; color: var(--fg); transition: border-color .15s, transform .15s; min-width: 0; }
+  .news-card:hover { border-color: rgba(196,138,69,.55); transform: translateY(-1px); }
+  .news-card .nc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .news-card .nc-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .news-card .nc-src { color: var(--gold); font-weight: 600; }
+  .news-card .nc-title { font-weight: 650; font-size: 14.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .news-card .nc-sum { color: var(--muted); font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .news-card img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; flex: 0 0 auto; background: var(--panel-2); }
+  .news-more { display: flex; justify-content: center; margin: 14px 0 8px; }
+  .news-empty { color: var(--muted); padding: 30px; text-align: center; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -484,6 +499,16 @@
           <tbody id="ecoBody"></tbody>
         </table>
       </div>
+      <div class="news-head">
+        <div>
+          <h2>Actualité économique</h2>
+          <p id="newsSub">Les derniers articles importants</p>
+        </div>
+        <button type="button" class="btn" id="newsRefresh">↻ Actualiser</button>
+      </div>
+      <div class="chips" id="newsSources"></div>
+      <div class="news-grid" id="newsGrid"></div>
+      <div class="news-more"><button type="button" class="btn" id="newsMore" hidden>Afficher plus d'articles</button></div>
     </div>
 
     <div class="empty-state" id="emptyState" hidden>
@@ -1172,6 +1197,10 @@ api('/api/prefs').then(p => {
     state.eco = { imp: p.eco.imp, countries: cs.length ? cs : state.eco.countries, range: p.eco.range || 'today' }; buildEcoFilters();
     if (state.page === 'eco') renderEco(true);
   }
+  if (Array.isArray(p.news) && p.news.length) {
+    const ns = p.news.filter(id => NEWS_SOURCES.some(x => x[0] === id));
+    if (ns.length) { state.news.sources = ns; buildNewsSources(); if (state.page === 'eco') loadNews(true); }
+  }
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
 
@@ -1426,7 +1455,7 @@ function showPage() {
   document.querySelector('header.top').style.display = state.page === 'eco' ? 'none' : '';
   $('#emptyState').hidden = hasAcc || state.page === 'eco';
   if (state.page === 'journal' && hasAcc) renderJournal();
-  if (state.page === 'eco') renderEco(true);
+  if (state.page === 'eco') { renderEco(true); loadNews(); }
 }
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
@@ -1879,6 +1908,77 @@ async function renderEco(force) {
 }
 function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
 buildEcoFilters();
+
+// ---------- actualité économique (flux RSS des sites d'information) ----------
+const NEWS_SOURCES = [
+  ['lemonde', 'Le Monde Économie'], ['lesechos', 'Les Echos'], ['figaro', 'Le Figaro Économie'],
+  ['bfm', 'BFM Business'], ['investing', 'Investing.com France'], ['cnbc', 'CNBC (anglais)'],
+];
+state.news = { sources: ['lemonde', 'lesechos', 'figaro', 'bfm', 'investing'], shown: 24 };
+let newsItems = [], newsTimer = null, newsLoadedAt = 0;
+function buildNewsSources() {
+  const box = $('#newsSources'); box.innerHTML = '';
+  for (const [id, label] of NEWS_SOURCES) {
+    const c = el('button', 'chip' + (state.news.sources.includes(id) ? ' on' : ''), label); c.type = 'button';
+    c.onclick = () => {
+      const on = state.news.sources.includes(id);
+      if (on && state.news.sources.length === 1) return;
+      state.news.sources = on ? state.news.sources.filter(x => x !== id) : state.news.sources.concat(id);
+      api('/api/prefs', { news: state.news.sources }).catch(() => {});
+      buildNewsSources(); loadNews(true);
+    };
+    box.appendChild(c);
+  }
+}
+function timeAgo(d) {
+  const m = Math.round((Date.now() - d) / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return 'il y a ' + m + ' min';
+  const h = Math.round(m / 60);
+  if (h < 24) return 'il y a ' + h + ' h';
+  return d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+}
+function renderNews() {
+  const grid = $('#newsGrid'); grid.innerHTML = '';
+  const list = newsItems.slice(0, state.news.shown);
+  if (!list.length) { grid.appendChild(el('div', 'news-empty', 'Aucun article pour le moment.')); }
+  for (const it of list) {
+    const card = el('button', 'news-card'); card.type = 'button'; card.title = 'Ouvrir l\'article';
+    const bodyEl = el('div', 'nc-body');
+    const meta = el('div', 'nc-meta'); meta.append(el('span', 'nc-src', it.source));
+    if (it.date) meta.append(el('span', null, '· ' + timeAgo(new Date(it.date))));
+    bodyEl.append(meta, el('div', 'nc-title', it.title));
+    if (it.summary) bodyEl.append(el('div', 'nc-sum', it.summary));
+    card.appendChild(bodyEl);
+    if (it.image) {
+      const img = document.createElement('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+      img.onerror = () => img.remove(); card.appendChild(img);
+    }
+    card.onclick = () => { if (/^https?:\/\//.test(it.link)) window.open(it.link, '_blank', 'noopener'); };
+    grid.appendChild(card);
+  }
+  $('#newsMore').hidden = newsItems.length <= state.news.shown;
+}
+async function loadNews(force) {
+  if (!force && Date.now() - newsLoadedAt < 5 * 60000 && newsItems.length) { renderNews(); return; }
+  const grid = $('#newsGrid');
+  if (!newsItems.length || force) { grid.innerHTML = ''; grid.appendChild(el('div', 'news-empty', 'Chargement des articles…')); }
+  try {
+    const r = await api('/api/news?sources=' + encodeURIComponent(state.news.sources.join(',')) + (force ? '&fresh=1' : ''));
+    newsItems = r.items || []; newsLoadedAt = Date.now(); state.news.shown = 24;
+    const failed = (r.failed || []).map(id => (NEWS_SOURCES.find(x => x[0] === id) || [id, id])[1]);
+    $('#newsSub').textContent = 'Les derniers articles · mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })
+      + (failed.length ? ' · indisponible : ' + failed.join(', ') : '');
+    renderNews();
+  } catch (e) {
+    grid.innerHTML = ''; grid.appendChild(el('div', 'news-empty', 'Impossible de récupérer les articles : ' + e.message));
+  }
+  clearTimeout(newsTimer);
+  newsTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) loadNews(true); }, 10 * 60000);
+}
+$('#newsMore').onclick = () => { state.news.shown += 24; renderNews(); };
+$('#newsRefresh').onclick = () => loadNews(true);
+buildNewsSources();
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
