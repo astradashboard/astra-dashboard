@@ -578,9 +578,9 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
-    if isinstance(body.get("tv"), dict):
-        tv = body["tv"]
-        prefs["tv"] = {"symbol": str(tv.get("symbol", ""))[:40], "interval": str(tv.get("interval", "15"))[:4]}
+    if isinstance(body.get("tv"), list):
+        prefs["tv"] = [{"symbol": str(x.get("symbol", ""))[:40], "interval": str(x.get("interval", "15"))[:4]}
+                       for x in body["tv"][:4] if isinstance(x, dict)]
     if isinstance(body.get("layout"), list):
         prefs["layout"] = [str(x)[:20] for x in body["layout"]][:10]
     if "heroCur" in body:

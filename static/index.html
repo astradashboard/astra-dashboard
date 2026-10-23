@@ -177,10 +177,15 @@
   .tv-tools { display: flex; gap: 8px; flex-wrap: wrap; }
   .tv-tools select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
   .tv-tools select:focus { outline: none; border-color: var(--gold); }
-  .tv-box { position: relative; height: 560px; border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+  .tv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tv-panel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .tv-panel .tv-tools select { flex: 1; min-width: 0; }
+  .tv-panel .tv-tools select:last-child { flex: 0 0 auto; }
+  .tv-box { position: relative; height: 400px; border-radius: 10px; overflow: hidden; background: var(--panel-2); }
   .tv-box > .tradingview-widget-container, .tv-box .tradingview-widget-container__widget { height: 100%; width: 100%; }
   .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
-  @media (max-width: 860px) { .tv-box { height: 420px; } }
+  @media (max-width: 1100px) { .tv-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) { .tv-box { height: 360px; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -362,32 +367,12 @@
         <div class="chart-hint">Molette pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
       </div>
-      <div class="blk" data-block="tv" data-label="Graphique TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="tv" data-label="Graphiques TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <section class="card">
         <div class="card-head">
-          <h2>Graphique TradingView</h2>
-          <div class="tv-tools">
-            <select id="tvSymbol" title="Actif affiché">
-              <option value="OANDA:NAS100USD">US100 · Nasdaq 100</option>
-              <option value="OANDA:US30USD">US30 · Dow Jones</option>
-              <option value="OANDA:SPX500USD">US500 · S&amp;P 500</option>
-              <option value="OANDA:DE30EUR">GER40 · DAX</option>
-              <option value="OANDA:XAUUSD">XAUUSD · Or</option>
-              <option value="OANDA:EURUSD">EURUSD</option>
-              <option value="OANDA:GBPUSD">GBPUSD</option>
-              <option value="BITSTAMP:BTCUSD">BTCUSD · Bitcoin</option>
-            </select>
-            <select id="tvInterval" title="Unité de temps">
-              <option value="1">1 min</option>
-              <option value="5">5 min</option>
-              <option value="15">15 min</option>
-              <option value="60">1 h</option>
-              <option value="240">4 h</option>
-              <option value="D">1 jour</option>
-            </select>
-          </div>
+          <h2>Graphiques TradingView</h2>
         </div>
-        <div class="tv-box" id="tvBox"><div class="tv-msg">Chargement du graphique…</div></div>
+        <div class="tv-grid" id="tvGrid"></div>
       </section>
       </div>
       <div class="blk" data-block="cal" data-label="Calendrier des profits et pertes"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
@@ -1085,12 +1070,9 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); }
   if (p.heroCur) { state.heroCur = p.heroCur; if (state.data) renderHero(); }
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
-  if (p.tv && p.tv.symbol) state.tv = { symbol: p.tv.symbol, interval: p.tv.interval || '15' };
-  $('#tvSymbol').value = state.tv.symbol; $('#tvInterval').value = state.tv.interval;
-  if ($('#tvSymbol').value !== state.tv.symbol) { // symbole choisi dans TradingView, hors liste
-    $('#tvSymbol').append(new Option(state.tv.symbol, state.tv.symbol)); $('#tvSymbol').value = state.tv.symbol;
-  }
-  renderTv(true);
+  if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
+  else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
+  buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
 
 /* ---------- courbe du capital (zoomable) ---------- */
@@ -1601,7 +1583,7 @@ function stopReorder(apply) {
     api('/api/prefs', { layout: state.layout }).catch(() => {});
   }
   if (state.data) renderChart();
-  if (blk.dataset.block === 'tv' || blk.querySelector('#tvBox')) renderTv(true);
+  if (blk.dataset.block === 'tv') renderTv(true);
 }
 function endReorder() { stopReorder(true); }
 function escReorder(ev) { if (ev.key === 'Escape') stopReorder(false); }
@@ -1610,14 +1592,46 @@ document.querySelectorAll('#content .blk-handle').forEach(h => h.addEventListene
   startReorder(h.closest('.blk'), ev);
 }));
 
-// ---------- graphique TradingView ----------
-state.tv = { symbol: 'OANDA:NAS100USD', interval: '15' };
-let tvLoaded = null;
-function renderTv(force) {
-  const key = state.tv.symbol + '|' + state.tv.interval;
-  if (!force && tvLoaded === key && $('#tvBox iframe')) return;
-  tvLoaded = key;
-  const box = $('#tvBox'); box.innerHTML = '';
+// ---------- graphiques TradingView (4) ----------
+const TV_SYMBOLS = [
+  ['OANDA:NAS100USD', 'US100 · Nasdaq 100'], ['OANDA:US30USD', 'US30 · Dow Jones'], ['OANDA:SPX500USD', 'US500 · S&P 500'],
+  ['OANDA:DE30EUR', 'GER40 · DAX'], ['OANDA:XAUUSD', 'XAUUSD · Or'], ['OANDA:XAGUSD', 'XAGUSD · Argent'],
+  ['OANDA:WTICOUSD', 'Pétrole WTI'], ['OANDA:EURUSD', 'EURUSD'], ['OANDA:GBPUSD', 'GBPUSD'], ['OANDA:USDJPY', 'USDJPY'],
+  ['BITSTAMP:BTCUSD', 'BTCUSD · Bitcoin'], ['BITSTAMP:ETHUSD', 'ETHUSD · Ethereum'],
+];
+const TV_INTERVALS = [['1', '1 min'], ['5', '5 min'], ['15', '15 min'], ['60', '1 h'], ['240', '4 h'], ['D', '1 jour'], ['W', '1 sem.']];
+const TV_DEFAULT = [
+  { symbol: 'OANDA:NAS100USD', interval: '15' }, { symbol: 'OANDA:SPX500USD', interval: '15' },
+  { symbol: 'OANDA:XAUUSD', interval: '15' }, { symbol: 'OANDA:EURUSD', interval: '15' },
+];
+state.tv = TV_DEFAULT.map(x => ({ ...x }));
+const tvLoaded = [];
+function buildTvGrid() {
+  const grid = $('#tvGrid'); grid.innerHTML = '';
+  state.tv.forEach((cfg, i) => {
+    const panel = el('div', 'tv-panel');
+    const tools = el('div', 'tv-tools');
+    const ss = el('select'); ss.title = 'Actif du graphique ' + (i + 1);
+    for (const [v, t] of TV_SYMBOLS) ss.append(new Option(t, v));
+    if (!TV_SYMBOLS.some(x => x[0] === cfg.symbol)) ss.append(new Option(cfg.symbol, cfg.symbol));
+    ss.value = cfg.symbol;
+    const si = el('select'); si.title = 'Unité de temps';
+    for (const [v, t] of TV_INTERVALS) si.append(new Option(t, v));
+    si.value = cfg.interval;
+    ss.onchange = () => { cfg.symbol = ss.value; renderTvPanel(i); saveTv(); };
+    si.onchange = () => { cfg.interval = si.value; renderTvPanel(i); saveTv(); };
+    tools.append(ss, si);
+    const box = el('div', 'tv-box'); box.id = 'tvBox' + i;
+    panel.append(tools, box); grid.appendChild(panel);
+    tvLoaded[i] = null;
+  });
+}
+function renderTvPanel(i, force) {
+  const cfg = state.tv[i], box = document.getElementById('tvBox' + i); if (!box) return;
+  const key = cfg.symbol + '|' + cfg.interval;
+  if (!force && tvLoaded[i] === key && box.querySelector('iframe')) return;
+  tvLoaded[i] = key;
+  box.innerHTML = '';
   const msg = el('div', 'tv-msg', 'Chargement du graphique…'); box.appendChild(msg);
   const wrap = el('div', 'tradingview-widget-container');
   const inner = el('div', 'tradingview-widget-container__widget');
@@ -1625,20 +1639,19 @@ function renderTv(force) {
   sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
   sc.async = true;
   sc.textContent = JSON.stringify({
-    autosize: true, symbol: state.tv.symbol, interval: state.tv.interval, timezone: 'Europe/Brussels',
+    autosize: true, symbol: cfg.symbol, interval: cfg.interval, timezone: 'Europe/Brussels',
     theme: 'dark', style: '1', locale: 'fr', backgroundColor: '#121722', gridColor: 'rgba(255,255,255,0.05)',
-    allow_symbol_change: true, hide_side_toolbar: false, calendar: false, save_image: true,
+    allow_symbol_change: true, hide_side_toolbar: true, hide_top_toolbar: false, calendar: false, save_image: false,
     support_host: 'https://www.tradingview.com'
   });
   sc.onerror = () => { msg.textContent = 'Impossible de charger TradingView : vérifie ta connexion internet.'; };
   wrap.append(inner, sc); box.appendChild(wrap);
-  // le message disparaît dès que le graphique est affiché
   const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
   setTimeout(() => clearInterval(t), 30000);
 }
+function renderTv(force) { state.tv.forEach((_, i) => renderTvPanel(i, force)); }
 function saveTv() { api('/api/prefs', { tv: state.tv }).catch(() => {}); }
-$('#tvSymbol').onchange = () => { state.tv.symbol = $('#tvSymbol').value; renderTv(); saveTv(); };
-$('#tvInterval').onchange = () => { state.tv.interval = $('#tvInterval').value; renderTv(); saveTv(); };
+buildTvGrid();
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
