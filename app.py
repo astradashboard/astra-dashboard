@@ -793,6 +793,8 @@ def api_prefs_set():
         if imp in ("-1,0,1", "0,1", "1") and countries:
             prefs["eco"] = {"imp": imp, "countries": countries,
                             "range": rng if rng in ("yesterday", "today", "tomorrow", "week", "nextweek") else "today"}
+    if isinstance(body.get("mask"), bool):
+        prefs["mask"] = body["mask"]
     if body.get("tvCount") in (1, 2, 3, 4):
         prefs["tvCount"] = body["tvCount"]
     if isinstance(body.get("tv"), list):
@@ -1350,7 +1352,15 @@ def month_report(login, month):
     }
 
 
-def report_html(rep, auto_print=False, preview=False):
+MASK = "••••••"
+
+
+def _mask_name(name):
+    import re
+    return re.sub(r"\d{5,}", MASK, name or "")
+
+
+def report_html(rep, auto_print=False, preview=False, masked=False):
     from html import escape as e
 
     cur, month = rep["cur"], rep["month"]
@@ -1421,7 +1431,11 @@ def report_html(rep, auto_print=False, preview=False):
              ) if rows else '<p class="muted">Aucun trade détaillé pour ce mois. Actualise le compte dans l\'app pour charger les trades.</p>'
 
     now = dt.datetime.now().strftime("%d/%m/%Y à %H:%M")
-    acc_line = e(acc.get("name") or acc["login"]) + (f" · {e(acc['login'])} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
+    name_ = acc.get("name") or acc["login"]
+    login_ = acc["login"]
+    if masked:
+        name_, login_ = _mask_name(name_), MASK
+    acc_line = e(name_) + (f" · {e(login_)} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
     script = "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script>" if auto_print else ""
     preview_css = ("<style>html{background:#3a3f4b}body{width:210mm;max-width:calc(100% - 24px);margin:14px auto;"
                    "padding:12mm;background:#fff;border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.35)}</style>") if preview else ""
@@ -1485,7 +1499,8 @@ def report_page():
         rep = month_report(login, month)
     except KeyError as ex:
         return str(ex), 404
-    return report_html(rep, auto_print=request.args.get("print") == "1", preview=request.args.get("apercu") == "1")
+    return report_html(rep, auto_print=request.args.get("print") == "1", preview=request.args.get("apercu") == "1",
+                       masked=request.args.get("masque") == "1")
 
 
 def find_pdf_browser():
@@ -1517,7 +1532,9 @@ def api_report_pdf():
         return jsonify({"error": "Aucun navigateur trouvé pour créer le PDF.", "fallback": True}), 501
     tmp = tempfile.mkdtemp(prefix="astra-pdf-")
     out = os.path.join(tmp, "rapport.pdf")
-    url = f"http://127.0.0.1:{SERVER['port'] or PREFERRED_PORT}/rapport?login={quote(login)}&month={month}"
+    masked = request.args.get("masque") == "1"
+    url = (f"http://127.0.0.1:{SERVER['port'] or PREFERRED_PORT}/rapport?login={quote(login)}&month={month}"
+           + ("&masque=1" if masked else ""))
     pdf, detail = None, ""
     for attempt in range(2):
         # profil neuf à chaque fois : un Edge resté ouvert en arrière-plan ne peut pas bloquer la création
@@ -1548,7 +1565,10 @@ def api_report_pdf():
         return jsonify({"error": "La création du PDF a échoué" + (f" ({detail})" if detail else "") + ".",
                         "fallback": True, "browser": os.path.basename(exe)}), 500
     y, m = int(month[:4]), int(month[5:])
-    safe = "".join(ch for ch in (accounts[login].get("name") or login) if ch not in '\\/:*?"<>|').strip() or login
+    nm = accounts[login].get("name") or login
+    if masked:
+        nm = _mask_name(nm).replace(MASK, "xxxxxx")
+    safe = "".join(ch for ch in nm if ch not in '\\/:*?"<>|').strip() or "compte"
     filename = f"ASTRA CAPITAL - {safe} - {MOIS[m - 1].capitalize()} {y}.pdf"
     resp = app.response_class(pdf, mimetype="application/pdf")
     mode = "inline" if request.args.get("inline") == "1" else "attachment"

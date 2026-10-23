@@ -184,6 +184,7 @@
   .tv-grid.n3 .tv-panel:nth-child(3) { grid-column: 1 / -1; }
   .tv-head-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   #tvAccount { padding: 6px 12px; font-size: 13px; }
+  #maskBtn.on { background: var(--gold-soft); border-color: rgba(196,138,69,.6); color: var(--gold); }
   .tv-open { flex: 0 0 auto !important; width: 34px; padding: 0; font-size: 14px; }
   .tv-count { display: flex; align-items: center; gap: 6px; }
   .tv-count span { color: var(--muted); font-size: 12px; margin-right: 2px; }
@@ -263,6 +264,7 @@
   .h-label-wrap { display: flex; align-items: center; gap: 10px; }
   .live-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
     color: var(--win); background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); border-radius: 999px; padding: 2px 9px; }
+  .live-dot[hidden] { display: none; }
   .live-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--win); animation: livePulse 1.4s ease-in-out infinite; }
   @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
   .hero .h-value { transition: color .4s; }
@@ -404,6 +406,7 @@
         <p id="subtitle"></p>
       </div>
       <div class="actions">
+        <button class="btn" id="maskBtn" title="Masquer ou afficher les numéros de compte (pratique pour les captures et les vidéos)">👁 Masquer les n° de compte</button>
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
@@ -710,6 +713,22 @@ function notice(msg, isError) {
   setTimeout(() => el.remove(), 9000);
 }
 
+/* ---------- masquage des numéros de compte ---------- */
+state.mask = false;
+const MASK = '••••••';
+const shownLogin = l => state.mask ? MASK : l;
+const shownName = n => state.mask ? String(n || '').replace(/\d{5,}/g, MASK) : n;
+function renderMaskBtn() {
+  const b = $('#maskBtn'); b.classList.toggle('on', state.mask);
+  b.textContent = state.mask ? '🙈 N° de compte masqués' : '👁 Masquer les n° de compte';
+}
+$('#maskBtn').onclick = () => {
+  state.mask = !state.mask; renderMaskBtn();
+  api('/api/prefs', { mask: state.mask }).catch(() => {});
+  renderAccounts();
+  if (state.data) loadData();
+};
+
 /* ---------- comptes ---------- */
 async function loadState() {
   const s = await api('/api/state');
@@ -736,8 +755,8 @@ function renderAccounts() {
     const b = document.createElement('button');
     b.className = 'acc' + (a.login === state.sel ? ' active' + (state.page === 'journal' ? ' dimmed' : '') : '');
     const left = document.createElement('div');
-    const nm = document.createElement('div'); nm.textContent = a.name;
-    const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : a.login + ' · ' + a.server);
+    const nm = document.createElement('div'); nm.textContent = shownName(a.name);
+    const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : shownLogin(a.login) + ' · ' + a.server);
     left.append(nm, sm);
     const bal = document.createElement('span'); bal.className = 'bal';
     bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
@@ -764,7 +783,7 @@ function updateRiskHint() {
 function openRisk(acc) {
   riskAcc = acc;
   $('#riskErr').style.display = 'none';
-  $('#riskSub').textContent = acc.name + (acc.start_balance ? ' · capital initial ' + money(acc.start_balance, acc.currency) : '');
+  $('#riskSub').textContent = shownName(acc.name) + (acc.start_balance ? ' · capital initial ' + money(acc.start_balance, acc.currency) : '');
   $('#riskMode').value = acc.risk ? acc.risk.mode : 'percent';
   $('#riskValue').value = acc.risk ? String(acc.risk.value).replace('.', ',') : '';
   $('#riskClear').hidden = !acc.risk;
@@ -788,14 +807,14 @@ $('#riskClear').onclick = () => saveRisk({ mode: null });
 $('#riskForm').addEventListener('submit', e => { e.preventDefault(); saveRisk({ mode: $('#riskMode').value, value: $('#riskValue').value }); });
 
 /* ---------- rapport PDF ---------- */
-const pdfQuery = () => 'login=' + encodeURIComponent(state.sel) + '&month=' + encodeURIComponent($('#pdfMonth').value);
+const pdfQuery = () => 'login=' + encodeURIComponent(state.sel) + '&month=' + encodeURIComponent($('#pdfMonth').value) + (state.mask ? '&masque=1' : '');
 function openPdf(months) {
   const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
   const sel = $('#pdfMonth'); sel.innerHTML = '';
   const list = months.length ? months : [new Date().getFullYear() + '-' + pad(new Date().getMonth() + 1)];
   for (const k of list) { const mn = MONTHS[Number(k.slice(5)) - 1]; sel.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
   sel.value = state.jMonth !== 'all' && list.includes(state.jMonth) ? state.jMonth : list[0];
-  $('#pdfSub').textContent = acc.name; $('#pdfErr').style.display = 'none';
+  $('#pdfSub').textContent = shownName(acc.name); $('#pdfErr').style.display = 'none';
   $('#pdfGo').disabled = false; $('#pdfGo').textContent = 'Enregistrer en PDF';
   setPdfBig(false);
   $('#pdfBg').classList.add('open');
@@ -916,7 +935,7 @@ async function refreshAccount(login) {
   finally { btn.disabled = false; btn.textContent = '↻ Actualiser'; }
 }
 async function deleteAccount(acc) {
-  if (!confirm('Supprimer « ' + acc.name + ' » du dashboard ?\n\nSon historique et son mot de passe mémorisé seront effacés de ce PC. Tu pourras toujours le reconnecter plus tard.')) return;
+  if (!confirm('Supprimer « ' + shownName(acc.name) + ' » du dashboard ?\n\nSon historique et son mot de passe mémorisé seront effacés de ce PC. Tu pourras toujours le reconnecter plus tard.')) return;
   await api('/api/remove', { login: acc.login });
   if (state.sel === acc.login) { state.sel = 'all'; state.month = null; state.view = null; }
   await loadState();
@@ -926,9 +945,9 @@ async function loadData() {
   try { state.data = await api('/api/data?login=' + encodeURIComponent(state.sel)); }
   catch (e) { notice(e.message, true); return; }
   const acc = state.accounts.find(a => a.login === state.sel);
-  $('#title').textContent = acc ? acc.name : 'Tous les comptes';
+  $('#title').textContent = acc ? shownName(acc.name) : 'Tous les comptes';
   const fetched = acc ? acc.fetched_at : state.accounts.map(a => a.fetched_at).filter(Boolean).sort()[0];
-  $('#subtitle').textContent = (acc ? (acc.demo ? 'Données fictives' : acc.login + ' · ' + acc.server) : state.data.accounts + ' comptes')
+  $('#subtitle').textContent = (acc ? (acc.demo ? 'Données fictives' : shownLogin(acc.login) + ' · ' + acc.server) : state.data.accounts + ' comptes')
     + (fetched ? ' · mis à jour le ' + new Date(fetched).toLocaleString('fr-BE', { dateStyle: 'short', timeStyle: 'short' }) : '');
   if (state.data.mixed_currencies) notice('Les comptes ont des devises différentes : les totaux additionnent les montants sans conversion.', true);
   if (!state.month) {
@@ -1253,6 +1272,7 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
   if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
   else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
+  if (typeof p.mask === 'boolean') { state.mask = p.mask; renderMaskBtn(); renderAccounts(); if (state.data) loadData(); }
   if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
   if (p.eco && p.eco.imp && Array.isArray(p.eco.countries) && p.eco.countries.length) {
     const cs = p.eco.countries.map(c => String(c).toUpperCase()).filter(c => ECO_COUNTRIES.some(x => x[0] === c));
@@ -1592,7 +1612,7 @@ function renderJournal() {
   const sum = el('div', 'sum'); sum.append(list.length + ' trade' + (list.length > 1 ? 's' : '') + ' · ');
   const tb = el('b', cls(total), money(total, d.currency, true)); sum.append(tb);
   const as = el('select'); as.title = 'Compte du journal';
-  for (const a of state.accounts) as.append(new Option(a.name, a.login));
+  for (const a of state.accounts) as.append(new Option(shownName(a.name), a.login));
   as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
   const pdfBtn = el('button', 'btn', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
   pdfBtn.onclick = () => openPdf(months);
