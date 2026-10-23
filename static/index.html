@@ -174,6 +174,13 @@
     border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 2px var(--gold); overflow: hidden; background: var(--bg); }
   .reorder-ghost .blk-handle { display: none; }
   @media (hover: none) { .blk-handle { opacity: .8; } }
+  .tv-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tv-tools select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tv-tools select:focus { outline: none; border-color: var(--gold); }
+  .tv-box { position: relative; height: 560px; border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+  .tv-box > .tradingview-widget-container, .tv-box .tradingview-widget-container__widget { height: 100%; width: 100%; }
+  .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
+  @media (max-width: 860px) { .tv-box { height: 420px; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -353,6 +360,34 @@
         </div>
         <div id="chart"><div class="tip" id="tip"></div></div>
         <div class="chart-hint">Molette pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
+      </section>
+      </div>
+      <div class="blk" data-block="tv" data-label="Graphique TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <section class="card">
+        <div class="card-head">
+          <h2>Graphique TradingView</h2>
+          <div class="tv-tools">
+            <select id="tvSymbol" title="Actif affiché">
+              <option value="OANDA:NAS100USD">US100 · Nasdaq 100</option>
+              <option value="OANDA:US30USD">US30 · Dow Jones</option>
+              <option value="OANDA:SPX500USD">US500 · S&amp;P 500</option>
+              <option value="OANDA:DE30EUR">GER40 · DAX</option>
+              <option value="OANDA:XAUUSD">XAUUSD · Or</option>
+              <option value="OANDA:EURUSD">EURUSD</option>
+              <option value="OANDA:GBPUSD">GBPUSD</option>
+              <option value="BITSTAMP:BTCUSD">BTCUSD · Bitcoin</option>
+            </select>
+            <select id="tvInterval" title="Unité de temps">
+              <option value="1">1 min</option>
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="60">1 h</option>
+              <option value="240">4 h</option>
+              <option value="D">1 jour</option>
+            </select>
+          </div>
+        </div>
+        <div class="tv-box" id="tvBox"><div class="tv-msg">Chargement du graphique…</div></div>
       </section>
       </div>
       <div class="blk" data-block="cal" data-label="Calendrier des profits et pertes"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
@@ -1050,7 +1085,13 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); }
   if (p.heroCur) { state.heroCur = p.heroCur; if (state.data) renderHero(); }
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
-}).catch(() => {});
+  if (p.tv && p.tv.symbol) state.tv = { symbol: p.tv.symbol, interval: p.tv.interval || '15' };
+  $('#tvSymbol').value = state.tv.symbol; $('#tvInterval').value = state.tv.interval;
+  if ($('#tvSymbol').value !== state.tv.symbol) { // symbole choisi dans TradingView, hors liste
+    $('#tvSymbol').append(new Option(state.tv.symbol, state.tv.symbol)); $('#tvSymbol').value = state.tv.symbol;
+  }
+  renderTv(true);
+}).catch(() => renderTv(true));
 
 /* ---------- courbe du capital (zoomable) ---------- */
 state.view = null; // { i0, i1, preset }
@@ -1474,7 +1515,7 @@ function renderTradeDetail(box, t, acc, cur) {
 }
 
 // ---------- blocs du tableau de bord déplaçables ----------
-const BLOCKS = ['hero', 'kpis', 'chart', 'cal'];
+const BLOCKS = ['hero', 'kpis', 'chart', 'tv', 'cal'];
 state.layout = BLOCKS.slice();
 function applyLayout() {
   const box = $('#content');
@@ -1501,6 +1542,7 @@ function startReorder(blk, ev) {
   // miniature du bloc qui suit la souris
   const ghost = blk.cloneNode(true);
   ghost.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+  ghost.querySelectorAll('iframe, script').forEach(n => { const ph = document.createElement('div'); ph.className = 'tv-msg'; ph.textContent = 'Graphique TradingView'; n.replaceWith(ph); });
   ghost.classList.add('reorder-ghost'); ghost.removeAttribute('data-block');
   ghost.style.width = r.width + 'px'; ghost.style.height = Math.min(r.height, 900) + 'px';
   ghost.style.transform = 'scale(' + GHOST_SCALE + ')';
@@ -1559,6 +1601,7 @@ function stopReorder(apply) {
     api('/api/prefs', { layout: state.layout }).catch(() => {});
   }
   if (state.data) renderChart();
+  if (blk.dataset.block === 'tv' || blk.querySelector('#tvBox')) renderTv(true);
 }
 function endReorder() { stopReorder(true); }
 function escReorder(ev) { if (ev.key === 'Escape') stopReorder(false); }
@@ -1566,6 +1609,36 @@ document.querySelectorAll('#content .blk-handle').forEach(h => h.addEventListene
   if (ev.button !== 0) return;
   startReorder(h.closest('.blk'), ev);
 }));
+
+// ---------- graphique TradingView ----------
+state.tv = { symbol: 'OANDA:NAS100USD', interval: '15' };
+let tvLoaded = null;
+function renderTv(force) {
+  const key = state.tv.symbol + '|' + state.tv.interval;
+  if (!force && tvLoaded === key && $('#tvBox iframe')) return;
+  tvLoaded = key;
+  const box = $('#tvBox'); box.innerHTML = '';
+  const msg = el('div', 'tv-msg', 'Chargement du graphique…'); box.appendChild(msg);
+  const wrap = el('div', 'tradingview-widget-container');
+  const inner = el('div', 'tradingview-widget-container__widget');
+  const sc = document.createElement('script');
+  sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  sc.async = true;
+  sc.textContent = JSON.stringify({
+    autosize: true, symbol: state.tv.symbol, interval: state.tv.interval, timezone: 'Europe/Brussels',
+    theme: 'dark', style: '1', locale: 'fr', backgroundColor: '#121722', gridColor: 'rgba(255,255,255,0.05)',
+    allow_symbol_change: true, hide_side_toolbar: false, calendar: false, save_image: true,
+    support_host: 'https://www.tradingview.com'
+  });
+  sc.onerror = () => { msg.textContent = 'Impossible de charger TradingView : vérifie ta connexion internet.'; };
+  wrap.append(inner, sc); box.appendChild(wrap);
+  // le message disparaît dès que le graphique est affiché
+  const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
+  setTimeout(() => clearInterval(t), 30000);
+}
+function saveTv() { api('/api/prefs', { tv: state.tv }).catch(() => {}); }
+$('#tvSymbol').onchange = () => { state.tv.symbol = $('#tvSymbol').value; renderTv(); saveTv(); };
+$('#tvInterval').onchange = () => { state.tv.interval = $('#tvInterval').value; renderTv(); saveTv(); };
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
