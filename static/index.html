@@ -217,7 +217,7 @@
   .pdf-done-head h2 { color: var(--win); }
   .pdf-done-head .sub { margin: 4px 0 0; word-break: break-word; }
   .pdf-done-head .right { display: flex; gap: 8px; }
-  #pdfPreview { flex: 1; width: 100%; min-height: 300px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  #pdfPreview { flex: 1; width: 100%; min-height: 300px; border: 1px solid var(--line); border-radius: 10px; background: #3a3f4b; }
   .field-select { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 10px 12px; font: inherit; }
   .field-select:focus { outline: none; border-color: var(--gold); }
   .kpi[data-risk] { cursor: pointer; }
@@ -594,14 +594,16 @@ function openPdf(months) {
 }
 $('#pdfCancel').onclick = () => $('#pdfBg').classList.remove('open');
 let pdfDoneUrl = null;
-function showPdfDone(url, name) {
+let pdfFullUrl = null;
+function showPdfDone(url, name, previewUrl, fullUrl) {
+  pdfFullUrl = fullUrl;
   if (pdfDoneUrl) URL.revokeObjectURL(pdfDoneUrl);
   pdfDoneUrl = url;
   $('#pdfDoneName').textContent = name + ' · dans ton dossier Téléchargements';
-  $('#pdfPreview').src = url + '#toolbar=0&navpanes=0&view=FitH';
+  $('#pdfPreview').src = previewUrl;
   $('#pdfDoneBg').classList.add('open');
 }
-$('#pdfDoneOpen').onclick = () => { if (pdfDoneUrl) window.open(pdfDoneUrl, '_blank'); };
+$('#pdfDoneOpen').onclick = () => { if (pdfFullUrl) window.open(pdfFullUrl, '_blank'); };
 $('#pdfDoneClose').onclick = () => { $('#pdfDoneBg').classList.remove('open'); $('#pdfPreview').src = 'about:blank'; };
 $('#pdfForm').addEventListener('submit', async ev => {
   ev.preventDefault();
@@ -622,7 +624,7 @@ $('#pdfForm').addEventListener('submit', async ev => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     $('#pdfBg').classList.remove('open');
-    showPdfDone(url, name);
+    showPdfDone(url, name, '/rapport?' + q + '&apercu=1', '/api/report.pdf?' + q + '&inline=1');
   } catch (e) {
     $('#pdfErr').textContent = e.message; $('#pdfErr').style.display = 'block';
   } finally { btn.disabled = false; btn.textContent = 'Enregistrer en PDF'; }

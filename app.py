@@ -938,7 +938,7 @@ def month_report(login, month):
     }
 
 
-def report_html(rep, auto_print=False):
+def report_html(rep, auto_print=False, preview=False):
     from html import escape as e
 
     cur, month = rep["cur"], rep["month"]
@@ -1011,6 +1011,8 @@ def report_html(rep, auto_print=False):
     now = dt.datetime.now().strftime("%d/%m/%Y à %H:%M")
     acc_line = e(acc.get("name") or acc["login"]) + (f" · {e(acc['login'])} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
     script = "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script>" if auto_print else ""
+    preview_css = ("<style>html{background:#3a3f4b}body{width:210mm;max-width:calc(100% - 24px);margin:14px auto;"
+                   "padding:12mm;background:#fff;border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.35)}</style>") if preview else ""
     return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '')} - {title}</title>
 <style>
 @page {{ size: A4; margin: 12mm 12mm 14mm; }}
@@ -1054,7 +1056,7 @@ tr {{ break-inside: avoid; }}
 <h2>Évolution du capital</h2><div class="chart">{chart}</div>
 <div class="page2"><h2>Trades du mois ({len(rep['trades'])})</h2>{table}</div>
 <div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else ''}</div>
-{script}</body></html>"""
+{script}{preview_css}</body></html>"""
 
 
 def _valid_month(month):
@@ -1070,7 +1072,7 @@ def report_page():
         rep = month_report(login, month)
     except KeyError as ex:
         return str(ex), 404
-    return report_html(rep, auto_print=request.args.get("print") == "1")
+    return report_html(rep, auto_print=request.args.get("print") == "1", preview=request.args.get("apercu") == "1")
 
 
 def find_pdf_browser():
@@ -1124,7 +1126,8 @@ def api_report_pdf():
     safe = "".join(ch for ch in (accounts[login].get("name") or login) if ch not in '\\/:*?"<>|').strip() or login
     filename = f"ASTRA CAPITAL - {safe} - {MOIS[m - 1].capitalize()} {y}.pdf"
     resp = app.response_class(pdf, mimetype="application/pdf")
-    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    mode = "inline" if request.args.get("inline") == "1" else "attachment"
+    resp.headers["Content-Disposition"] = f"{mode}; filename*=UTF-8''{quote(filename)}"
     return resp
 
 
