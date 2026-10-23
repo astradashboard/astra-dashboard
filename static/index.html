@@ -213,21 +213,25 @@
   .eco-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
   .eco-tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 9px 12px; font-size: 14px; margin-bottom: -1px; }
   .eco-tabs button:hover { color: var(--fg); }
-  #ecoRange { justify-content: center; }
-  #eco > .eco-head { justify-content: center; text-align: center; margin-bottom: 8px; }
-  .eco-line-tools { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 14px; flex-wrap: wrap; order: 2; }
-  #ecoRange > button { order: 1; }
-  .eco-line-tools .eco-upd { margin: 0; }
-  .eco-line-tools .seg button { padding: 6px 10px; border: none; margin: 0; font-size: 13px; }
+  /* barre de filtres sur une seule ligne : tout à 36 px de haut */
+  #ecoRange.eco-tabs { border-bottom: none; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  #ecoRange .eco-days { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; height: 36px; box-sizing: border-box; }
+  #ecoRange .eco-days button { border: none; margin: 0; padding: 0 13px; border-radius: 7px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #ecoRange .eco-days button:hover { color: var(--fg); }
+  #ecoRange .eco-days button.on { background: var(--gold-soft); color: var(--gold); font-weight: 600; border: none; }
+  .eco-line-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .eco-line-tools .seg { height: 36px; box-sizing: border-box; align-items: stretch; }
+  .eco-line-tools .seg button { display: inline-flex; align-items: center; gap: 6px; }
+  .eco-line-tools .seg button { padding: 0 11px; border: none; margin: 0; font-size: 13px; }
   .eco-line-tools .seg button.on { color: var(--gold); }
   .eco-zones { position: relative; }
   .eco-zones-btn { padding: 7px 12px; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
-  .eco-tabs .eco-zones-btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; margin: 0; color: var(--fg); padding: 8px 12px; }
+  .eco-tabs .eco-zones-btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; margin: 0; color: var(--fg); padding: 0 12px; height: 36px; box-sizing: border-box; }
   .eco-tabs .eco-zones-btn:hover { border-color: rgba(196,138,69,.6); }
   .eco-zones-btn .flags { color: var(--muted); }
   .eco-zones-btn .car { color: var(--muted); font-size: 10px; }
   .eco-zones-menu[hidden] { display: none; }
-  .eco-zones-menu { position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 6px); z-index: 8; width: 250px; max-height: 420px; overflow-y: auto;
+  .eco-zones-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 8; width: 250px; max-height: 420px; overflow-y: auto;
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 40px rgba(0,0,0,.5); padding: 8px; }
   .eco-zones-menu .zq { display: flex; gap: 6px; padding: 2px 4px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
   .eco-zones-menu .zq button { flex: 1; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 5px; font-size: 12px; }
@@ -237,7 +241,7 @@
   .eco-zones-menu input { accent-color: var(--gold); width: 15px; height: 15px; margin: 0; }
   .eco-zones-menu .cur { margin-left: auto; color: var(--muted); font-size: 11.5px; }
   .eco-tz { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-  .eco-tz select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; font: inherit; font-size: 13px; cursor: pointer; max-width: 230px; }
+  .eco-tz select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; height: 36px; font: inherit; font-size: 13px; cursor: pointer; max-width: 230px; }
   .eco-tabs button.on { color: var(--fg); border-bottom-color: var(--gold); font-weight: 600; }
   .eco-upd { margin-left: auto; color: var(--muted); font-size: 12px; }
   .eco-card { padding: 0; overflow: hidden; }
@@ -680,15 +684,17 @@
       <div class="eco-head">
         <div>
           <h1>Calendrier économique</h1>
-          <p id="ecoSub">Annonces économiques à l'heure de Bruxelles</p>
+          <p><span id="ecoSub">Annonces économiques à l'heure de Bruxelles</span> · <span id="ecoUpd"></span></p>
         </div>
       </div>
       <div class="eco-tabs" id="ecoRange">
+        <div class="eco-days">
         <button type="button" data-range="yesterday">Hier</button>
         <button type="button" data-range="today">Aujourd'hui</button>
         <button type="button" data-range="tomorrow">Demain</button>
         <button type="button" data-range="week">Cette semaine</button>
         <button type="button" data-range="nextweek">Semaine prochaine</button>
+        </div>
         <div class="eco-line-tools">
           <div class="eco-zones" id="ecoZones">
             <button type="button" class="btn eco-zones-btn" id="ecoZonesBtn" title="Zones et pays des annonces"></button>
@@ -699,8 +705,7 @@
             <button type="button" data-imp="0,1" title="2 étoiles et plus"><span class="bulls b2"><i></i></span> et plus</button>
             <button type="button" data-imp="1" title="3 étoiles seulement"><span class="bulls b3"><i></i></span></button>
           </div>
-          <label class="eco-tz" title="Fuseau horaire des heures affichées">🕒 <select id="ecoTz"></select></label>
-          <span class="eco-upd" id="ecoUpd"></span>
+          <label class="eco-tz" title="Fuseau horaire des heures affichées"><select id="ecoTz"></select></label>
         </div>
       </div>
       <div class="card eco-card">
@@ -2108,14 +2113,14 @@ function buildEcoFilters() {
     b.classList.toggle('on', b.dataset.imp === state.eco.imp);
     b.onclick = () => { state.eco.imp = b.dataset.imp; saveEco(); buildEcoFilters(); renderEco(true); };
   });
-  document.querySelectorAll('#ecoRange > button').forEach(b => {
+  document.querySelectorAll('#ecoRange .eco-days button').forEach(b => {
     b.classList.toggle('on', b.dataset.range === state.eco.range);
     b.onclick = () => { state.eco.range = b.dataset.range; saveEco(); buildEcoFilters(); renderEco(true); };
   });
   // menu déroulant des zones (cases à cocher)
   const btn = $('#ecoZonesBtn'); btn.innerHTML = '';
   const chosen = ECO_COUNTRIES.filter(c => state.eco.countries.includes(c[0]));
-  btn.append('🌍 Zones', el('span', 'flags', chosen.length === ECO_COUNTRIES.length ? 'toutes' : chosen.length <= 4 ? chosen.map(c => c[1]).join('') : chosen.length + ' choisies'), el('span', 'car', '▾'));
+  btn.append('Zones', el('span', 'flags', chosen.length === ECO_COUNTRIES.length ? 'toutes' : chosen.length <= 4 ? chosen.map(c => c[1]).join('') : chosen.length + ' choisies'), el('span', 'car', '▾'));
   btn.title = chosen.map(c => c[2]).join(', ');
   const box = $('#ecoCountries'); box.innerHTML = '';
   const zq = el('div', 'zq');
@@ -2196,7 +2201,7 @@ async function renderEco(force) {
     tr.append(tdT, tdC, tdI, tdE, tdA, el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), el('td', 'c-val', fmtEcoVal(ev.previous, ev)));
     body.appendChild(tr);
   });
-  $('#ecoUpd').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');
+  $('#ecoUpd').textContent = 'mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');
   // actualisation automatique tant que la page est ouverte (les valeurs « Actuel » arrivent en direct)
   clearTimeout(ecoTimer);
   ecoTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) renderEco(); }, 60000);
