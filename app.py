@@ -581,9 +581,11 @@ def api_prefs_set():
     if isinstance(body.get("eco"), dict):
         eco = body["eco"]
         imp = str(eco.get("imp", "0,1"))
-        countries = [str(c)[:2] for c in (eco.get("countries") or []) if isinstance(c, str)][:20]
+        countries = [str(c)[:2].upper() for c in (eco.get("countries") or []) if isinstance(c, str)][:20]
+        rng = str(eco.get("range", "today"))
         if imp in ("-1,0,1", "0,1", "1") and countries:
-            prefs["eco"] = {"imp": imp, "countries": countries}
+            prefs["eco"] = {"imp": imp, "countries": countries,
+                            "range": rng if rng in ("yesterday", "today", "tomorrow", "week", "nextweek") else "today"}
     if body.get("tvCount") in (1, 2, 3, 4):
         prefs["tvCount"] = body["tvCount"]
     if isinstance(body.get("tv"), list):
@@ -714,6 +716,73 @@ def api_fx():
     if entry:  # hors ligne : derniers taux connus
         return jsonify({**entry, "stale": True})
     return jsonify({"error": "Taux de change indisponibles (pas de connexion internet ?)."}), 503
+
+
+ECO_ALLOWED = {"US", "EU", "DE", "FR", "GB", "IT", "ES", "CH", "JP", "CN", "CA", "AU", "NZ"}
+_eco_cache = {}
+
+
+def _num(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    try:
+        return float(str(v).replace(",", "."))
+    except ValueError:
+        return str(v)
+
+
+@app.get("/api/eco")
+def api_eco():
+    """Annonces du calendrier économique (flux public utilisé par le calendrier de TradingView)."""
+    import time
+    import urllib.request
+
+    frm, to = str(request.args.get("from", "")), str(request.args.get("to", ""))
+    try:
+        d0, d1 = dt.date.fromisoformat(frm), dt.date.fromisoformat(to)
+    except ValueError:
+        return jsonify({"error": "Dates invalides."}), 400
+    if d1 < d0 or (d1 - d0).days > 31:
+        return jsonify({"error": "Période invalide."}), 400
+    countries = sorted({c.strip().upper() for c in str(request.args.get("countries", "US")).split(",")} & ECO_ALLOWED) or ["US"]
+    key = (frm, to, ",".join(countries))
+    hit = _eco_cache.get(key)
+    if hit and time.time() - hit["at"] < 120:
+        return jsonify(hit["data"])
+    # marge d'un jour de chaque côté : l'app filtre ensuite sur les jours de Bruxelles
+    start = (d0 - dt.timedelta(days=1)).isoformat() + "T00:00:00.000Z"
+    end = (d1 + dt.timedelta(days=1)).isoformat() + "T23:59:59.000Z"
+    url = (f"https://economic-calendar.tradingview.com/events?from={start}&to={end}"
+           f"&countries={','.join(countries)}")
+    req = urllib.request.Request(url, headers={
+        "Origin": "https://fr.tradingview.com", "Referer": "https://fr.tradingview.com/",
+        "Accept": "application/json", "Accept-Language": "fr-FR,fr;q=0.9",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            raw = json.loads(r.read().decode("utf-8"))
+    except Exception as ex:
+        if hit:
+            return jsonify({**hit["data"], "stale": True})
+        return jsonify({"error": f"service indisponible ({type(ex).__name__})"}), 502
+    items = raw.get("result") if isinstance(raw, dict) else raw
+    events = []
+    for it in items or []:
+        if not isinstance(it, dict) or not it.get("date"):
+            continue
+        imp = it.get("importance")
+        events.append({
+            "id": it.get("id"), "date": it.get("date"), "title": it.get("title") or it.get("indicator"),
+            "country": it.get("country"), "currency": it.get("currency"), "period": it.get("period"),
+            "importance": imp if imp in (-1, 0, 1) else -1,
+            "actual": _num(it.get("actual")), "forecast": _num(it.get("forecast")), "previous": _num(it.get("previous")),
+            "unit": it.get("unit") or "", "scale": it.get("scale") or "",
+        })
+    data = {"events": events}
+    _eco_cache[key] = {"at": time.time(), "data": data}
+    return jsonify(data)
 
 
 @app.get("/api/version")

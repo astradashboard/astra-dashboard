@@ -208,8 +208,35 @@
   .chip { background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
   .chip:hover { color: var(--fg); }
   .chip.on { border-color: rgba(196,138,69,.6); color: var(--fg); background: var(--gold-soft); }
-  .eco-box { position: relative; height: calc(100vh - 230px); min-height: 520px; padding: 6px; overflow: hidden; }
-  .eco-box .tradingview-widget-container, .eco-box .tradingview-widget-container__widget { height: 100%; width: 100%; }
+  .eco-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .eco-tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 9px 12px; font-size: 14px; margin-bottom: -1px; }
+  .eco-tabs button:hover { color: var(--fg); }
+  .eco-tabs button.on { color: var(--fg); border-bottom-color: var(--gold); font-weight: 600; }
+  .eco-upd { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .eco-card { padding: 0; overflow: hidden; }
+  .eco-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  .eco-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+    padding: 11px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line); }
+  .eco-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .eco-table .c-time { width: 62px; } .eco-table .c-cur { width: 86px; } .eco-table .c-imp { width: 70px; }
+  .eco-table .c-val { width: 96px; text-align: right; }
+  .eco-table td.c-val { font-weight: 600; }
+  .eco-table tr.eco-day td { background: var(--bg); color: var(--fg); font-weight: 650; text-align: center; padding: 8px 12px; }
+  .eco-table tr.ev:hover td { background: var(--panel-2); }
+  .eco-table tr.ev.past td { color: #b6bdcb; }
+  .eco-table tr.ev.next td { background: rgba(196,138,69,.08); }
+  .eco-table tr.ev.next td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+  .eco-table .cur { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+  .eco-table .ev-t { font-weight: 500; }
+  .eco-table .ev-p { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  .eco-table .holiday { color: var(--muted); font-style: italic; }
+  .eco-table tr.ev td.val-up { color: var(--win); } .eco-table tr.ev td.val-down { color: var(--loss); }
+  .eco-table .empty td { text-align: center; color: var(--muted); padding: 40px 12px; }
+  .bulls { display: inline-flex; gap: 2px; vertical-align: -2px; }
+  .bulls::before, .bulls::after, .bulls i { content: ''; display: inline-block; width: 9px; height: 12px; border-radius: 2px; background: #3a4357; }
+  .bulls i { display: inline-block; }
+  .bulls.b1::before, .bulls.b2::before, .bulls.b2 i, .bulls.b3::before, .bulls.b3 i, .bulls.b3::after { background: var(--gold); }
+  @media (max-width: 860px) { .eco-table .c-val:nth-child(7) { display: none; } .eco-table th.c-val:nth-child(7) { display: none; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -431,18 +458,32 @@
       <div class="eco-head">
         <div>
           <h1>Calendrier économique</h1>
-          <p>Annonces économiques à l'heure de Bruxelles · données TradingView</p>
+          <p id="ecoSub">Annonces économiques à l'heure de Bruxelles</p>
         </div>
         <div class="eco-filters">
           <div class="seg" id="ecoImp" title="Importance des annonces">
             <button type="button" data-imp="-1,0,1">Toutes</button>
-            <button type="button" data-imp="0,1">Moyennes et fortes</button>
-            <button type="button" data-imp="1">Fortes uniquement</button>
+            <button type="button" data-imp="0,1"><span class="bulls b2"><i></i></span> et plus</button>
+            <button type="button" data-imp="1"><span class="bulls b3"><i></i></span> seulement</button>
           </div>
         </div>
       </div>
+      <div class="eco-tabs" id="ecoRange">
+        <button type="button" data-range="yesterday">Hier</button>
+        <button type="button" data-range="today">Aujourd'hui</button>
+        <button type="button" data-range="tomorrow">Demain</button>
+        <button type="button" data-range="week">Cette semaine</button>
+        <button type="button" data-range="nextweek">Semaine prochaine</button>
+        <span class="eco-upd" id="ecoUpd"></span>
+      </div>
       <div class="chips" id="ecoCountries"></div>
-      <div class="card eco-box" id="ecoBox"></div>
+      <div class="card eco-card">
+        <table class="eco-table">
+          <thead><tr><th class="c-time">Heure</th><th class="c-cur">Dev.</th><th class="c-imp">Imp.</th><th>Événement</th>
+            <th class="c-val">Actuel</th><th class="c-val">Prévision</th><th class="c-val">Précédent</th></tr></thead>
+          <tbody id="ecoBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="empty-state" id="emptyState" hidden>
@@ -1127,8 +1168,9 @@ api('/api/prefs').then(p => {
   else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
   if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
   if (p.eco && p.eco.imp && Array.isArray(p.eco.countries) && p.eco.countries.length) {
-    state.eco = { imp: p.eco.imp, countries: p.eco.countries }; buildEcoFilters();
-    if (state.page === 'eco') renderEco();
+    const cs = p.eco.countries.map(c => String(c).toUpperCase()).filter(c => ECO_COUNTRIES.some(x => x[0] === c));
+    state.eco = { imp: p.eco.imp, countries: cs.length ? cs : state.eco.countries, range: p.eco.range || 'today' }; buildEcoFilters();
+    if (state.page === 'eco') renderEco(true);
   }
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
@@ -1384,7 +1426,7 @@ function showPage() {
   document.querySelector('header.top').style.display = state.page === 'eco' ? 'none' : '';
   $('#emptyState').hidden = hasAcc || state.page === 'eco';
   if (state.page === 'journal' && hasAcc) renderJournal();
-  if (state.page === 'eco') renderEco();
+  if (state.page === 'eco') renderEco(true);
 }
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
@@ -1724,51 +1766,116 @@ document.querySelectorAll('#tvCount .btn').forEach(b => b.onclick = () => {
 function saveTv() { api('/api/prefs', { tv: state.tv }).catch(() => {}); }
 buildTvGrid();
 
-// ---------- calendrier économique ----------
+// ---------- calendrier économique (style Investing.com, annonces TradingView) ----------
 const ECO_COUNTRIES = [
-  ['us', '🇺🇸 États-Unis'], ['eu', '🇪🇺 Zone euro'], ['de', '🇩🇪 Allemagne'], ['fr', '🇫🇷 France'], ['gb', '🇬🇧 Royaume-Uni'],
-  ['it', '🇮🇹 Italie'], ['es', '🇪🇸 Espagne'], ['ch', '🇨🇭 Suisse'], ['jp', '🇯🇵 Japon'], ['cn', '🇨🇳 Chine'],
-  ['ca', '🇨🇦 Canada'], ['au', '🇦🇺 Australie'], ['nz', '🇳🇿 Nouvelle-Zélande'],
+  ['US', '🇺🇸', 'États-Unis', 'USD'], ['EU', '🇪🇺', 'Zone euro', 'EUR'], ['DE', '🇩🇪', 'Allemagne', 'EUR'], ['FR', '🇫🇷', 'France', 'EUR'],
+  ['GB', '🇬🇧', 'Royaume-Uni', 'GBP'], ['IT', '🇮🇹', 'Italie', 'EUR'], ['ES', '🇪🇸', 'Espagne', 'EUR'], ['CH', '🇨🇭', 'Suisse', 'CHF'],
+  ['JP', '🇯🇵', 'Japon', 'JPY'], ['CN', '🇨🇳', 'Chine', 'CNY'], ['CA', '🇨🇦', 'Canada', 'CAD'], ['AU', '🇦🇺', 'Australie', 'AUD'],
+  ['NZ', '🇳🇿', 'Nouvelle-Zélande', 'NZD'],
 ];
-state.eco = { imp: '0,1', countries: ['us', 'eu', 'de', 'fr', 'gb', 'ch', 'jp', 'cn'] };
-let ecoLoaded = null;
+const ECO_TZ = 'Europe/Brussels';
+state.eco = { imp: '0,1', countries: ['US', 'EU', 'DE', 'FR', 'GB', 'CH', 'JP', 'CN'], range: 'today' };
+let ecoTimer = null, ecoReq = 0;
+const bxDate = d => new Intl.DateTimeFormat('en-CA', { timeZone: ECO_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+function ecoDays() {
+  const today = new Date(bxDate(new Date()) + 'T12:00:00');
+  const add = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const monday = add(today, -((today.getDay() + 6) % 7));
+  switch (state.eco.range) {
+    case 'yesterday': return [iso(add(today, -1)), iso(add(today, -1))];
+    case 'tomorrow': return [iso(add(today, 1)), iso(add(today, 1))];
+    case 'week': return [iso(monday), iso(add(monday, 6))];
+    case 'nextweek': return [iso(add(monday, 7)), iso(add(monday, 13))];
+    default: return [iso(today), iso(today)];
+  }
+}
 function buildEcoFilters() {
   document.querySelectorAll('#ecoImp button').forEach(b => {
     b.classList.toggle('on', b.dataset.imp === state.eco.imp);
-    b.onclick = () => { state.eco.imp = b.dataset.imp; saveEco(); buildEcoFilters(); renderEco(); };
+    b.onclick = () => { state.eco.imp = b.dataset.imp; saveEco(); buildEcoFilters(); renderEco(true); };
+  });
+  document.querySelectorAll('#ecoRange button').forEach(b => {
+    b.classList.toggle('on', b.dataset.range === state.eco.range);
+    b.onclick = () => { state.eco.range = b.dataset.range; saveEco(); buildEcoFilters(); renderEco(true); };
   });
   const box = $('#ecoCountries'); box.innerHTML = '';
-  for (const [code, label] of ECO_COUNTRIES) {
-    const c = el('button', 'chip' + (state.eco.countries.includes(code) ? ' on' : ''), label); c.type = 'button';
+  for (const [code, flag, label] of ECO_COUNTRIES) {
+    const c = el('button', 'chip' + (state.eco.countries.includes(code) ? ' on' : ''), flag + ' ' + label); c.type = 'button';
     c.onclick = () => {
       const on = state.eco.countries.includes(code);
       if (on && state.eco.countries.length === 1) return; // au moins un pays
       state.eco.countries = on ? state.eco.countries.filter(x => x !== code) : state.eco.countries.concat(code);
-      saveEco(); buildEcoFilters(); renderEco();
+      saveEco(); buildEcoFilters(); renderEco(true);
     };
     box.appendChild(c);
   }
 }
-function renderEco() {
-  const key = state.eco.imp + '|' + state.eco.countries.slice().sort().join(',');
-  const box = $('#ecoBox');
-  if (ecoLoaded === key && box.querySelector('iframe')) return;
-  ecoLoaded = key;
-  box.innerHTML = '';
-  const msg = el('div', 'tv-msg', 'Chargement du calendrier…'); box.appendChild(msg);
-  const wrap = el('div', 'tradingview-widget-container');
-  const inner = el('div', 'tradingview-widget-container__widget');
-  const sc = document.createElement('script');
-  sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
-  sc.async = true;
-  sc.textContent = JSON.stringify({
-    colorTheme: 'dark', isTransparent: true, width: '100%', height: '100%', locale: 'fr',
-    importanceFilter: state.eco.imp, countryFilter: state.eco.countries.join(',')
+const ECO_INVERSE = /unemploy|jobless|claims|chômage|deficit|déficit/i; // une hausse est une mauvaise nouvelle
+function fmtEcoVal(v, ev) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v !== 'number') return String(v);
+  const dec = Math.abs(v) >= 100 || Number.isInteger(v) ? (Number.isInteger(v) ? 0 : 1) : (Math.abs(v) < 10 ? 2 : 1);
+  return v.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: Math.max(dec, 1) }) + (ev.scale || '') + (ev.unit || '');
+}
+async function renderEco(force) {
+  const body = $('#ecoBody'), id = ++ecoReq;
+  const [from, to] = ecoDays();
+  if (force || !body.children.length) body.innerHTML = '<tr class="empty"><td colspan="7">Chargement des annonces…</td></tr>';
+  let data;
+  try {
+    data = await api('/api/eco?from=' + from + '&to=' + to + '&countries=' + encodeURIComponent(state.eco.countries.join(',')));
+  } catch (e) {
+    if (id !== ecoReq) return;
+    body.innerHTML = '';
+    const tr = el('tr', 'empty'); const td = el('td', null, 'Impossible de récupérer les annonces : ' + e.message); td.colSpan = 7; tr.appendChild(td); body.appendChild(tr);
+    return;
+  }
+  if (id !== ecoReq) return;
+  const imps = state.eco.imp.split(',').map(Number);
+  const now = Date.now();
+  const evs = (data.events || []).map(ev => ({ ...ev, t: new Date(ev.date) }))
+    .filter(ev => !isNaN(ev.t) && imps.includes(ev.importance ?? -1) && bxDate(ev.t) >= from && bxDate(ev.t) <= to)
+    .sort((a, b) => a.t - b.t || (b.importance - a.importance));
+  body.innerHTML = '';
+  if (!evs.length) {
+    const tr = el('tr', 'empty'); const td = el('td', null, 'Aucune annonce pour ces filtres.'); td.colSpan = 7; tr.appendChild(td); body.appendChild(tr);
+  }
+  const nextIdx = evs.findIndex(ev => ev.t.getTime() >= now - 60000);
+  let lastDay = null;
+  evs.forEach((ev, i) => {
+    const day = bxDate(ev.t);
+    if (day !== lastDay) {
+      lastDay = day;
+      const tr = el('tr', 'eco-day'); const td = el('td'); td.colSpan = 7;
+      const lbl = ev.t.toLocaleDateString('fr-BE', { timeZone: ECO_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      td.textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
+      tr.appendChild(td); body.appendChild(tr);
+    }
+    const tr = el('tr', 'ev' + (ev.t.getTime() < now - 60000 ? ' past' : '') + (i === nextIdx ? ' next' : ''));
+    const allDay = ev.t.toLocaleTimeString('fr-BE', { timeZone: ECO_TZ, hour: '2-digit', minute: '2-digit' });
+    const c = ECO_COUNTRIES.find(x => x[0] === (ev.country || '').toUpperCase());
+    const tdT = el('td', 'c-time', allDay);
+    const tdC = el('td', 'c-cur'); const cur = el('span', 'cur'); cur.append((c ? c[1] : '🏳') + ' ', ev.currency || (c ? c[3] : ev.country || '')); tdC.appendChild(cur);
+    if (c) tdC.title = c[2];
+    const tdI = el('td', 'c-imp'); const lvl = ev.importance === 1 ? 3 : ev.importance === 0 ? 2 : 1;
+    const bl = el('span', 'bulls b' + lvl); bl.appendChild(document.createElement('i')); tdI.appendChild(bl);
+    tdI.title = ['Faible', 'Moyenne', 'Forte'][lvl - 1] + ' importance';
+    const tdE = el('td'); tdE.appendChild(el('span', 'ev-t', ev.title || ev.indicator || '—'));
+    if (ev.period) tdE.appendChild(el('span', 'ev-p', '(' + ev.period + ')'));
+    const tdA = el('td', 'c-val', fmtEcoVal(ev.actual, ev));
+    if (typeof ev.actual === 'number' && typeof ev.forecast === 'number' && ev.actual !== ev.forecast) {
+      const better = (ev.actual > ev.forecast) !== ECO_INVERSE.test(ev.title || '');
+      tdA.classList.add(better ? 'val-up' : 'val-down');
+    }
+    tr.append(tdT, tdC, tdI, tdE, tdA, el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), el('td', 'c-val', fmtEcoVal(ev.previous, ev)));
+    body.appendChild(tr);
   });
-  sc.onerror = () => { msg.textContent = 'Impossible de charger le calendrier : vérifie ta connexion internet.'; };
-  wrap.append(inner, sc); box.appendChild(wrap);
-  const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
-  setTimeout(() => clearInterval(t), 30000);
+  $('#ecoUpd').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');
+  // actualisation automatique tant que la page est ouverte (les valeurs « Actuel » arrivent en direct)
+  clearTimeout(ecoTimer);
+  ecoTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) renderEco(); }, 60000);
+  if (force && nextIdx > 0) { const r = body.querySelector('tr.next'); if (r) r.scrollIntoView({ block: 'center' }); }
 }
 function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
 buildEcoFilters();
