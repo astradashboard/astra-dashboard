@@ -1239,12 +1239,24 @@ def api_news():
                 if hit:
                     items.extend(hit["items"])
                 failed.append(i)
-    seen, out = set(), []
+    import re as _re
+    import unicodedata as _ud
+
+    def _key(t):
+        t = _ud.normalize("NFD", t.lower())
+        t = "".join(ch for ch in t if _ud.category(ch) != "Mn")
+        return " ".join(_re.findall(r"[a-z0-9]+", t)[:8])  # mêmes 8 premiers mots = même info
+
+    seen, out = {}, []
     for it in sorted(items, key=lambda x: x["date"] or "", reverse=True):
-        key = it["title"].lower()[:90]
+        key = _key(it["title"])
         if key in seen:
+            seen[key]["n"] = seen[key].get("n", 1) + 1
+            if not seen[key].get("image") and it.get("image"):
+                seen[key]["image"] = it["image"]
             continue
-        seen.add(key)
+        it = {**it, "n": 1}
+        seen[key] = it
         out.append(it)
     return jsonify({"items": out[:250], "failed": failed})
 

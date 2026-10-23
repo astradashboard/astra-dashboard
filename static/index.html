@@ -259,7 +259,52 @@
   .news-search input:focus { outline: none; border-color: var(--gold); }
   .news-search .ns-ic { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 15px; pointer-events: none; }
   .news-card mark { background: rgba(196,138,69,.3); color: inherit; border-radius: 3px; padding: 0 1px; }
-  .news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .news-grid { display: block; }
+  .news-lead { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .news-side { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; }
+  .news-row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+  .na { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; cursor: pointer; text-align: left; color: var(--fg); padding: 0; transition: border-color .15s, transform .15s, box-shadow .15s; min-width: 0; }
+  .na:hover { border-color: rgba(196,138,69,.6); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .na .vis { position: relative; flex: 0 0 auto; background-size: cover; background-position: center; }
+  .na .vis.ph { display: grid; place-items: center; }
+  .na .vis.ph span { font-size: 54px; opacity: .22; filter: grayscale(.2); }
+  .na .vis.us { background-image: linear-gradient(135deg, #1b2a4a 0%, #2b1d2e 100%); }
+  .na .vis.eu { background-image: linear-gradient(135deg, #14284a 0%, #2a2a14 100%); }
+  .na .vis.crypto { background-image: linear-gradient(135deg, #3a2410 0%, #1a1f2e 100%); }
+  .na .vis.search { background-image: linear-gradient(135deg, #242a38 0%, #1a1f2e 100%); }
+  .na .txt { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 7px; flex: 1; min-height: 0; }
+  .na .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .na .src { color: var(--gold); font-weight: 700; letter-spacing: .02em; }
+  .na .kicker { background: var(--gold); color: #0a0d14; font-weight: 800; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 4px; }
+  .na .ttl { font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .na .sum { color: #a9b1c1; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .na.lead .vis { height: 250px; }
+  .na.lead .vis.ph span { font-size: 110px; }
+  .na.lead .ttl { font-size: 24px; -webkit-line-clamp: 3; letter-spacing: -.01em; }
+  .na.lead .sum { font-size: 14px; -webkit-line-clamp: 3; }
+  .na.side { flex-direction: row; }
+  .na.side .vis { width: 38%; min-height: 100%; }
+  .na.side .ttl { font-size: 16px; -webkit-line-clamp: 4; }
+  .na.side .sum { display: none; }
+  .na.mid .vis { height: 130px; }
+  .na.mid .ttl { font-size: 15.5px; -webkit-line-clamp: 3; }
+  .na.mid .sum { font-size: 12.5px; -webkit-line-clamp: 2; }
+  .news-subhead { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; color: var(--muted); font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .1em; }
+  .news-subhead::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .news-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .nl { display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: start; padding: 11px 4px; border: none; border-bottom: 1px solid var(--line);
+    background: none; color: var(--fg); text-align: left; cursor: pointer; min-width: 0; }
+  .nl:hover .nl-t { color: var(--gold); }
+  .nl .nl-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .nl .nl-t { font-size: 14px; font-weight: 600; line-height: 1.4; transition: color .15s; }
+  .nl .nl-s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .nl .nl-s b { color: var(--gold); font-weight: 600; }
+  .news-info { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  @media (max-width: 1100px) { .news-lead { grid-template-columns: 1fr; } .news-row3 { grid-template-columns: 1fr 1fr; } .news-list { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .news-row3 { grid-template-columns: 1fr; } .na.lead .ttl { font-size: 20px; } }
   .news-card { display: flex; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
     cursor: pointer; text-align: left; color: var(--fg); transition: border-color .15s, transform .15s; min-width: 0; }
   .news-card:hover { border-color: rgba(196,138,69,.55); transform: translateY(-1px); }
@@ -2078,6 +2123,60 @@ function highlight(node, text, terms) {
   }
   node.replaceChildren(...parts);
 }
+// importance d'un article : sujets qui font bouger les marchés, fraîcheur, reprise par plusieurs médias
+const NEWS_WEIGHTS = [
+  [3, ['fed', 'reserve federale', 'powell', 'fomc', 'bce', 'lagarde', 'taux directeur', 'baisse des taux', 'hausse des taux', 'inflation', 'cpi', 'ipc',
+       'nfp', 'emplois', 'chomage', 'recession', 'pib', 'croissance', 'krach', 'effondre', 'plonge', 'flambe', 'record', 'historique',
+       'droits de douane', 'tarifs douaniers', 'faillite', 'banque centrale', 'shutdown', 'dette americaine', 'tresor', 'opep', 'etf bitcoin', 'sec ']],
+  [1.5, ['wall street', 'nasdaq', 'dow jones', 's&p', 'cac 40', 'dax', 'euro stoxx', 'dollar', 'euro', 'petrole', 'brent', 'or ', 'bitcoin',
+         'ethereum', 'crypto', 'resultats', 'bourse', 'marches', 'obligations', 'rendement', 'chine', 'trump', 'europe']],
+];
+function newsScore(it) {
+  const t = ' ' + norm(it.title + ' ' + (it.summary || '')) + ' ';
+  let sc = 0;
+  for (const [w, words] of NEWS_WEIGHTS) for (const k of words) if (t.includes(k)) { sc += w; if (sc > 9) break; }
+  const ageH = it.date ? (Date.now() - new Date(it.date)) / 3600000 : 48;
+  sc += 5 * Math.exp(-Math.max(0, ageH) / 10);   // un article récent compte plus
+  sc += Math.min(3, (it.n || 1) - 1) * 1.5;       // repris par plusieurs médias
+  if (it.image) sc += .6;
+  return sc;
+}
+const THEME_ICON = { us: '🇺🇸', eu: '🇪🇺', crypto: '₿', search: '📰' };
+function newsVisual(it, cls) {
+  const v = el('div', 'vis ' + (it.tag || 'search'));
+  if (it.image) {
+    v.style.backgroundImage = 'url("' + it.image.replace(/["\\]/g, '') + '")';
+    const probe = new Image(); probe.referrerPolicy = 'no-referrer';
+    probe.onerror = () => { v.style.backgroundImage = ''; v.classList.add('ph'); v.appendChild(el('span', null, THEME_ICON[it.tag] || '📰')); };
+    probe.src = it.image;
+  } else { v.classList.add('ph'); v.appendChild(el('span', null, THEME_ICON[it.tag] || '📰')); }
+  return v;
+}
+const openArticle = it => { if (/^https?:\/\//.test(it.link)) window.open(it.link, '_blank', 'noopener'); };
+function newsCard(it, kind, terms, kicker) {
+  const c = el('button', 'na ' + kind); c.type = 'button'; c.title = 'Lire l\'article';
+  c.appendChild(newsVisual(it));
+  const tx = el('div', 'txt');
+  const meta = el('div', 'meta');
+  if (kicker) meta.appendChild(el('span', 'kicker', kicker));
+  meta.append(el('span', 'src', it.source));
+  if (it.date) meta.append(el('span', null, timeAgo(new Date(it.date))));
+  const ttl = el('div', 'ttl'); highlight(ttl, it.title, terms);
+  tx.append(meta, ttl);
+  if (it.summary) { const sm = el('div', 'sum'); highlight(sm, it.summary, terms); tx.appendChild(sm); }
+  c.appendChild(tx); c.onclick = () => openArticle(it);
+  return c;
+}
+function newsLine(it, terms) {
+  const r = el('button', 'nl'); r.type = 'button'; r.title = 'Lire l\'article';
+  const d = it.date ? new Date(it.date) : null;
+  const sameDay = d && d.toDateString() === new Date().toDateString();
+  r.appendChild(el('div', 'nl-time', d ? (sameDay ? d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' })) : ''));
+  const b = el('div'); const t = el('div', 'nl-t'); highlight(t, it.title, terms);
+  const sub = el('div', 'nl-s'); sub.appendChild(el('b', null, it.source)); if (d) sub.append(' · ' + timeAgo(d));
+  b.append(t, sub); r.appendChild(b); r.onclick = () => openArticle(it);
+  return r;
+}
 function renderNews() {
   const grid = $('#newsGrid'); grid.innerHTML = '';
   const q = $('#newsSearch').value, terms = searchTerms(q);
@@ -2086,31 +2185,38 @@ function renderNews() {
     const local = newsItems.filter(it => matches(it, terms));
     const seen = new Set(local.map(it => norm(it.title).slice(0, 80)));
     const remote = (newsSearch.q === q.trim() ? newsSearch.items : []).filter(it => !seen.has(norm(it.title).slice(0, 80)));
-    found = local.concat(remote).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    found = local.concat(remote);
   } else {
     found = newsItems.filter(it => state.news.themes.includes(it.tag));
   }
-  const list = found.slice(0, state.news.shown);
-  if (!list.length) grid.appendChild(el('div', 'news-empty', q.trim()
-    ? (newsSearch.loading ? 'Recherche dans Google Actualités…' : 'Aucun article récent sur « ' + q.trim() + ' ».' + (newsSearch.error ? ' (' + newsSearch.error + ')' : ''))
-    : 'Aucun article pour ces thèmes pour le moment.'));
-  else if (terms.length) { const info = el('div', null, found.length + ' article' + (found.length > 1 ? 's' : '') + ' sur « ' + q.trim() + ' »'); info.style.cssText = 'grid-column:1/-1;color:var(--muted);font-size:13px'; grid.appendChild(info); }
-  for (const it of list) {
-    const card = el('button', 'news-card'); card.type = 'button'; card.title = 'Ouvrir l\'article';
-    const bodyEl = el('div', 'nc-body');
-    const meta = el('div', 'nc-meta'); meta.append(el('span', 'nc-src', it.source));
-    if (it.date) meta.append(el('span', null, '· ' + timeAgo(new Date(it.date))));
-    const tEl = el('div', 'nc-title'); highlight(tEl, it.title, terms); bodyEl.append(meta, tEl);
-    if (it.summary) { const sEl = el('div', 'nc-sum'); highlight(sEl, it.summary, terms); bodyEl.append(sEl); }
-    card.appendChild(bodyEl);
-    if (it.image) {
-      const img = document.createElement('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
-      img.onerror = () => img.remove(); card.appendChild(img);
-    }
-    card.onclick = () => { if (/^https?:\/\//.test(it.link)) window.open(it.link, '_blank', 'noopener'); };
-    grid.appendChild(card);
+  found = found.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!found.length) {
+    grid.appendChild(el('div', 'news-empty', q.trim()
+      ? (newsSearch.loading ? 'Recherche dans Google Actualités…' : 'Aucun article récent sur « ' + q.trim() + ' ».' + (newsSearch.error ? ' (' + newsSearch.error + ')' : ''))
+      : 'Aucun article pour ces thèmes pour le moment.'));
+    $('#newsMore').hidden = true; return;
   }
-  $('#newsMore').hidden = found.length <= state.news.shown;
+  if (terms.length) grid.appendChild(el('div', 'news-info', found.length + ' article' + (found.length > 1 ? 's' : '') + ' sur « ' + q.trim() + ' »' + (newsSearch.loading ? ' · recherche en cours…' : '')));
+  // à la une : les plus importants des dernières 36 heures
+  const recent = found.filter(it => !it.date || Date.now() - new Date(it.date) < 36 * 3600000);
+  const pool = (recent.length >= 6 ? recent : found).map(it => [newsScore(it), it]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
+  const top = pool.slice(0, 6), topSet = new Set(top);
+  const rest = found.filter(it => !topSet.has(it));
+  if (top.length) {
+    const lead = el('div', 'news-lead');
+    lead.appendChild(newsCard(top[0], 'lead', terms, 'À la une'));
+    if (top.length > 1) { const side = el('div', 'news-side'); top.slice(1, 3).forEach(it => side.appendChild(newsCard(it, 'side', terms))); lead.appendChild(side); }
+    else lead.style.gridTemplateColumns = '1fr';
+    grid.appendChild(lead);
+  }
+  if (top.length > 3) { const row = el('div', 'news-row3'); top.slice(3, 6).forEach(it => row.appendChild(newsCard(it, 'mid', terms))); grid.appendChild(row); }
+  if (rest.length) {
+    grid.appendChild(el('div', 'news-subhead', 'Toutes les actualités'));
+    const list = el('div', 'news-list');
+    rest.slice(0, state.news.shown).forEach(it => list.appendChild(newsLine(it, terms)));
+    grid.appendChild(list);
+  }
+  $('#newsMore').hidden = rest.length <= state.news.shown;
 }
 async function loadNews(force) {
   if (!force && Date.now() - newsLoadedAt < 5 * 60000 && newsItems.length) { renderNews(); return; }
