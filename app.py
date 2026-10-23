@@ -578,6 +578,12 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    if isinstance(body.get("eco"), dict):
+        eco = body["eco"]
+        imp = str(eco.get("imp", "0,1"))
+        countries = [str(c)[:2] for c in (eco.get("countries") or []) if isinstance(c, str)][:20]
+        if imp in ("-1,0,1", "0,1", "1") and countries:
+            prefs["eco"] = {"imp": imp, "countries": countries}
     if body.get("tvCount") in (1, 2, 3, 4):
         prefs["tvCount"] = body["tvCount"]
     if isinstance(body.get("tv"), list):

@@ -197,6 +197,19 @@
   .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
   @media (max-width: 1100px) { .tv-grid { grid-template-columns: 1fr; } }
   @media (max-width: 860px) { .tv-box { height: 360px; } }
+  .eco-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .eco-head h1 { margin: 0; font-size: 22px; font-weight: 650; }
+  .eco-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { background: none; border: none; color: var(--muted); padding: 7px 12px; border-radius: 8px; font-size: 13px; }
+  .seg button:hover { color: var(--fg); }
+  .seg button.on { background: var(--gold-soft); color: var(--gold); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+  .chip:hover { color: var(--fg); }
+  .chip.on { border-color: rgba(196,138,69,.6); color: var(--fg); background: var(--gold-soft); }
+  .eco-box { position: relative; height: calc(100vh - 230px); min-height: 520px; padding: 6px; overflow: hidden; }
+  .eco-box .tradingview-widget-container, .eco-box .tradingview-widget-container__widget { height: 100%; width: 100%; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -306,6 +319,7 @@
         <button class="sub-add" id="addBtn">+ Ajouter un compte</button>
       </div>
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span></button>
+      <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span></button>
     </nav>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
@@ -412,6 +426,24 @@
     </div>
 
     <div id="journal" hidden></div>
+
+    <div id="eco" hidden>
+      <div class="eco-head">
+        <div>
+          <h1>Calendrier économique</h1>
+          <p>Annonces économiques à l'heure de Bruxelles · données TradingView</p>
+        </div>
+        <div class="eco-filters">
+          <div class="seg" id="ecoImp" title="Importance des annonces">
+            <button type="button" data-imp="-1,0,1">Toutes</button>
+            <button type="button" data-imp="0,1">Moyennes et fortes</button>
+            <button type="button" data-imp="1">Fortes uniquement</button>
+          </div>
+        </div>
+      </div>
+      <div class="chips" id="ecoCountries"></div>
+      <div class="card eco-box" id="ecoBox"></div>
+    </div>
 
     <div class="empty-state" id="emptyState" hidden>
       <img class="hero-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
@@ -1094,6 +1126,10 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
   else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
   if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
+  if (p.eco && p.eco.imp && Array.isArray(p.eco.countries) && p.eco.countries.length) {
+    state.eco = { imp: p.eco.imp, countries: p.eco.countries }; buildEcoFilters();
+    if (state.page === 'eco') renderEco();
+  }
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
 
@@ -1344,7 +1380,11 @@ function showPage() {
   const hasAcc = state.accounts.length > 0;
   $('#content').hidden = !hasAcc || state.page !== 'dash';
   $('#journal').hidden = !hasAcc || state.page !== 'journal';
+  $('#eco').hidden = state.page !== 'eco';
+  document.querySelector('header.top').style.display = state.page === 'eco' ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || state.page === 'eco';
   if (state.page === 'journal' && hasAcc) renderJournal();
+  if (state.page === 'eco') renderEco();
 }
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
@@ -1683,6 +1723,55 @@ document.querySelectorAll('#tvCount .btn').forEach(b => b.onclick = () => {
 });
 function saveTv() { api('/api/prefs', { tv: state.tv }).catch(() => {}); }
 buildTvGrid();
+
+// ---------- calendrier économique ----------
+const ECO_COUNTRIES = [
+  ['us', '🇺🇸 États-Unis'], ['eu', '🇪🇺 Zone euro'], ['de', '🇩🇪 Allemagne'], ['fr', '🇫🇷 France'], ['gb', '🇬🇧 Royaume-Uni'],
+  ['it', '🇮🇹 Italie'], ['es', '🇪🇸 Espagne'], ['ch', '🇨🇭 Suisse'], ['jp', '🇯🇵 Japon'], ['cn', '🇨🇳 Chine'],
+  ['ca', '🇨🇦 Canada'], ['au', '🇦🇺 Australie'], ['nz', '🇳🇿 Nouvelle-Zélande'],
+];
+state.eco = { imp: '0,1', countries: ['us', 'eu', 'de', 'fr', 'gb', 'ch', 'jp', 'cn'] };
+let ecoLoaded = null;
+function buildEcoFilters() {
+  document.querySelectorAll('#ecoImp button').forEach(b => {
+    b.classList.toggle('on', b.dataset.imp === state.eco.imp);
+    b.onclick = () => { state.eco.imp = b.dataset.imp; saveEco(); buildEcoFilters(); renderEco(); };
+  });
+  const box = $('#ecoCountries'); box.innerHTML = '';
+  for (const [code, label] of ECO_COUNTRIES) {
+    const c = el('button', 'chip' + (state.eco.countries.includes(code) ? ' on' : ''), label); c.type = 'button';
+    c.onclick = () => {
+      const on = state.eco.countries.includes(code);
+      if (on && state.eco.countries.length === 1) return; // au moins un pays
+      state.eco.countries = on ? state.eco.countries.filter(x => x !== code) : state.eco.countries.concat(code);
+      saveEco(); buildEcoFilters(); renderEco();
+    };
+    box.appendChild(c);
+  }
+}
+function renderEco() {
+  const key = state.eco.imp + '|' + state.eco.countries.slice().sort().join(',');
+  const box = $('#ecoBox');
+  if (ecoLoaded === key && box.querySelector('iframe')) return;
+  ecoLoaded = key;
+  box.innerHTML = '';
+  const msg = el('div', 'tv-msg', 'Chargement du calendrier…'); box.appendChild(msg);
+  const wrap = el('div', 'tradingview-widget-container');
+  const inner = el('div', 'tradingview-widget-container__widget');
+  const sc = document.createElement('script');
+  sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+  sc.async = true;
+  sc.textContent = JSON.stringify({
+    colorTheme: 'dark', isTransparent: true, width: '100%', height: '100%', locale: 'fr',
+    importanceFilter: state.eco.imp, countryFilter: state.eco.countries.join(',')
+  });
+  sc.onerror = () => { msg.textContent = 'Impossible de charger le calendrier : vérifie ta connexion internet.'; };
+  wrap.append(inner, sc); box.appendChild(wrap);
+  const t = setInterval(() => { if (box.querySelector('iframe')) { msg.remove(); clearInterval(t); } }, 300);
+  setTimeout(() => clearInterval(t), 30000);
+}
+function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
+buildEcoFilters();
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
