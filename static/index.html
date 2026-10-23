@@ -471,6 +471,58 @@
   .week .p { font-weight: 650; }
   .notice { background: var(--gold-soft); border: 1px solid rgba(196,138,69,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
   .notice.error { background: var(--loss-soft); border-color: rgba(239,68,68,.4); }
+  /* ---------- page Nos offres ---------- */
+  #offres { max-width: 980px; margin: 0 auto; padding: 8px 0 40px; }
+  .of-head { text-align: center; margin: 6px 0 30px; }
+  .of-logo { width: 120px; display: block; margin: 0 auto 10px; }
+  .of-head h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+  .of-head p { margin: 8px auto 0; color: var(--muted); font-size: 15px; max-width: 560px; }
+  .of-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: stretch; }
+  .of-plan { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 28px 28px 24px; display: flex; flex-direction: column; }
+  .of-plan.best { border-color: rgba(196,138,69,.75); background: linear-gradient(180deg, rgba(196,138,69,.10), var(--panel) 45%); box-shadow: 0 18px 50px rgba(196,138,69,.10); }
+  .of-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--gold); color: #0a0d14; font-size: 11.5px; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
+  .of-plan h2 { margin: 0; font-size: 20px; }
+  .of-plan .of-acc { color: var(--gold); font-size: 13.5px; font-weight: 600; margin-top: 4px; }
+  .of-price { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 4px; }
+  .of-price b { font-size: 44px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .of-price span { color: var(--muted); font-size: 14px; }
+  .of-plan ul { list-style: none; padding: 0; margin: 18px 0 24px; display: grid; gap: 11px; flex: 1; align-content: start; }
+  .of-plan li { display: flex; gap: 10px; font-size: 14px; line-height: 1.4; }
+  .of-plan li::before { content: '✓'; flex: none; width: 19px; height: 19px; border-radius: 50%; background: var(--gold-soft); color: var(--gold);
+    font-size: 11px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+  .of-plan .btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 650; border-radius: 11px; }
+  .of-plan .btn[disabled] { opacity: .55; cursor: default; }
+  .of-plan.current { border-color: var(--win); }
+  .of-trust { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin: 22px 0 28px; }
+  .of-trust b { color: var(--fg); font-weight: 600; }
+  .of-key { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: center; padding: 22px 24px; }
+  .of-key h3 { margin: 0 0 4px; font-size: 16px; }
+  .of-key p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .of-key-form { display: flex; gap: 10px; }
+  .of-key-form input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 11px 12px;
+    font: inherit; font-size: 13.5px; font-family: ui-monospace, Consolas, monospace; }
+  .of-key-form input:focus { outline: none; border-color: var(--gold); }
+  .of-key-err { grid-column: 1 / -1; color: var(--loss); font-size: 13px; }
+  .of-key-err:empty { display: none; }
+  .of-active { background: var(--panel); border: 1px solid rgba(34,197,94,.45); border-radius: 16px; padding: 18px 22px; margin-bottom: 26px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .of-active[hidden] { display: none; }
+  .of-active .st { width: 40px; height: 40px; border-radius: 50%; background: rgba(34,197,94,.14); color: var(--win); display: grid; place-items: center; font-weight: 800; font-size: 18px; flex: none; }
+  .of-active .tx { flex: 1; min-width: 220px; }
+  .of-active .tx b { font-size: 15.5px; }
+  .of-active .tx div { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .of-active .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .of-active.warn { border-color: rgba(239,68,68,.5); }
+  .of-active.warn .st { background: rgba(239,68,68,.14); color: var(--loss); }
+  @media (max-width: 860px) { .of-plans, .of-key { grid-template-columns: 1fr; } }
+  /* application verrouillée sans abonnement */
+  .nav button .lock { margin-left: auto; opacity: .7; display: none; }
+  body.locked .nav button:not(.nav-offres) { opacity: .45; }
+  body.locked .nav button:not(.nav-offres) .lock { display: inline-flex; }
+  body.locked .nav button:not(.nav-offres) .chev { display: none; }
+  body.locked #accSub, body.locked #removeBtn { display: none !important; }
+  .nav-offres .ic { color: var(--gold); }
   .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty-state h2 { color: var(--fg); margin-bottom: 6px; }
   /* modale de connexion */
@@ -532,14 +584,15 @@
       <div><b>ASTRA CAPITAL</b><span>Dashboard des comptes</span></div>
     </div>
     <nav class="nav" id="nav">
-      <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="chev" id="accToggle" title="Afficher / masquer les comptes">▾</span></button>
+      <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="chev" id="accToggle" title="Afficher / masquer les comptes">▾</span></button>
       <div class="sub" id="accSub">
         <div class="acc-list" id="accList"></div>
         <button class="sub-add" id="addBtn">+ Ajouter un compte</button>
         <button class="sub-add sub-mask" id="maskBtn" title="Masquer ou afficher les numéros de compte (pratique pour les captures et les vidéos)">👁 Masquer les n° de compte</button>
       </div>
-      <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span></button>
-      <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span></button>
+      <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
+      <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
+      <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Nos offres</span></button>
     </nav>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
@@ -733,6 +786,32 @@
       <div class="news-more"><button type="button" class="btn" id="newsMore" hidden>Afficher plus d'articles</button></div>
     </div>
 
+    <div id="offres" hidden>
+      <div class="of-head">
+        <img class="of-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
+        <h1>Nos offres</h1>
+        <p>Ton dashboard de trading complet : capital, résultats, journal, suivi en direct et calendrier économique.</p>
+      </div>
+      <div class="of-active" id="ofActive" hidden></div>
+      <div class="of-plans" id="ofPlans"></div>
+      <div class="of-trust">
+        <span><b>Sans engagement</b> · résiliable à tout moment</span>
+        <span><b>Paiement sécurisé</b> par carte, Apple Pay ou PayPal</span>
+        <span><b>Accès immédiat</b> : ta clé arrive par e-mail</span>
+      </div>
+      <div class="card of-key" id="ofKeyBox">
+        <div>
+          <h3>Déjà abonné ?</h3>
+          <p>Colle ici la clé de licence reçue par e-mail après ton achat pour débloquer l'application sur ce PC.</p>
+        </div>
+        <form class="of-key-form" id="ofKeyForm">
+          <input id="ofKey" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" autocomplete="off" spellcheck="false">
+          <button class="btn primary" type="submit" id="ofKeyBtn">Activer</button>
+        </form>
+        <div class="of-key-err" id="ofKeyErr"></div>
+      </div>
+    </div>
+
     <div class="empty-state" id="emptyState" hidden>
       <img class="hero-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
       <h2>Aucun compte connecté</h2>
@@ -857,6 +936,7 @@ async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   const r = await fetch(path, opts);
   const j = await r.json().catch(() => ({}));
+  if (r.status === 402 && j.licence === false && typeof licenceLost === 'function') licenceLost();
   if (!r.ok) throw new Error(j.error || 'Erreur inattendue');
   return j;
 }
@@ -1699,7 +1779,97 @@ $('#refreshBtn').onclick = async () => {
 };
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
-loadState().catch(e => notice(e.message, true));
+// ---------- abonnement : page « Nos offres » et verrouillage ----------
+state.lic = null; let offresData = null;
+const licOk = () => !!(state.lic && state.lic.active);
+function applyLock() { document.body.classList.toggle('locked', !licOk()); }
+function licenceLost() {
+  if (state.lic && !state.lic.active) return;
+  state.lic = Object.assign({}, state.lic || {}, { active: false });
+  applyLock(); state.page = 'offres'; showPage();
+}
+const fmtLicDay = iso => { try { return new Date(iso).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+async function renderOffres() {
+  if (!offresData) { try { offresData = await api('/api/offres'); } catch (e) { offresData = { plans: [] }; } }
+  const lic = state.lic || {};
+  // abonnement en cours
+  const box = $('#ofActive'); box.innerHTML = ''; box.className = 'of-active';
+  if (lic.key_hint) {
+    box.hidden = false;
+    if (!lic.active) box.classList.add('warn');
+    const tx = el('div', 'tx');
+    tx.appendChild(el('b', null, lic.active ? (lic.owner ? 'Accès propriétaire' : 'Abonnement ' + (lic.plan_name || '') + ' actif') : 'Abonnement inactif'));
+    const parts = [];
+    if (lic.owner) parts.push('Accès illimité, tous les comptes');
+    else if (lic.max_accounts) parts.push(lic.max_accounts + ' compte' + (lic.max_accounts > 1 ? 's' : '') + ' maximum (' + (lic.real_accounts || 0) + ' connecté' + ((lic.real_accounts || 0) > 1 ? 's' : '') + ')');
+    if (lic.email) parts.push(lic.email);
+    if (lic.renews_at && !lic.owner) parts.push((lic.active ? 'valable jusqu\'au ' : 'expiré le ') + fmtLicDay(lic.renews_at));
+    parts.push('clé ' + lic.key_hint);
+    if (lic.offline && lic.active) parts.push('vérifié hors ligne');
+    tx.appendChild(el('div', null, parts.join(' · ')));
+    if (lic.error) tx.appendChild(el('div', null, lic.error));
+    const acts = el('div', 'acts');
+    if (!lic.owner && offresData.portal_url) {
+      const g = el('button', 'btn', 'Gérer mon abonnement'); g.type = 'button'; g.onclick = () => openPay(offresData.portal_url); acts.appendChild(g);
+    }
+    const v = el('button', 'btn', 'Vérifier'); v.type = 'button';
+    v.onclick = async () => { v.disabled = true; await refreshLicence(true); v.disabled = false; toast(licOk() ? 'Abonnement vérifié.' : 'Abonnement inactif.'); };
+    const rm = el('button', 'btn ghost danger', 'Retirer de ce PC'); rm.type = 'button';
+    rm.onclick = async () => {
+      if (!confirmRemoveLic) { confirmRemoveLic = true; rm.textContent = 'Confirmer ?'; setTimeout(() => { confirmRemoveLic = false; rm.textContent = 'Retirer de ce PC'; }, 3000); return; }
+      await api('/api/licence/remove', {}); confirmRemoveLic = false; await refreshLicence(); toast('Licence retirée de ce PC.');
+    };
+    acts.append(v, rm);
+    box.append(el('div', 'st', lic.active ? '✓' : '!'), tx, acts);
+  } else box.hidden = true;
+  $('#ofKeyBox').hidden = !!lic.active;
+  // les offres
+  const wrap = $('#ofPlans'); wrap.innerHTML = '';
+  const plans = offresData.plans || [];
+  plans.forEach((p, i) => {
+    const best = !!p.badge;
+    const c = el('div', 'of-plan' + (best ? ' best' : '') + (lic.active && lic.plan === p.id ? ' current' : ''));
+    if (p.badge) c.appendChild(el('div', 'of-badge', p.badge));
+    c.appendChild(el('h2', null, p.name));
+    c.appendChild(el('div', 'of-acc', p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
+    const pr = el('div', 'of-price'); pr.append(el('b', null, p.price), el('span', null, p.period || 'par mois')); c.appendChild(pr);
+    const ul = el('ul'); (p.features || []).forEach(f => ul.appendChild(el('li', null, f))); c.appendChild(ul);
+    let label = 'S\'abonner', dis = false;
+    if (lic.active && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
+    else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
+    else if (!p.checkout_url) { label = 'Bientôt disponible'; dis = true; }
+    else if (lic.active) label = 'Changer pour cette offre';
+    const b = el('button', 'btn' + (best || plans.length === 1 ? ' primary' : ''), label); b.type = 'button'; b.disabled = dis;
+    b.onclick = () => openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url);
+    c.appendChild(b); wrap.appendChild(c);
+  });
+}
+let confirmRemoveLic = false;
+async function openPay(url) {
+  try { await api('/api/open-url', { url }); toast('La page de paiement s\'ouvre dans ton navigateur. Ta clé arrive ensuite par e-mail.'); }
+  catch (e) { window.open(url, '_blank', 'noopener'); }
+}
+async function refreshLicence(force) {
+  const was = licOk();
+  try { state.lic = await api('/api/licence' + (force ? '?verifier=1' : '')); } catch (e) { state.lic = state.lic || { active: false }; }
+  applyLock();
+  if (licOk() && !was) { state.page = 'dash'; await loadState(); }
+  else if (!licOk()) { state.page = 'offres'; showPage(); }
+  else if (state.page === 'offres') renderOffres();
+}
+$('#ofKeyForm').onsubmit = async e => {
+  e.preventDefault();
+  const key = $('#ofKey').value.trim(), btn = $('#ofKeyBtn'); $('#ofKeyErr').textContent = '';
+  if (!key) { $('#ofKeyErr').textContent = 'Colle ta clé de licence.'; return; }
+  btn.disabled = true; btn.textContent = 'Vérification…';
+  try {
+    await api('/api/licence', { key }); $('#ofKey').value = '';
+    await refreshLicence(); toast('Application débloquée, bienvenue !');
+  } catch (err) { $('#ofKeyErr').textContent = err.message; }
+  btn.disabled = false; btn.textContent = 'Activer';
+};
+setInterval(() => refreshLicence(), 30 * 60 * 1000); // revérification régulière
+refreshLicence().catch(e => notice(e.message, true));
 // ---------- navigation entre les pages ----------
 state.page = 'dash'; state.jTrade = null; state.jMonth = 'all'; state.jFilter = 'all';
 function showPage() {
@@ -1709,13 +1879,17 @@ function showPage() {
   $('#content').hidden = !hasAcc || state.page !== 'dash';
   $('#journal').hidden = !hasAcc || state.page !== 'journal';
   $('#eco').hidden = state.page !== 'eco';
-  document.querySelector('header.top').style.display = state.page === 'eco' ? 'none' : '';
-  $('#emptyState').hidden = hasAcc || state.page === 'eco';
+  $('#offres').hidden = state.page !== 'offres';
+  if (state.page === 'offres') { $('#content').hidden = true; $('#journal').hidden = true; }
+  document.querySelector('header.top').style.display = state.page === 'eco' || state.page === 'offres' ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || state.page === 'eco' || state.page === 'offres';
+  if (state.page === 'offres') renderOffres();
   if (state.page === 'journal' && hasAcc) renderJournal();
   if (state.page === 'eco') { renderEco(true); loadNews(); }
 }
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
+  if (!licOk() && b.dataset.page !== 'offres') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
   state.page = b.dataset.page; state.jTrade = null;
   if (state.page === 'journal' && state.sel === 'all' && state.accounts.length) {
     state.sel = state.accounts[0].login; state.month = null; state.view = null; renderAccounts(); loadData();

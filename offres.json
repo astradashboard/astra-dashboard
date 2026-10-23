@@ -1,0 +1,41 @@
+{
+  "_aide": "Configuration des offres. Remplis store_id, variant_id et checkout_url avec les valeurs de ton tableau de bord Lemon Squeezy.",
+  "store_id": null,
+  "portal_url": "https://app.lemonsqueezy.com/my-orders",
+  "plans": [
+    {
+      "id": "essentiel",
+      "name": "Essentiel",
+      "price": "19,95 €",
+      "period": "par mois",
+      "accounts": 1,
+      "variant_id": null,
+      "checkout_url": "",
+      "features": [
+        "1 compte de trading connecté (FTMO ou autre prop firm)",
+        "Tableau de bord, capital et calendrier des résultats",
+        "Suivi en direct des trades en cours",
+        "Journal de trading et rapport PDF mensuel",
+        "Calendrier économique et actualités",
+        "Graphiques TradingView et cours des marchés",
+        "Mises à jour automatiques"
+      ]
+    },
+    {
+      "id": "duo",
+      "name": "Duo",
+      "price": "24,95 €",
+      "period": "par mois",
+      "accounts": 2,
+      "badge": "Le plus complet",
+      "variant_id": null,
+      "checkout_url": "",
+      "features": [
+        "Jusqu'à 2 comptes de trading connectés",
+        "Vue « Tous les comptes » cumulée",
+        "Tout ce qui est inclus dans l'offre Essentiel",
+        "Mises à jour automatiques"
+      ]
+    }
+  ]
+}

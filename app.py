@@ -1671,6 +1671,226 @@ def static_files(name):
     return send_from_directory(STATIC_DIR, name)
 
 
+# ---------------------------------------------------------------- licence (abonnement Lemon Squeezy)
+LICENCE_FILE = os.path.join(DATA_DIR, "licence.json")
+OWNER_KEYS = {"20c8f1e472984770c44f9a0ea7ae360e8d577a460fb38a3e64426e804668d303"}  # empreintes SHA-256 des clés propriétaire
+LS_API = "https://api.lemonsqueezy.com/v1/licenses/"
+LIC_RECHECK = 6 * 3600      # on revérifie l'abonnement toutes les 6 h
+LIC_GRACE = 3 * 86400       # sans internet, l'accès reste ouvert 3 jours après la dernière vérification réussie
+_lic_lock = threading.Lock()
+
+
+def load_offers():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "offres.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"plans": []}
+
+
+def _owner_key(key):
+    import hashlib
+    return hashlib.sha256(key.strip().encode()).hexdigest() in OWNER_KEYS
+
+
+def _ls_call(action, **fields):
+    """Appel à l'API des licences Lemon Squeezy (aucune clé API nécessaire)."""
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlencode
+
+    req = urllib.request.Request(LS_API + action, data=urlencode(fields).encode(), headers={
+        "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "ASTRA-Dashboard"})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:  # Lemon Squeezy répond 400/404 avec un message d'erreur en JSON
+        try:
+            return json.loads(e.read().decode("utf-8"))
+        except Exception:
+            raise ConnectionError(f"Lemon Squeezy HTTP {e.code}")
+
+
+def _plan_from_meta(meta):
+    offers = load_offers()
+    plans = offers.get("plans") or []
+    vid = meta.get("variant_id")
+    for p in plans:
+        if p.get("variant_id") and str(p["variant_id"]) == str(vid):
+            return p
+    name = (str(meta.get("variant_name", "")) + " " + str(meta.get("product_name", ""))).lower()
+    for p in sorted(plans, key=lambda x: -int(x.get("accounts", 1))):  # repli : d'après le nom de l'offre
+        if p.get("name", "").lower() in name or (int(p.get("accounts", 1)) >= 2 and ("duo" in name or "2 comptes" in name)):
+            return p
+    return min(plans, key=lambda x: int(x.get("accounts", 1))) if plans else {"id": "essentiel", "name": "Essentiel", "accounts": 1}
+
+
+def _store_ok(meta):
+    want = load_offers().get("store_id")
+    return not want or str(meta.get("store_id")) == str(want)
+
+
+def _lic_public(lic):
+    if not lic or not lic.get("key"):
+        return {"active": False, "status": "none"}
+    k = lic["key"]
+    hint = k[:4] + "…" + k[-4:] if len(k) > 10 else "…"
+    return {"active": bool(lic.get("active")), "status": lic.get("status"), "owner": bool(lic.get("owner")),
+            "plan": lic.get("plan"), "plan_name": lic.get("plan_name"), "max_accounts": lic.get("max_accounts"),
+            "email": lic.get("email"), "renews_at": lic.get("expires_at"), "key_hint": hint,
+            "checked_at": lic.get("checked_at"), "offline": bool(lic.get("offline")), "error": lic.get("error")}
+
+
+def licence(force=False):
+    """État de la licence de ce PC (revérifiée en ligne de temps en temps)."""
+    import time
+
+    with _lic_lock:
+        lic = _load(LICENCE_FILE, {})
+        if not lic.get("key"):
+            return {}
+        if lic.get("owner"):
+            lic["active"] = _owner_key(lic["key"])
+            return lic
+        now = time.time()
+        if not force and lic.get("active") and now - lic.get("last_ok", 0) < LIC_RECHECK:
+            return lic
+        if not force and now - lic.get("last_try", 0) < 60:
+            return lic  # pas plus d'une vérification par minute
+        lic["last_try"] = now
+        try:
+            r = _ls_call("validate", license_key=lic["key"], instance_id=lic.get("instance_id", ""))
+        except Exception:
+            lic["offline"] = True
+            lic["active"] = now - lic.get("last_ok", 0) < LIC_GRACE
+            lic["error"] = None if lic["active"] else "Impossible de vérifier ton abonnement (pas d'internet depuis plus de 3 jours)."
+            _save(LICENCE_FILE, lic)
+            return lic
+        lk, meta = r.get("license_key") or {}, r.get("meta") or {}
+        status = lk.get("status") or ("active" if r.get("valid") else "invalid")
+        ok = bool(r.get("valid")) and status == "active" and _store_ok(meta)
+        lic.update(offline=False, status=status, checked_at=dt.datetime.now().isoformat(timespec="seconds"),
+                   expires_at=lk.get("expires_at"), email=meta.get("customer_email") or lic.get("email"))
+        if meta:
+            plan = _plan_from_meta(meta)
+            lic.update(plan=plan.get("id"), plan_name=plan.get("name"), max_accounts=int(plan.get("accounts", 1)))
+        lic["active"] = ok
+        lic["error"] = None if ok else {"expired": "Ton abonnement a expiré.", "disabled": "Cette clé a été désactivée.",
+                                        "inactive": "Cette clé n'est plus active sur ce PC."}.get(status, r.get("error") or "Clé invalide.")
+        if ok:
+            lic["last_ok"] = now
+        _save(LICENCE_FILE, lic)
+        return lic
+
+
+def licence_active():
+    try:
+        return bool(licence().get("active"))
+    except Exception:
+        return False
+
+
+def max_accounts():
+    lic = licence()
+    if lic.get("owner"):
+        return None  # illimité
+    return int(lic.get("max_accounts") or 1)
+
+
+_OPEN_PATHS = ("/api/licence", "/api/offres", "/api/open-url", "/api/version", "/api/update", "/api/ping", "/api/bye",
+               "/api/quit", "/api/prefs", "/static/", "/favicon.png")
+
+
+@app.before_request
+def _paywall():
+    p = request.path
+    if p == "/" or p.startswith(_OPEN_PATHS):
+        return None
+    if not licence_active():
+        return jsonify({"error": "Abonnement requis : choisis une offre dans « Nos offres ».", "licence": False}), 402
+    return None
+
+
+@app.get("/api/offres")
+def api_offres():
+    o = load_offers()
+    return jsonify({"plans": [{k: v for k, v in p.items() if k != "variant_id"} for p in o.get("plans", [])],
+                    "portal_url": o.get("portal_url")})
+
+
+@app.get("/api/licence")
+def api_licence():
+    lic = licence(force=bool(request.args.get("verifier")))
+    out = _lic_public(lic)
+    accounts, cache = load_accounts(), load_cache()
+    out["real_accounts"] = sum(1 for l in accounts if not cache.get(l, {}).get("demo"))
+    return jsonify(out)
+
+
+@app.post("/api/licence")
+def api_licence_activate():
+    import socket as _s
+    import time
+
+    key = str((request.get_json(force=True) or {}).get("key", "")).strip()
+    if len(key) < 8 or len(key) > 120:
+        return jsonify({"error": "Colle la clé de licence reçue par e-mail après ton achat."}), 400
+    if _owner_key(key):
+        lic = {"key": key, "owner": True, "active": True, "status": "active", "plan": "owner", "plan_name": "Propriétaire",
+               "max_accounts": None, "checked_at": dt.datetime.now().isoformat(timespec="seconds")}
+        _save(LICENCE_FILE, lic)
+        return jsonify(_lic_public(lic))
+    try:
+        r = _ls_call("activate", license_key=key, instance_name=f"ASTRA Dashboard – {_s.gethostname()}"[:100])
+    except Exception:
+        return jsonify({"error": "Impossible de joindre le service de paiement. Vérifie ta connexion internet."}), 502
+    meta, lk = r.get("meta") or {}, r.get("license_key") or {}
+    if not r.get("activated"):
+        err = str(r.get("error") or "Clé invalide.")
+        if "limit" in err.lower():
+            err = (f"Cette clé est déjà utilisée sur {lk.get('activation_usage', 'plusieurs')} PC "
+                   f"(maximum {lk.get('activation_limit', '?')}). Retire-la d'un autre PC d'abord.")
+        elif "not found" in err.lower() or "invalid" in err.lower():
+            err = "Cette clé n'existe pas. Vérifie qu'elle est copiée en entier."
+        return jsonify({"error": err}), 400
+    if not _store_ok(meta):
+        return jsonify({"error": "Cette clé ne vient pas de la boutique ASTRA Capital."}), 400
+    plan = _plan_from_meta(meta)
+    lic = {"key": key, "instance_id": (r.get("instance") or {}).get("id"), "owner": False, "active": lk.get("status", "active") == "active",
+           "status": lk.get("status", "active"), "plan": plan.get("id"), "plan_name": plan.get("name"),
+           "max_accounts": int(plan.get("accounts", 1)), "email": meta.get("customer_email"), "expires_at": lk.get("expires_at"),
+           "checked_at": dt.datetime.now().isoformat(timespec="seconds"), "last_ok": time.time()}
+    _save(LICENCE_FILE, lic)
+    return jsonify(_lic_public(lic))
+
+
+@app.post("/api/licence/remove")
+def api_licence_remove():
+    lic = _load(LICENCE_FILE, {})
+    if lic.get("key") and not lic.get("owner") and lic.get("instance_id"):
+        try:
+            _ls_call("deactivate", license_key=lic["key"], instance_id=lic["instance_id"])  # libère la place pour un autre PC
+        except Exception:
+            pass
+    _save(LICENCE_FILE, {})
+    return jsonify({"ok": True})
+
+
+@app.post("/api/open-url")
+def api_open_url():
+    """Ouvre la page de paiement dans le navigateur habituel (cartes et comptes déjà enregistrés)."""
+    from urllib.parse import urlparse
+
+    url = str((request.get_json(force=True) or {}).get("url", ""))
+    o = load_offers()
+    allowed = {p.get("checkout_url") for p in o.get("plans", [])} | {o.get("portal_url")}
+    host = urlparse(url).hostname or ""
+    if url not in allowed and not (url.startswith("https://") and (host == "lemonsqueezy.com" or host.endswith(".lemonsqueezy.com"))):
+        return jsonify({"error": "Adresse non autorisée."}), 400
+    webbrowser.open(url)
+    return jsonify({"ok": True})
+
+
 @app.get("/api/state")
 def api_state():
     accounts, cache = load_accounts(), load_cache()
@@ -1689,6 +1909,15 @@ def api_connect():
     server = str(body.get("server", "")).strip()
     if not login.isdigit() or not password or not server:
         return jsonify({"error": "Numéro de compte, mot de passe et serveur sont obligatoires."}), 400
+
+    accounts0, cache0 = load_accounts(), load_cache()
+    limit = max_accounts()
+    real = [l for l in accounts0 if not cache0.get(l, {}).get("demo")]
+    if limit is not None and login not in accounts0 and len(real) >= limit:
+        more = ("Passe à l'offre Duo dans « Nos offres » pour en ajouter un autre, ou retire d'abord un compte."
+                if limit < 2 else "Retire d'abord un compte pour en connecter un autre.")
+        return jsonify({"error": f"Ton offre permet de connecter {limit} compte{'s' if limit > 1 else ''}. " + more,
+                        "limit": limit}), 403
 
     acc = {
         "login": login,
