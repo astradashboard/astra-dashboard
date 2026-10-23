@@ -244,7 +244,11 @@
   .news-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .news-filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .news-filters .chips { margin-bottom: 0; flex: 1; min-width: 0; }
-  #newsSources { flex-direction: column; gap: 8px; }
+  .themes { align-items: center; }
+  .themes .t-lab { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .theme-chip { font-size: 14px; padding: 8px 15px; display: inline-flex; gap: 7px; align-items: center; }
+  .theme-chip .ck { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid #4a5468; display: inline-grid; place-items: center; font-size: 11px; line-height: 1; }
+  .theme-chip.on .ck { background: var(--gold); border-color: var(--gold); color: #0a0d14; }
   .chip-row { display: flex; gap: 6px; align-items: flex-start; }
   .chip-row .chip-group { padding-top: 8px; }
   .chip-list { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
@@ -555,17 +559,11 @@
         <button type="button" class="btn" id="newsRefresh">↻ Actualiser</button>
       </div>
       <div class="news-filters">
-        <div class="chips" id="newsSources"></div>
+        <div class="chips themes" id="newsThemes"></div>
         <div class="news-search">
           <span class="ns-ic">⌕</span>
           <input type="search" id="newsSearch" placeholder="Rechercher : crypto, BCE, pétrole…" autocomplete="off">
         </div>
-      </div>
-      <div class="eco-tabs" id="newsTabs">
-        <button type="button" data-tab="us">🇺🇸 Économie US</button>
-        <button type="button" data-tab="crypto">₿ Crypto</button>
-        <button type="button" data-tab="eco">Économie</button>
-        <button type="button" data-tab="all">Tout</button>
       </div>
       <div class="news-grid" id="newsGrid"></div>
       <div class="news-more"><button type="button" class="btn" id="newsMore" hidden>Afficher plus d'articles</button></div>
@@ -1291,15 +1289,9 @@ api('/api/prefs').then(p => {
     state.eco = { imp: p.eco.imp, countries: cs.length ? cs : state.eco.countries, range: p.eco.range || 'today' }; buildEcoFilters();
     if (state.page === 'eco') renderEco(true);
   }
-  if (Array.isArray(p.news) && p.news.length) {
-    let ns = p.news.filter(id => NEWS_SOURCES.some(x => x[0] === id));
-    if ((p.newsV || 0) < 3) { // nouvelles sources (Économie US, crypto) : activées une fois pour les réglages existants
-      ns = ns.concat(NEWS_NEW_DEFAULT.filter(id => !ns.includes(id)));
-      api('/api/prefs', { news: ns }).catch(() => {});
-    }
-    if (ns.length) { state.news.sources = ns; buildNewsSources(); if (state.page === 'eco') loadNews(true); }
-  }
-  if (['us', 'crypto', 'eco', 'all'].includes(p.newsTab)) { state.news.tab = p.newsTab; buildNewsTabs(); if (newsItems.length) renderNews();
+  if (Array.isArray(p.newsThemes) && p.newsThemes.length) {
+    const th = p.newsThemes.filter(id => NEWS_THEMES.some(t => t[0] === id));
+    if (th.length) { state.news.themes = th; buildNewsThemes(); if (state.page === 'eco') loadNews(true); }
   }
   buildTvGrid(); renderTv(true);
 }).catch(() => renderTv(true));
@@ -2015,34 +2007,31 @@ function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
 buildEcoFilters();
 
 // ---------- actualité économique (flux RSS des sites d'information) ----------
-const NEWS_SOURCES = [
-  ['us', 'Économie US (Google Actualités)', 'us'], ['cnbc', 'CNBC (anglais)', 'us'],
-  ['lemonde', 'Le Monde Économie', 'eco'], ['lesechos', 'Les Echos', 'eco'], ['figaro', 'Le Figaro Économie', 'eco'],
-  ['bfm', 'BFM Business', 'eco'], ['investing', 'Investing.com France', 'eco'],
-  ['gcrypto', 'Crypto (Google Actualités)', 'crypto'], ['cryptoast', 'Cryptoast', 'crypto'], ['jdc', 'Journal du Coin', 'crypto'],
-  ['ctfr', 'Cointelegraph FR', 'crypto'], ['cointribune', 'Cointribune', 'crypto'], ['coindesk', 'CoinDesk (anglais)', 'crypto'],
+const NEWS_THEMES = [
+  ['us', '🇺🇸 Économie US', ['us']],
+  ['eu', '🇪🇺 Économie Europe', ['eu', 'lemonde', 'lesechos', 'figaro', 'bfm', 'investing']],
+  ['crypto', '₿ Crypto', ['gcrypto', 'cryptoast', 'jdc', 'ctfr', 'cointribune']],
 ];
-const NEWS_NEW_DEFAULT = ['us', 'gcrypto', 'cryptoast', 'jdc', 'ctfr'];
-const NEWS_GROUPS = { us: 'Économie US', eco: 'Économie', crypto: 'Crypto' };
-state.news = { sources: ['us', 'lemonde', 'lesechos', 'figaro', 'bfm', 'investing', 'gcrypto', 'cryptoast', 'jdc', 'ctfr'], shown: 24, tab: 'us' };
+const NEWS_SOURCE_NAMES = { us: 'Économie US', eu: 'Économie Europe', lemonde: 'Le Monde', lesechos: 'Les Echos', figaro: 'Le Figaro',
+  bfm: 'BFM Business', investing: 'Investing.com', gcrypto: 'Crypto', cryptoast: 'Cryptoast', jdc: 'Journal du Coin',
+  ctfr: 'Cointelegraph FR', cointribune: 'Cointribune' };
+state.news = { themes: ['us'], shown: 24 };
 let newsItems = [], newsTimer = null, newsLoadedAt = 0;
-function buildNewsSources() {
-  const box = $('#newsSources'); box.innerHTML = '';
-  let group = null, row = null;
-  for (const [id, label, g] of NEWS_SOURCES) {
-    if (g !== group) {
-      group = g; const line = el('div', 'chip-row'); line.appendChild(el('span', 'chip-group', NEWS_GROUPS[g]));
-      row = el('div', 'chip-list'); line.appendChild(row); box.appendChild(line);
-    }
-    const c = el('button', 'chip' + (state.news.sources.includes(id) ? ' on' : ''), label); c.type = 'button';
+const newsSourcesFor = themes => [...new Set(NEWS_THEMES.filter(t => themes.includes(t[0])).flatMap(t => t[2]))];
+function buildNewsThemes() {
+  const box = $('#newsThemes'); box.innerHTML = '';
+  box.appendChild(el('span', 't-lab', 'Thèmes :'));
+  for (const [id, label] of NEWS_THEMES) {
+    const on = state.news.themes.includes(id);
+    const c = el('button', 'chip theme-chip' + (on ? ' on' : '')); c.type = 'button';
+    c.append(el('span', 'ck', on ? '✓' : ''), label);
     c.onclick = () => {
-      const on = state.news.sources.includes(id);
-      if (on && state.news.sources.length === 1) return;
-      state.news.sources = on ? state.news.sources.filter(x => x !== id) : state.news.sources.concat(id);
-      api('/api/prefs', { news: state.news.sources }).catch(() => {});
-      buildNewsSources(); loadNews(true);
+      if (on && state.news.themes.length === 1) return; // au moins un thème
+      state.news.themes = on ? state.news.themes.filter(x => x !== id) : NEWS_THEMES.map(t => t[0]).filter(x => x === id || state.news.themes.includes(x));
+      api('/api/prefs', { newsThemes: state.news.themes }).catch(() => {});
+      buildNewsThemes(); state.news.shown = 24; loadNews(true);
     };
-    row.appendChild(c);
+    box.appendChild(c);
   }
 }
 function timeAgo(d) {
@@ -2099,12 +2088,12 @@ function renderNews() {
     const remote = (newsSearch.q === q.trim() ? newsSearch.items : []).filter(it => !seen.has(norm(it.title).slice(0, 80)));
     found = local.concat(remote).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   } else {
-    found = state.news.tab === 'all' ? newsItems : newsItems.filter(it => it.tag === state.news.tab);
+    found = newsItems.filter(it => state.news.themes.includes(it.tag));
   }
   const list = found.slice(0, state.news.shown);
   if (!list.length) grid.appendChild(el('div', 'news-empty', q.trim()
     ? (newsSearch.loading ? 'Recherche dans Google Actualités…' : 'Aucun article récent sur « ' + q.trim() + ' ».' + (newsSearch.error ? ' (' + newsSearch.error + ')' : ''))
-    : 'Aucun article dans cet onglet pour le moment.'));
+    : 'Aucun article pour ces thèmes pour le moment.'));
   else if (terms.length) { const info = el('div', null, found.length + ' article' + (found.length > 1 ? 's' : '') + ' sur « ' + q.trim() + ' »'); info.style.cssText = 'grid-column:1/-1;color:var(--muted);font-size:13px'; grid.appendChild(info); }
   for (const it of list) {
     const card = el('button', 'news-card'); card.type = 'button'; card.title = 'Ouvrir l\'article';
@@ -2128,9 +2117,9 @@ async function loadNews(force) {
   const grid = $('#newsGrid');
   if (!newsItems.length || force) { grid.innerHTML = ''; grid.appendChild(el('div', 'news-empty', 'Chargement des articles…')); }
   try {
-    const r = await api('/api/news?sources=' + encodeURIComponent(state.news.sources.join(',')) + (force ? '&fresh=1' : ''));
+    const r = await api('/api/news?sources=' + encodeURIComponent(newsSourcesFor(state.news.themes).join(',')) + (force ? '&fresh=1' : ''));
     newsItems = r.items || []; newsLoadedAt = Date.now(); state.news.shown = 24;
-    const failed = (r.failed || []).map(id => (NEWS_SOURCES.find(x => x[0] === id) || [id, id])[1]);
+    const failed = (r.failed || []).map(id => NEWS_SOURCE_NAMES[id] || id);
     $('#newsSub').textContent = 'Les derniers articles · mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })
       + (failed.length ? ' · indisponible : ' + failed.join(', ') : '');
     renderNews();
@@ -2152,24 +2141,12 @@ async function searchRemote(q) {
 $('#newsSearch').addEventListener('input', () => {
   clearTimeout(newsSearchT); clearTimeout(newsRemoteT);
   const q = $('#newsSearch').value.trim();
-  $('#newsTabs').style.opacity = q ? '.45' : '';
   newsSearchT = setTimeout(() => { state.news.shown = 24; renderNews(); }, 150);
   if (q.length >= 2) newsRemoteT = setTimeout(() => searchRemote(q), 600);
   else { newsSearch.q = ''; newsSearch.items = []; }
 });
-function buildNewsTabs() {
-  document.querySelectorAll('#newsTabs button').forEach(b => {
-    b.classList.toggle('on', b.dataset.tab === state.news.tab);
-    b.onclick = () => {
-      state.news.tab = b.dataset.tab; state.news.shown = 24;
-      if ($('#newsSearch').value) { $('#newsSearch').value = ''; newsSearch.q = ''; $('#newsTabs').style.opacity = ''; }
-      buildNewsTabs(); renderNews(); api('/api/prefs', { newsTab: state.news.tab }).catch(() => {});
-    };
-  });
-}
-buildNewsTabs();
+buildNewsThemes();
 $('#newsRefresh').onclick = () => loadNews(true);
-buildNewsSources();
 
 // ---------- suivi en direct (trades en cours, capital à la seconde) ----------
 state.live = null;

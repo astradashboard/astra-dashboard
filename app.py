@@ -854,8 +854,10 @@ def api_prefs_set():
     if isinstance(body.get("news"), list):
         prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:12]
         prefs["newsV"] = 3
-    if body.get("newsTab") in ("us", "crypto", "eco", "all"):
-        prefs["newsTab"] = body["newsTab"]
+    if isinstance(body.get("newsThemes"), list):
+        th = [x for x in body["newsThemes"] if x in ("us", "eu", "crypto")]
+        if th:
+            prefs["newsThemes"] = th
     if isinstance(body.get("eco"), dict):
         eco = body["eco"]
         imp = str(eco.get("imp", "0,1"))
@@ -1074,14 +1076,17 @@ def _gnews(query):
 US_QUERY = ('"économie américaine" OR "Réserve fédérale" OR Fed OR Powell OR "Wall Street" OR "inflation aux États-Unis" '
             'OR "emploi américain" OR "dollar américain" OR "Trésor américain" OR Nasdaq when:3d')
 CRYPTO_QUERY = 'bitcoin OR crypto OR cryptomonnaie OR ethereum OR stablecoin when:3d'
+EU_QUERY = ('"zone euro" OR BCE OR Lagarde OR "économie européenne" OR "économie française" OR "CAC 40" OR DAX '
+            'OR "inflation en zone euro" OR "Commission européenne" économie when:3d')
 
 NEWS_FEEDS = {  # id : (nom affiché, adresse du flux, thème)
     "us": ("Économie US", _gnews(US_QUERY), "us"),
-    "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eco"),
-    "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml", "eco"),
-    "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml", "eco"),
-    "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/", "eco"),
-    "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss", "eco"),
+    "eu": ("Économie Europe", _gnews(EU_QUERY), "eu"),
+    "lemonde": ("Le Monde", "https://www.lemonde.fr/economie/rss_full.xml", "eu"),
+    "lesechos": ("Les Echos", "https://services.lesechos.fr/rss/les-echos-economie.xml", "eu"),
+    "figaro": ("Le Figaro", "https://www.lefigaro.fr/rss/figaro_economie.xml", "eu"),
+    "bfm": ("BFM Business", "https://www.bfmtv.com/rss/economie/", "eu"),
+    "investing": ("Investing.com", "https://fr.investing.com/rss/news.rss", "eu"),
     "cnbc": ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html", "us"),
     "gcrypto": ("Crypto", _gnews(CRYPTO_QUERY), "crypto"),
     "cryptoast": ("Cryptoast", "https://cryptoast.fr/feed/", "crypto"),
