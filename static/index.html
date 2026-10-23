@@ -213,7 +213,11 @@
   .eco-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
   .eco-tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 9px 12px; font-size: 14px; margin-bottom: -1px; }
   .eco-tabs button:hover { color: var(--fg); }
-  .eco-line-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; padding-bottom: 6px; flex-wrap: wrap; }
+  #ecoRange { justify-content: center; }
+  #eco > .eco-head { justify-content: center; text-align: center; margin-bottom: 8px; }
+  .eco-line-tools { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 14px; flex-wrap: wrap; order: 2; }
+  #ecoRange > button { order: 1; }
+  .eco-line-tools .eco-upd { margin: 0; }
   .eco-line-tools .seg button { padding: 6px 10px; border: none; margin: 0; font-size: 13px; }
   .eco-line-tools .seg button.on { color: var(--gold); }
   .eco-zones { position: relative; }
@@ -223,7 +227,7 @@
   .eco-zones-btn .flags { color: var(--muted); }
   .eco-zones-btn .car { color: var(--muted); font-size: 10px; }
   .eco-zones-menu[hidden] { display: none; }
-  .eco-zones-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; width: 250px; max-height: 420px; overflow-y: auto;
+  .eco-zones-menu { position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 6px); z-index: 8; width: 250px; max-height: 420px; overflow-y: auto;
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 40px rgba(0,0,0,.5); padding: 8px; }
   .eco-zones-menu .zq { display: flex; gap: 6px; padding: 2px 4px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
   .eco-zones-menu .zq button { flex: 1; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 5px; font-size: 12px; }
