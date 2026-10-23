@@ -24,7 +24,8 @@
       "checkout_url": "",
       "perks": [
         "live",
-        "pdf"
+        "pdf",
+        "cards"
       ]
     }
   ],
@@ -52,6 +53,13 @@
     },
     {
       "label": "Rapport PDF mensuel",
+      "values": {
+        "essentiel": false,
+        "pro": true
+      }
+    },
+    {
+      "label": "Cartes de résultats à partager (TikTok, Instagram)",
       "values": {
         "essentiel": false,
         "pro": true

@@ -376,6 +376,23 @@
   .live-table tfoot td { border-top: 1px solid var(--line); border-bottom: none; font-weight: 650; }
   .live-empty { color: var(--muted); text-align: center; padding: 22px 10px; }
   .perk-box { display: grid; justify-items: center; gap: 12px; }
+  /* cartes de résultats */
+  .modal.card-modal { max-width: 1040px; display: grid; grid-template-columns: 330px 1fr; gap: 26px; padding: 24px; }
+  .card-side { display: flex; flex-direction: column; }
+  .card-side .sub { margin-bottom: 8px; }
+  .c-lab { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin: 14px 0 7px; }
+  .c-seg { display: flex; } .c-seg button { flex: 1; padding: 8px 6px; }
+  .c-seg button[disabled] { opacity: .4; cursor: not-allowed; }
+  .c-sel { width: 100%; margin-top: 8px; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 13.5px; }
+  input.c-sel { margin-top: 0; } input.c-sel:focus, select.c-sel:focus { outline: none; border-color: var(--gold); }
+  .c-check { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 13.5px; cursor: pointer; }
+  .c-check input { accent-color: var(--gold); }
+  .c-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 20px; flex-wrap: wrap; }
+  .card-prev { background: #05070b; border: 1px solid var(--line); border-radius: 14px; display: grid; place-items: center; padding: 16px; min-height: 420px; }
+  .card-prev canvas { max-width: 100%; max-height: calc(100vh - 120px); width: auto; height: auto; border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.6); }
+  .card-prev canvas[hidden] { display: none; }
+  .c-empty { color: var(--muted); }
+  @media (max-width: 900px) { .modal.card-modal { grid-template-columns: 1fr; } }
   .btn.perk-off { opacity: .6; }
   @media (max-width: 860px) { .live-table .hide-s { display: none; } }
   .chart-row { --split: 66.6667%; display: grid; grid-template-columns: minmax(0, calc(var(--split) - 9px)) 18px minmax(0, 1fr); align-items: stretch; }
@@ -616,6 +633,7 @@
         <p id="subtitle"></p>
       </div>
       <div class="actions">
+        <button class="btn" id="shareBtn" title="Créer une image de tes résultats à poster (TikTok, Instagram…)">Partager mes résultats</button>
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
@@ -857,6 +875,31 @@
       </div>
     </div>
   </form>
+</div>
+
+<div class="modal-bg" id="cardBg">
+  <div class="modal card-modal">
+    <div class="card-side">
+      <h2>Carte de résultats</h2>
+      <p class="sub">Une image prête à poster sur TikTok, Instagram ou dans ton groupe.</p>
+      <label class="c-lab">Période</label>
+      <div class="seg c-seg" id="cardKind"><button type="button" data-v="day">Jour</button><button type="button" data-v="week">Semaine</button><button type="button" data-v="month">Mois</button></div>
+      <select id="cardPeriod" class="c-sel"></select>
+      <label class="c-lab">Afficher</label>
+      <div class="seg c-seg" id="cardMode"><button type="button" data-v="both">Montant + %</button><button type="button" data-v="pct">% seulement</button><button type="button" data-v="r">En R</button></div>
+      <label class="c-lab">Format</label>
+      <div class="seg c-seg" id="cardFormat"><button type="button" data-v="post">Post 4:5</button><button type="button" data-v="story">Story 9:16</button><button type="button" data-v="square">Carré</button></div>
+      <label class="c-lab">Ton pseudo (en bas à droite)</label>
+      <input id="cardHandle" class="c-sel" placeholder="@astracapital" maxlength="30">
+      <label class="c-check"><input type="checkbox" id="cardHideAcc"> Masquer le nom du compte</label>
+      <div class="c-actions">
+        <button class="btn primary" id="cardSave" type="button">Enregistrer l'image</button>
+        <button class="btn" id="cardCopy" type="button">Copier</button>
+        <button class="btn ghost" id="cardClose" type="button">Fermer</button>
+      </div>
+    </div>
+    <div class="card-prev"><canvas id="cardCanvas"></canvas><div id="cardEmpty" class="c-empty" hidden>Aucun trade sur ce compte pour l'instant.</div></div>
+  </div>
 </div>
 
 <div class="modal-bg" id="pdfBg">
@@ -1788,6 +1831,206 @@ $('#refreshBtn').onclick = async () => {
   finally { btn.disabled = false; btn.textContent = '↻ Actualiser'; }
 };
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
+
+// ---------- cartes de résultats à partager (TikTok, Instagram…) ----------
+const CARD_FORMATS = { post: [1080, 1350, 'Post 4:5'], story: [1080, 1920, 'Story 9:16'], square: [1080, 1080, 'Carré 1:1'] };
+state.card = { kind: 'month', key: null, mode: 'both', format: 'post', handle: '', hideAcc: false };
+const cardLogo = new Image(); cardLogo.src = '/static/logo.png';
+const isoD = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const mondayOf = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return isoD(d); };
+function cardPeriods(kind) {
+  const days = [...new Set((state.data.trades || []).map(t => t.d).concat((state.data.daily || []).filter(x => x.trades || x.pnl).map(x => x.date)))].sort().reverse();
+  const keys = kind === 'day' ? days : kind === 'week' ? [...new Set(days.map(mondayOf))] : [...new Set(days.map(d => d.slice(0, 7)))];
+  return keys.map(k => ({ key: k, label: cardLabel(kind, k) }));
+}
+function cardRange(kind, key) {
+  if (kind === 'day') return [key, key];
+  if (kind === 'month') return [key + '-01', key + '-31'];
+  const e = new Date(key + 'T12:00:00'); e.setDate(e.getDate() + 6); return [key, isoD(e)];
+}
+function cardLabel(kind, key) {
+  const f = (iso, o) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-BE', o);
+  if (kind === 'day') { const s = f(key, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); }
+  if (kind === 'month') { const m = MONTHS[Number(key.slice(5)) - 1]; return m[0].toUpperCase() + m.slice(1) + ' ' + key.slice(0, 4); }
+  const [a, b] = cardRange('week', key);
+  const sameM = a.slice(0, 7) === b.slice(0, 7);
+  return 'Semaine du ' + f(a, sameM ? { day: 'numeric' } : { day: 'numeric', month: 'long' }) + ' au ' + f(b, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function cardStats() {
+  const d = state.data, c = state.card, [from, to] = cardRange(c.kind, c.key);
+  const trades = (d.trades || []).filter(t => t.d >= from && t.d <= to).sort((x, y) => (x.ct || x.d) < (y.ct || y.d) ? -1 : 1);
+  const daily = (d.daily || []).filter(x => x.date >= from && x.date <= to);
+  const pnl = trades.length ? trades.reduce((s, t) => s + t.n, 0) : daily.reduce((s, x) => s + x.pnl, 0);
+  const base = d.start_balance + (d.daily || []).filter(x => x.date < from).reduce((s, x) => s + x.pnl, 0);
+  let r = 0, rOk = trades.length > 0;
+  for (const t of trades) { const ra = riskAmount((d.per_account || {})[t.a]); if (!ra) { rOk = false; break; } r += t.n / ra; }
+  const wins = trades.filter(t => t.n > 0), losses = trades.filter(t => t.n < 0);
+  const gw = wins.reduce((s, t) => s + t.n, 0), gl = -losses.reduce((s, t) => s + t.n, 0);
+  const best = trades.reduce((m, t) => !m || t.n > m.n ? t : m, null);
+  const tDays = daily.filter(x => x.trades || x.pnl);
+  return { from, to, trades, daily: tDays, pnl, base, pctV: base ? pnl / base * 100 : null, r, rOk, wins: wins.length, losses: losses.length,
+    winRate: trades.length ? wins.length / trades.length * 100 : null, pf: gl ? gw / gl : (gw ? Infinity : null), best,
+    winDays: tDays.filter(x => x.pnl > 0).length, cur: d.currency };
+}
+function cardFmt(v, st, kind) { // valeur affichée selon le mode : montants, % ou R
+  const m = state.card.mode;
+  if (kind === 'pct' || m === 'pct') return st.base ? pct(v / st.base * 100) : '—';
+  if (kind === 'r' || m === 'r') return v === null ? '—' : fmtR(v, true);
+  return money(v, st.cur, true);
+}
+function drawCard(cv) {
+  const [W, H] = CARD_FORMATS[state.card.format];
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d'), st = cardStats(), c = state.card;
+  const F = (w, s) => w + ' ' + s + 'px "Segoe UI", system-ui, -apple-system, sans-serif';
+  const GOLD = '#c48a45', WIN = '#22c55e', LOSS = '#ef4444', FG = '#eef1f6', MUT = '#8a93a6';
+  const pos = st.pnl >= 0, ACC = st.pnl > 0 ? WIN : st.pnl < 0 ? LOSS : FG;
+  const tall = H / W > 1.5, sq = H === W, post = !tall && !sq;
+  // fond
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#111827'); bg.addColorStop(1, '#070a10');
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, H * .36, 10, W / 2, H * .36, W * .75);
+  glow.addColorStop(0, pos ? 'rgba(34,197,94,.13)' : 'rgba(239,68,68,.13)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  const halo = g.createRadialGradient(W / 2, 0, 10, W / 2, 0, W * .6); halo.addColorStop(0, 'rgba(196,138,69,.18)'); halo.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = halo; g.fillRect(0, 0, W, H * .5);
+  g.strokeStyle = 'rgba(196,138,69,.55)'; g.lineWidth = 3; g.beginPath(); g.roundRect(28, 28, W - 56, H - 56, 34); g.stroke();
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  let y = tall ? 150 : sq ? 70 : 90;
+  // logo
+  if (cardLogo.complete && cardLogo.naturalWidth) {
+    const lw = sq ? 170 : post ? 180 : 220, lh = lw * cardLogo.naturalHeight / cardLogo.naturalWidth;
+    g.drawImage(cardLogo, (W - lw) / 2, y, lw, lh); y += lh + (sq ? 34 : post ? 40 : 50);
+  } else y += 120;
+  // titre et période
+  const kindLbl = { day: 'RÉSULTAT DU JOUR', week: 'RÉSULTAT DE LA SEMAINE', month: 'RÉSULTAT DU MOIS' }[c.kind];
+  g.fillStyle = GOLD; g.font = F(700, 30); g.letterSpacing = '6px'; g.fillText(kindLbl, W / 2, y); g.letterSpacing = '0px';
+  y += 52; g.fillStyle = MUT; g.font = F(500, 34); g.fillText(cardLabel(c.kind, c.key), W / 2, y);
+  // grand chiffre
+  y += sq ? 150 : post ? 165 : 185;
+  const main = c.mode === 'r' ? (st.rOk ? fmtR(st.r, true) : '—') : c.mode === 'pct' ? (st.pctV === null ? '—' : pct(st.pctV)) : money(st.pnl, st.cur, true);
+  let fs = sq ? 150 : 170; g.font = F(800, fs);
+  while (g.measureText(main).width > W - 160 && fs > 70) { fs -= 6; g.font = F(800, fs); }
+  g.fillStyle = ACC; g.shadowColor = pos ? 'rgba(34,197,94,.35)' : 'rgba(239,68,68,.35)'; g.shadowBlur = 40;
+  g.fillText(main, W / 2, y); g.shadowBlur = 0;
+  // ligne secondaire
+  const sec = [];
+  if (c.mode === 'both') { if (st.pctV !== null) sec.push(pct(st.pctV)); if (st.rOk) sec.push(fmtR(st.r, true)); }
+  if (c.mode === 'pct' && st.rOk) sec.push(fmtR(st.r, true));
+  if (c.mode === 'r' && st.pctV !== null) sec.push(pct(st.pctV));
+  y += 76; g.font = F(600, 44); g.fillStyle = FG; if (sec.length) g.fillText(sec.join('   ·   '), W / 2, y);
+  // tuiles de statistiques
+  y += sq ? 60 : post ? 70 : 80;
+  const tiles = [
+    ['Trades', String(st.trades.length || st.daily.reduce((s, x) => s + x.trades, 0))],
+    ['Taux de réussite', st.winRate === null ? '—' : Math.round(st.winRate) + ' %'],
+    c.kind === 'day' ? ['Gagnants / perdants', st.wins + ' / ' + st.losses] : ['Jours gagnants', st.winDays + ' / ' + st.daily.length],
+    ['Meilleur trade', st.best ? (c.mode === 'r' ? (st.rOk ? fmtR(st.best.n / riskAmount(state.data.per_account[st.best.a]), true) : '—') : c.mode === 'pct' ? cardFmt(st.best.n, st, 'pct') : money(st.best.n, st.cur, true)) : '—'],
+  ];
+  const cols = 2, gap = 22, tw = (W - 120 - gap) / cols, th = sq ? 118 : post ? 120 : 138;
+  tiles.forEach(([lab, val], i) => {
+    const tx = 60 + (i % cols) * (tw + gap), ty = y + Math.floor(i / cols) * (th + gap);
+    g.fillStyle = 'rgba(255,255,255,.045)'; g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(tx, ty, tw, th, 22); g.fill(); g.stroke();
+    g.fillStyle = MUT; g.font = F(600, 26); g.fillText(lab, tx + tw / 2, ty + (sq ? 44 : 52));
+    let vs = 46; g.font = F(750, vs); while (g.measureText(val).width > tw - 30 && vs > 26) { vs -= 2; g.font = F(750, vs); }
+    g.fillStyle = lab === 'Meilleur trade' && st.best ? (st.best.n >= 0 ? WIN : LOSS) : FG; g.fillText(val, tx + tw / 2, ty + (sq ? 92 : 108));
+  });
+  y += 2 * th + gap + (sq ? 40 : post ? 36 : 60);
+  // graphique : courbe cumulée (jour) ou barres par jour (semaine / mois), centré dans la place restante
+  const footH = 120, lblH = c.kind === 'week' && st.daily.length >= 2 ? 50 : 0;
+  const avail = H - y - footH - 40, ch = Math.min(avail - lblH, tall ? 520 : 380);
+  y += Math.max(0, (avail - ch - lblH) / 2);
+  if (ch > 120) {
+    const cx = 70, cw = W - 140;
+    if (c.kind === 'day' || st.daily.length < 2) {
+      const pts = [0]; for (const t of st.trades) pts.push(pts[pts.length - 1] + t.n);
+      if (pts.length > 1) {
+        const mn = Math.min(0, ...pts), mx = Math.max(0, ...pts), sp = (mx - mn) || 1;
+        const X = i => cx + i / (pts.length - 1) * cw, Y = v => y + ch - (v - mn) / sp * ch;
+        g.strokeStyle = 'rgba(255,255,255,.12)'; g.setLineDash([8, 10]); g.lineWidth = 2; g.beginPath(); g.moveTo(cx, Y(0)); g.lineTo(cx + cw, Y(0)); g.stroke(); g.setLineDash([]);
+        const fill = g.createLinearGradient(0, y, 0, y + ch); fill.addColorStop(0, pos ? 'rgba(34,197,94,.30)' : 'rgba(239,68,68,.30)'); fill.addColorStop(1, 'rgba(0,0,0,0)');
+        g.beginPath(); pts.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))); g.lineTo(X(pts.length - 1), y + ch); g.lineTo(cx, y + ch); g.closePath(); g.fillStyle = fill; g.fill();
+        g.beginPath(); pts.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))); g.strokeStyle = ACC; g.lineWidth = 6; g.lineJoin = 'round'; g.stroke();
+        g.fillStyle = ACC; g.beginPath(); g.arc(X(pts.length - 1), Y(pts[pts.length - 1]), 10, 0, 7); g.fill();
+      }
+    } else {
+      const [from, to] = [st.from, st.to]; const days = [];
+      for (let d = new Date(from + 'T12:00:00'); isoD(d) <= to; d.setDate(d.getDate() + 1)) {
+        const k = isoD(d), dow = d.getDay(); const rec = st.daily.find(x => x.date === k);
+        if (c.kind === 'week' && (dow === 0 || dow === 6) && !rec) continue;
+        if (c.kind === 'month' && Number(k.slice(5, 7)) !== Number(c.key.slice(5, 7))) break;
+        days.push({ k, v: rec ? rec.pnl : 0 });
+      }
+      const mx = Math.max(1, ...days.map(x => Math.abs(x.v))), mid = y + ch / 2, bw = cw / days.length;
+      g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, mid); g.lineTo(cx + cw, mid); g.stroke();
+      days.forEach((x, i) => {
+        const h = Math.abs(x.v) / mx * (ch / 2 - 30), bx = cx + i * bw + bw * .18;
+        g.fillStyle = x.v > 0 ? WIN : x.v < 0 ? LOSS : 'rgba(255,255,255,.14)';
+        g.beginPath(); g.roundRect(bx, x.v >= 0 ? mid - Math.max(h, 4) : mid, bw * .64, Math.max(h, 4), Math.min(10, bw * .2)); g.fill();
+        if (c.kind === 'week') { g.fillStyle = MUT; g.font = F(600, 24); g.fillText(new Date(x.k + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short' }).replace('.', ''), cx + i * bw + bw / 2, y + ch + 34); }
+      });
+    }
+  }
+  // pied de carte
+  const fy = H - 76;
+  g.strokeStyle = 'rgba(196,138,69,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(80, fy - 50); g.lineTo(W - 80, fy - 50); g.stroke();
+  g.font = F(600, 28); g.fillStyle = MUT; g.textAlign = 'left';
+  const accName = state.sel === 'all' ? 'Tous les comptes' : shownName((state.accounts.find(a => a.login === state.sel) || {}).name || '');
+  g.fillText(c.hideAcc ? '' : accName, 80, fy);
+  g.textAlign = 'right'; g.fillStyle = GOLD; g.font = F(700, 28);
+  g.fillText(c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : 'ASTRA CAPITAL', W - 80, fy);
+  g.textAlign = 'center';
+}
+function cardOptions() {
+  const c = state.card, per = cardPeriods(c.kind);
+  if (!per.some(p => p.key === c.key)) c.key = per.length ? per[0].key : null;
+  const sel = $('#cardPeriod'); sel.innerHTML = '';
+  for (const p of per) sel.appendChild(new Option(p.label, p.key));
+  sel.value = c.key || '';
+  document.querySelectorAll('#cardKind button').forEach(b => b.classList.toggle('on', b.dataset.v === c.kind));
+  document.querySelectorAll('#cardMode button').forEach(b => b.classList.toggle('on', b.dataset.v === c.mode));
+  document.querySelectorAll('#cardFormat button').forEach(b => b.classList.toggle('on', b.dataset.v === c.format));
+  const st = c.key ? cardStats() : null;
+  const rBtn = document.querySelector('#cardMode button[data-v="r"]');
+  rBtn.disabled = !!st && !st.rOk; rBtn.title = st && !st.rOk ? 'Définis ton risque par trade sur le compte pour afficher les R' : '';
+  if (c.mode === 'r' && st && !st.rOk) { c.mode = 'both'; return cardOptions(); }
+  $('#cardEmpty').hidden = !!c.key; $('#cardCanvas').hidden = !c.key;
+  $('#cardSave').disabled = $('#cardCopy').disabled = !c.key;
+  if (c.key) drawCard($('#cardCanvas'));
+}
+function openCard() {
+  if (!hasPerk('cards')) return perkUpsell('Les cartes de résultats');
+  if (!state.data) return;
+  state.card.hideAcc = state.mask || state.card.hideAcc;
+  $('#cardHandle').value = state.card.handle; $('#cardHideAcc').checked = state.card.hideAcc;
+  $('#cardBg').classList.add('open');
+  const go = () => cardOptions();
+  if (cardLogo.complete) go(); else cardLogo.onload = go;
+}
+function saveCardPrefs() { api('/api/prefs', { card: { mode: state.card.mode, format: state.card.format, handle: state.card.handle, hideAcc: state.card.hideAcc } }).catch(() => {}); }
+const cardFile = () => 'ASTRA-' + { day: 'jour', week: 'semaine', month: 'mois' }[state.card.kind] + '-' + state.card.key + '.png';
+document.querySelectorAll('#cardKind button').forEach(b => b.onclick = () => { state.card.kind = b.dataset.v; state.card.key = null; cardOptions(); });
+document.querySelectorAll('#cardMode button').forEach(b => b.onclick = () => { if (b.disabled) return; state.card.mode = b.dataset.v; saveCardPrefs(); cardOptions(); });
+document.querySelectorAll('#cardFormat button').forEach(b => b.onclick = () => { state.card.format = b.dataset.v; saveCardPrefs(); cardOptions(); });
+$('#cardPeriod').onchange = e => { state.card.key = e.target.value; cardOptions(); };
+$('#cardHandle').oninput = e => { state.card.handle = e.target.value.trim().slice(0, 30); cardOptions(); clearTimeout(saveCardPrefs.t); saveCardPrefs.t = setTimeout(saveCardPrefs, 600); };
+$('#cardHideAcc').onchange = e => { state.card.hideAcc = e.target.checked; saveCardPrefs(); cardOptions(); };
+$('#cardClose').onclick = () => $('#cardBg').classList.remove('open');
+$('#cardBg').addEventListener('click', e => { if (e.target.id === 'cardBg') $('#cardBg').classList.remove('open'); });
+$('#cardSave').onclick = () => $('#cardCanvas').toBlob(b => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cardFile(); document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('Image enregistrée dans tes Téléchargements : ' + cardFile());
+}, 'image/png');
+$('#cardCopy').onclick = () => $('#cardCanvas').toBlob(async b => {
+  try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('Image copiée : colle-la où tu veux (Ctrl+V).'); }
+  catch (e) { toast('Copie impossible ici : utilise « Enregistrer l\'image ».'); }
+}, 'image/png');
+$('#shareBtn').onclick = openCard;
+api('/api/prefs').then(p => { if (p.card && typeof p.card === 'object') Object.assign(state.card, {
+  mode: ['both', 'pct', 'r'].includes(p.card.mode) ? p.card.mode : 'both', format: CARD_FORMATS[p.card.format] ? p.card.format : 'post',
+  handle: String(p.card.handle || '').slice(0, 30), hideAcc: !!p.card.hideAcc }); }).catch(() => {});
 
 // ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;

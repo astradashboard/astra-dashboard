@@ -1053,6 +1053,11 @@ def api_prefs_set():
                 prefs["eco"]["tz"] = tz
     if isinstance(body.get("split"), (int, float)):
         prefs["split"] = min(0.8, max(0.35, float(body["split"])))
+    if isinstance(body.get("card"), dict):
+        cd = body["card"]
+        prefs["card"] = {"mode": cd.get("mode") if cd.get("mode") in ("both", "pct", "r") else "both",
+                         "format": cd.get("format") if cd.get("format") in ("post", "story", "square") else "post",
+                         "handle": str(cd.get("handle", ""))[:30], "hideAcc": bool(cd.get("hideAcc"))}
     if isinstance(body.get("quotes"), list):
         prefs["quotes"] = [str(x)[:40] for x in body["quotes"] if isinstance(x, str)][:30]
     if isinstance(body.get("mask"), bool):
@@ -1792,7 +1797,7 @@ def licence_active():
         return False
 
 
-PERK_NAMES = {"live": "Le suivi en direct des trades", "pdf": "Le rapport PDF mensuel"}
+PERK_NAMES = {"live": "Le suivi en direct des trades", "pdf": "Le rapport PDF mensuel", "cards": "Les cartes de résultats"}
 
 
 def has_perk(name):
