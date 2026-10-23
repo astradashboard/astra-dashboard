@@ -1815,7 +1815,7 @@ def _paywall():
 def api_offres():
     o = load_offers()
     return jsonify({"plans": [{k: v for k, v in p.items() if k != "variant_id"} for p in o.get("plans", [])],
-                    "portal_url": o.get("portal_url")})
+                    "features": o.get("features") or [], "portal_url": o.get("portal_url")})
 
 
 @app.get("/api/licence")

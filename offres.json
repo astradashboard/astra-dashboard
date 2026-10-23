@@ -10,16 +10,7 @@
       "period": "par mois",
       "accounts": 1,
       "variant_id": null,
-      "checkout_url": "",
-      "features": [
-        "1 compte de trading connecté (FTMO ou autre prop firm)",
-        "Tableau de bord, capital et calendrier des résultats",
-        "Suivi en direct des trades en cours",
-        "Journal de trading et rapport PDF mensuel",
-        "Calendrier économique et actualités",
-        "Graphiques TradingView et cours des marchés",
-        "Mises à jour automatiques"
-      ]
+      "checkout_url": ""
     },
     {
       "id": "pro",
@@ -29,14 +20,72 @@
       "accounts": 50,
       "badge": "Le plus complet",
       "variant_id": null,
-      "checkout_url": "",
-      "features": [
-        "Jusqu'à 50 comptes de trading connectés",
-        "Vue « Tous les comptes » cumulée",
-        "Idéal pour gérer plusieurs challenges et comptes financés",
-        "Tout ce qui est inclus dans l'offre Essentiel",
-        "Mises à jour automatiques"
-      ]
+      "checkout_url": ""
+    }
+  ],
+  "features": [
+    {
+      "label": "Comptes de trading connectés",
+      "values": {
+        "essentiel": "1 compte",
+        "pro": "Jusqu'à 50"
+      }
+    },
+    {
+      "label": "Vue « Tous les comptes » cumulée",
+      "values": {
+        "essentiel": false,
+        "pro": true
+      }
+    },
+    {
+      "label": "Tableau de bord, capital et calendrier des résultats",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Suivi en direct des trades en cours",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Journal de trading détaillé",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Rapport PDF mensuel",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Calendrier économique et actualités",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Graphiques TradingView et cours des marchés",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
+    },
+    {
+      "label": "Mises à jour automatiques",
+      "values": {
+        "essentiel": true,
+        "pro": true
+      }
     }
   ]
 }

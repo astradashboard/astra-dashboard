@@ -489,9 +489,14 @@
   .of-price b { font-size: 44px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .of-price span { color: var(--muted); font-size: 14px; }
   .of-plan ul { list-style: none; padding: 0; margin: 18px 0 24px; display: grid; gap: 11px; flex: 1; align-content: start; }
-  .of-plan li { display: flex; gap: 10px; font-size: 14px; line-height: 1.4; }
-  .of-plan li::before { content: '✓'; flex: none; width: 19px; height: 19px; border-radius: 50%; background: var(--gold-soft); color: var(--gold);
+  .of-plan li { display: flex; gap: 10px; font-size: 14px; line-height: 1.4; align-items: flex-start; }
+  .of-plan li .mk { flex: none; width: 19px; height: 19px; border-radius: 50%; background: var(--gold-soft); color: var(--gold);
     font-size: 11px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+  .of-plan li .lb { flex: 1; }
+  .of-plan li .val { color: var(--gold); font-weight: 650; white-space: nowrap; }
+  .of-plan li.no { color: var(--muted); }
+  .of-plan li.no .lb { text-decoration: line-through; text-decoration-color: rgba(138,147,166,.5); }
+  .of-plan li.no .mk { background: rgba(138,147,166,.12); color: #6b7487; font-size: 10px; }
   .of-plan .btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 650; border-radius: 11px; }
   .of-plan .btn[disabled] { opacity: .55; cursor: default; }
   .of-plan:not(.best):hover { border-color: rgba(196,138,69,.4); transform: translateY(-2px); }
@@ -1840,7 +1845,16 @@ async function renderOffres() {
     c.appendChild(el('h2', null, p.name));
     c.appendChild(el('div', 'of-acc', p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
     const pr = el('div', 'of-price'); pr.append(el('b', null, p.price), el('span', null, p.period || 'par mois')); c.appendChild(pr);
-    const ul = el('ul'); (p.features || []).forEach(f => ul.appendChild(el('li', null, f))); c.appendChild(ul);
+    const ul = el('ul');
+    const feats = (offresData.features || []).length ? offresData.features : (p.features || []).map(f => ({ label: f, values: { [p.id]: true } }));
+    for (const f of feats) {
+      const v = (f.values || {})[p.id];
+      const li = el('li', v ? 'yes' : 'no'); li.appendChild(el('span', 'mk', v ? '✓' : '✕'));
+      const t = el('span', 'lb', f.label); li.appendChild(t);
+      if (typeof v === 'string') li.appendChild(el('b', 'val', v));
+      ul.appendChild(li);
+    }
+    c.appendChild(ul);
     let label = 'S\'abonner', dis = false;
     if (lic.active && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
     else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
