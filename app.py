@@ -655,6 +655,186 @@ def _live_loop():
                     LIVE["status"], LIVE["error"], LIVE["error_at"] = "error", str(ex), time.time()
 
 
+# ---------------------------------------------------------------- cotations des indices
+QUOTE_LIST = [  # (clé, nom, drapeau, catégorie, noms possibles du symbole selon le broker)
+    ("us30", "Dow Jones", "🇺🇸", "Indices", ["US30.cash", "US30", "US30Cash", "DJ30", "WS30", "DJI30", "USA30"]),
+    ("us500", "S&P 500", "🇺🇸", "Indices", ["US500.cash", "US500", "US500Cash", "SPX500", "SP500", "USA500"]),
+    ("us100", "Nasdaq 100", "🇺🇸", "Indices", ["US100.cash", "US100", "US100Cash", "NAS100", "USTEC", "NDX100", "USTECH"]),
+    ("us2000", "Russell 2000", "🇺🇸", "Indices", ["US2000.cash", "US2000", "RUSS2000", "US2000Cash"]),
+    ("vix", "VIX", "🇺🇸", "Indices", ["VIX", "VIX.cash", "VIXX", "VOLX"]),
+    ("ger40", "DAX", "🇩🇪", "Indices", ["GER40.cash", "GER40", "DE40", "GER30", "DAX40", "DE30"]),
+    ("fra40", "CAC 40", "🇫🇷", "Indices", ["FRA40.cash", "FRA40", "FR40", "F40"]),
+    ("eu50", "Euro Stoxx 50", "🇪🇺", "Indices", ["EU50.cash", "EU50", "EUSTX50", "STOXX50"]),
+    ("uk100", "FTSE 100", "🇬🇧", "Indices", ["UK100.cash", "UK100", "FTSE100"]),
+    ("jp225", "Nikkei 225", "🇯🇵", "Indices", ["JP225.cash", "JP225", "JPN225", "NIKKEI225", "JAP225"]),
+    ("hk50", "Hang Seng", "🇭🇰", "Indices", ["HK50.cash", "HK50", "HSI50", "HKG50"]),
+    ("aus200", "ASX 200", "🇦🇺", "Indices", ["AUS200.cash", "AUS200", "AU200", "ASX200"]),
+    ("xauusd", "Or", "🥇", "Matières premières", ["XAUUSD", "GOLD", "XAUUSD.cash"]),
+    ("xagusd", "Argent", "🥈", "Matières premières", ["XAGUSD", "SILVER", "XAGUSD.cash"]),
+    ("oil", "Pétrole WTI", "🛢", "Matières premières", ["USOIL.cash", "USOIL", "WTI", "XTIUSD", "CL.cash"]),
+    ("brent", "Pétrole Brent", "🛢", "Matières premières", ["UKOIL.cash", "UKOIL", "BRENT", "XBRUSD"]),
+    ("natgas", "Gaz naturel", "🔥", "Matières premières", ["NATGAS.cash", "NATGAS", "XNGUSD", "NGAS"]),
+    ("eurusd", "EUR/USD", "🇪🇺", "Forex", ["EURUSD"]),
+    ("gbpusd", "GBP/USD", "🇬🇧", "Forex", ["GBPUSD"]),
+    ("usdjpy", "USD/JPY", "🇯🇵", "Forex", ["USDJPY"]),
+    ("usdchf", "USD/CHF", "🇨🇭", "Forex", ["USDCHF"]),
+    ("audusd", "AUD/USD", "🇦🇺", "Forex", ["AUDUSD"]),
+    ("usdcad", "USD/CAD", "🇨🇦", "Forex", ["USDCAD"]),
+    ("dxy", "Dollar Index", "💵", "Forex", ["DXY", "DXY.cash", "USDX", "DX.cash"]),
+    ("btcusd", "Bitcoin", "₿", "Crypto", ["BTCUSD", "BTCUSD.cash", "BTC/USD"]),
+    ("ethusd", "Ethereum", "Ξ", "Crypto", ["ETHUSD", "ETHUSD.cash", "ETH/USD"]),
+    ("solusd", "Solana", "◎", "Crypto", ["SOLUSD", "SOLUSD.cash"]),
+]
+QUOTE_DEFAULT = ["us30", "us500", "us100", "vix", "ger40", "jp225"]
+_quote_symbols = {"exe": None, "map": {}, "names": {}}
+_quote_state = {}
+
+
+def _resolve_symbols():
+    """Trouve, pour chaque indice, le nom exact du symbole chez le broker connecté."""
+    if _quote_symbols["exe"] == SESSION.exe and _quote_symbols["map"]:
+        return _quote_symbols["map"]
+    found = {}
+    try:
+        names = {sy.name.lower(): sy.name for sy in (mt5.symbols_get() or [])}
+    except Exception:
+        names = {}
+    for key, _n, _f, _cat, cands in QUOTE_LIST:
+        for c in cands:
+            real = names.get(c.lower())
+            if real:
+                found[key] = real
+                break
+    _quote_symbols.update(exe=SESSION.exe, map=found, names=names)
+    return found
+
+
+def _quote_row(key, name, flag, real):
+    import time
+
+    try:
+        mt5.symbol_select(real, True)
+        tick = mt5.symbol_info_tick(real)
+        rates = mt5.copy_rates_from_pos(real, mt5.TIMEFRAME_D1, 0, 2)
+        info = mt5.symbol_info(real)
+    except Exception:
+        return None
+    if tick is None or rates is None or len(rates) == 0 or not tick.bid:
+        return None
+    last = float(tick.bid)
+    today = rates[-1]
+    prev = float(rates[-2]["close"] if len(rates) > 1 else today["open"])
+    st = _quote_state.setdefault(key, {"last": None, "at": None})
+    if st["last"] != last:
+        st["last"], st["at"] = last, time.time()
+    return {"key": key, "name": name, "flag": flag, "symbol": real, "digits": getattr(info, "digits", 2) if info else 2,
+            "last": last, "prev": prev, "high": max(float(today["high"]), last), "low": min(float(today["low"]), last),
+            "chg": last - prev, "pct": (last - prev) / prev * 100 if prev else 0.0,
+            "at": dt.datetime.fromtimestamp(st["at"]).strftime("%H:%M:%S") if st["at"] else None}
+
+
+def _read_quotes(keys):
+    out, missing = [], []
+    sym = _resolve_symbols()
+    names = _quote_symbols.get("names") or {}
+    meta = {q[0]: q for q in QUOTE_LIST}
+    for key in keys:
+        if key.startswith("x:"):  # symbole libre tapé par l'utilisateur
+            real = names.get(key[2:].lower())
+            row = _quote_row(key, real or key[2:], "📈", real) if real else None
+        else:
+            q = meta.get(key)
+            real = sym.get(key) if q else None
+            row = _quote_row(key, q[1], q[2], real) if real else None
+        if row:
+            out.append(row)
+        else:
+            missing.append(key)
+    return out, missing
+
+
+_demo_quotes = {"rnd": random.Random(11), "v": None}
+
+
+QUOTE_DEMO_BASE = {"us30": (52449, 53068, 2), "us500": (7671.25, 7704.5, 2), "us100": (29163.25, 29142, 2), "us2000": (2512.4, 2498.7, 2),
+                   "vix": (19.35, 19.38, 2), "ger40": (25261.1, 25261.0, 1), "fra40": (8120.4, 8095.2, 1), "eu50": (5710.3, 5698.1, 1),
+                   "uk100": (9650.3, 9632.1, 1), "jp225": (62617.5, 62362.5, 1), "hk50": (26120.0, 26305.0, 1), "aus200": (8890.2, 8872.4, 1),
+                   "xauusd": (4105.2, 4088.9, 2), "xagusd": (48.62, 48.10, 3), "oil": (61.85, 62.40, 2), "brent": (65.70, 66.12, 2),
+                   "natgas": (3.412, 3.385, 3), "eurusd": (1.1652, 1.1640, 5), "gbpusd": (1.3375, 1.3390, 5), "usdjpy": (151.82, 151.40, 3),
+                   "usdchf": (0.7962, 0.7975, 5), "audusd": (0.6545, 0.6530, 5), "usdcad": (1.3990, 1.4005, 5), "dxy": (98.62, 98.75, 3),
+                   "btcusd": (108250.0, 106900.0, 2), "ethusd": (3890.5, 3842.0, 2), "solusd": (186.4, 181.9, 2)}
+
+
+def _demo_quote_list(keys):
+    import time
+
+    rnd = _demo_quotes["rnd"]
+    if _demo_quotes["v"] is None:
+        _demo_quotes["v"] = {k: {"last": v[0], "high": v[0] * 1.004, "low": v[0] * 0.995, "at": time.time()} for k, v in QUOTE_DEMO_BASE.items()}
+    meta = {q[0]: q for q in QUOTE_LIST}
+    out, missing = [], []
+    for key in keys:
+        if key not in QUOTE_DEMO_BASE:
+            missing.append(key)
+            continue
+        _k, name, flag, _cat, _c = meta[key]
+        last0, prev, dg = QUOTE_DEMO_BASE[key]
+        q = _demo_quotes["v"][key]
+        if rnd.random() < 0.6:
+            q["last"] = round(q["last"] * (1 + rnd.gauss(0, 0.00025)), dg)
+            q["at"] = time.time()
+            q["high"], q["low"] = max(q["high"], q["last"]), min(q["low"], q["last"])
+        out.append({"key": key, "name": name, "flag": flag, "symbol": key.upper(), "digits": dg, "last": q["last"], "prev": prev,
+                    "high": q["high"], "low": q["low"], "chg": q["last"] - prev, "pct": (q["last"] - prev) / prev * 100,
+                    "at": dt.datetime.fromtimestamp(q["at"]).strftime("%H:%M:%S")})
+    return out, missing
+
+
+def _quote_keys():
+    raw = [k.strip() for k in str(request.args.get("keys", "")).split(",") if k.strip()]
+    known = {q[0] for q in QUOTE_LIST}
+    keys = [k for k in raw if k in known or (k.startswith("x:") and 2 < len(k) <= 40)][:30]
+    return keys if raw else list(QUOTE_DEFAULT)
+
+
+@app.get("/api/quotes/catalog")
+def api_quotes_catalog():
+    """Liste des marchés proposés, et ceux que le broker connecté propose vraiment."""
+    avail = set(_quote_symbols["map"]) if _quote_symbols["map"] else None
+    return jsonify({"default": QUOTE_DEFAULT, "items": [
+        {"key": k, "name": n, "flag": f, "cat": c, "available": None if avail is None else k in avail} for k, n, f, c, _x in QUOTE_LIST]})
+
+
+@app.get("/api/quotes")
+def api_quotes():
+    """Cours des grands indices, lus dans la copie cachée de MT5 (mêmes prix que le broker)."""
+    accounts, cache = load_accounts(), load_cache()
+    if mt5 is None or not accounts or all(cache.get(l, {}).get("demo") for l in accounts):
+        q, miss = _demo_quote_list(_quote_keys())
+        return jsonify({"status": "demo", "quotes": q, "missing": miss})
+    _start_mt5_threads()
+    # un compte avec mot de passe mémorisé suffit : les cours sont les mêmes pour tous les comptes du broker
+    pref = str(request.args.get("login", ""))
+    order = ([pref] if pref in accounts else []) + [l for l in accounts if l != pref]
+    acc = next((accounts[l] for l in order if not cache.get(l, {}).get("demo") and get_saved_password(l)), None)
+    if acc is None:
+        return jsonify({"status": "need_password",
+                        "error": "Mémorise le mot de passe d'un compte pour afficher les cours en direct."})
+    if not mt5_lock.acquire(timeout=3):
+        return jsonify({"status": "busy"})  # MT5 occupé (actualisation en cours) : réessayer plus tard
+    try:
+        if SESSION.term is None:
+            SESSION.ensure(acc, get_saved_password(acc["login"]))
+        import time
+        SESSION.used = time.time()
+        quotes, miss = _read_quotes(_quote_keys())
+    except Exception as ex:
+        return jsonify({"status": "error", "error": str(ex)})
+    finally:
+        mt5_lock.release()
+    return jsonify({"status": "running", "quotes": quotes, "missing": miss})
+
+
 # démo : positions fictives qui bougent à chaque seconde
 _demo_live = {"positions": None, "rnd": random.Random(7)}
 
@@ -866,6 +1046,8 @@ def api_prefs_set():
         if imp in ("-1,0,1", "0,1", "1") and countries:
             prefs["eco"] = {"imp": imp, "countries": countries,
                             "range": rng if rng in ("yesterday", "today", "tomorrow", "week", "nextweek") else "today"}
+    if isinstance(body.get("quotes"), list):
+        prefs["quotes"] = [str(x)[:40] for x in body["quotes"] if isinstance(x, str)][:30]
     if isinstance(body.get("mask"), bool):
         prefs["mask"] = body["mask"]
     if body.get("tvCount") in (1, 2, 3, 4):

@@ -347,6 +347,48 @@
   .live-table tfoot td { border-top: 1px solid var(--line); border-bottom: none; font-weight: 650; }
   .live-empty { color: var(--muted); text-align: center; padding: 22px 10px; }
   @media (max-width: 860px) { .live-table .hide-s { display: none; } }
+  .chart-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+  .chart-row > .card { margin-bottom: 0; min-width: 0; }
+  .quotes-card { padding: 16px 0 6px; }
+  .quotes-card .card-head { padding: 0 18px; }
+  .q-arrow { color: var(--gold); }
+  .q-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .q-table th { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 8px;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel-2); text-align: left; white-space: nowrap; }
+  .q-table th:first-child, .q-table td:first-child { padding-left: 18px; }
+  .q-table th:last-child, .q-table td:last-child { padding-right: 18px; }
+  .q-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; transition: background-color .6s; }
+  .q-table tr:last-child td { border-bottom: none; }
+  .q-table .r { text-align: right; }
+  .q-table .q-name { font-weight: 700; color: var(--fg); }
+  .q-table .q-name .fl { margin-right: 8px; }
+  .q-table .q-sym { color: var(--muted); font-size: 11px; font-weight: 500; margin-left: 6px; }
+  .q-table .q-last { font-weight: 700; }
+  .q-table .q-time { color: var(--muted); font-size: 12px; }
+  .q-table td.up-flash { background-color: rgba(34,197,94,.22); transition: none; }
+  .q-table td.down-flash { background-color: rgba(239,68,68,.22); transition: none; }
+  .quotes-card { position: relative; }
+  .q-tools { display: flex; align-items: center; gap: 10px; }
+  .q-btn { padding: 6px 11px; font-size: 12.5px; }
+  .q-pick[hidden] { display: none; }
+  .q-pick { position: absolute; right: 14px; top: 52px; z-index: 6; width: min(430px, calc(100% - 28px)); max-height: 470px; overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.5); padding: 14px 16px; }
+  .q-pick-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .q-pick-head .muted { color: var(--muted); font-size: 12px; }
+  .q-cat { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 6px; }
+  .q-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .q-chips .chip { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 12.5px; padding: 5px 10px; }
+  .q-chips .chip.na { opacity: .45; }
+  .q-chips .chip .x { margin-left: 2px; color: var(--muted); }
+  .q-pick-add { display: flex; gap: 8px; margin-top: 14px; }
+  .q-pick-add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13px; }
+  .q-pick-foot { display: flex; justify-content: space-between; margin-top: 14px; }
+  .q-table tr.q-miss td { color: var(--muted); font-style: italic; }
+  .q-empty { color: var(--muted); text-align: center; padding: 26px 12px !important; white-space: normal !important; }
+  .quotes-card { container-type: inline-size; }
+  @container (max-width: 700px) { .q-table .q-hide { display: none; } }
+  @container (max-width: 520px) { .q-table .q-hide2 { display: none; } .q-table .q-sym { display: none; } }
+  @media (max-width: 1280px) { .chart-row { grid-template-columns: 1fr; } }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
@@ -521,7 +563,8 @@
       <section class="kpis" id="kpis"></section>
       </div>
       <div class="blk" data-block="chart" data-label="Évolution du capital"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
-      <section class="card">
+      <div class="chart-row">
+      <section class="card chart-card">
         <div class="card-head">
           <div><h2>Évolution du capital</h2><span id="chartRange" style="color:var(--muted);font-size:12px"></span></div>
           <div class="zoom-bar" id="zoomBar">
@@ -539,6 +582,27 @@
         <div id="chart"><div class="tip" id="tip"></div></div>
         <div class="chart-hint">Boutons − / + pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
+      <section class="card quotes-card">
+        <div class="card-head">
+          <h2>Marchés <span class="q-arrow">»</span></h2>
+          <div class="q-tools"><span class="live-status" id="quotesStatus"></span>
+            <button class="btn q-btn" id="quotesPickBtn" type="button" title="Choisir les marchés à suivre">⚙ Marchés</button></div>
+        </div>
+        <div class="q-pick" id="quotesPick" hidden>
+          <div class="q-pick-head"><b>Marchés à suivre</b><span class="muted" id="quotesPickCount"></span></div>
+          <div id="quotesPickList"></div>
+          <div class="q-pick-add"><input id="quotesExtra" placeholder="Autre symbole de ton broker (ex. NVDA, US30.cash…)" maxlength="30">
+            <button class="btn" id="quotesExtraAdd" type="button">Ajouter</button></div>
+          <div class="q-pick-foot"><button class="btn" id="quotesReset" type="button">Par défaut</button>
+            <button class="btn primary" id="quotesPickClose" type="button">Terminé</button></div>
+        </div>
+        <table class="q-table">
+          <thead><tr><th>Indice</th><th class="r">Dernier</th><th class="r q-hide">Préc.</th><th class="r q-hide2">Haut</th><th class="r q-hide2">Bas</th>
+            <th class="r">Var.</th><th class="r">Var. %</th><th class="r q-hide">Heure</th></tr></thead>
+          <tbody id="quotesBody"><tr><td colspan="8" class="q-empty">Chargement des cours…</td></tr></tbody>
+        </table>
+      </section>
+      </div>
       </div>
       <div class="blk" data-block="tv" data-label="Graphiques TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <section class="card">
@@ -2374,6 +2438,128 @@ async function liveTick() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });
 liveTick();
+
+// ---------- cotations des marchés (MT5), marchés choisis par l'utilisateur ----------
+let quotesTimer = null, quotesCatalog = null; const quotesPrev = {};
+state.quotes = ['us30', 'us500', 'us100', 'vix', 'ger40', 'jp225'];
+const QUOTES_DEFAULT = state.quotes.slice();
+const fmtQ = (v, dg) => Number(v).toLocaleString('fr-BE', { minimumFractionDigits: dg, maximumFractionDigits: dg });
+function quoteLabel(k) {
+  if (k.startsWith('x:')) return k.slice(2);
+  const it = quotesCatalog && quotesCatalog.items.find(x => x.key === k);
+  return it ? it.name : k;
+}
+function renderQuotes(r) {
+  const body = $('#quotesBody');
+  const st = $('#quotesStatus'); st.innerHTML = '';
+  if (r.status === 'running' || r.status === 'demo') st.append(el('span', 'ok', '● En direct'), r.status === 'demo' ? ' · démo' : ' · MT5');
+  else if (r.status === 'busy') { st.textContent = 'MT5 occupé…'; return; }
+  body.innerHTML = '';
+  const rows = new Map((r.quotes || []).map(q => [q.key, q]));
+  if (!state.quotes.length) {
+    const tr = el('tr'); const td = el('td', 'q-empty', 'Aucun marché choisi : clique sur « ⚙ Marchés ».'); td.colSpan = 8; tr.appendChild(td); body.appendChild(tr); return;
+  }
+  if (!rows.size && r.status !== 'running' && r.status !== 'demo') {
+    const tr = el('tr'); const td = el('td', 'q-empty', r.error || 'Connexion à MT5…'); td.colSpan = 8; tr.appendChild(td); body.appendChild(tr); return;
+  }
+  for (const key of state.quotes) {
+    const q = rows.get(key);
+    const tr = el('tr');
+    if (!q) {
+      tr.className = 'q-miss';
+      const nm = el('td', 'q-name', quoteLabel(key)); const td = el('td', 'r', 'non proposé par ton broker'); td.colSpan = 7;
+      tr.append(nm, td); body.appendChild(tr); continue;
+    }
+    const dg = Math.min(q.digits ?? 2, 5);
+    const nm = el('td', 'q-name'); nm.append(el('span', 'fl', q.flag), q.name);
+    const last = el('td', 'r q-last', fmtQ(q.last, dg));
+    const prevLast = quotesPrev[q.key];
+    if (prevLast !== undefined && prevLast !== q.last) {
+      last.classList.add(q.last > prevLast ? 'up-flash' : 'down-flash');
+      setTimeout(() => last.classList.remove('up-flash', 'down-flash'), 50);
+    }
+    quotesPrev[q.key] = q.last;
+    const c = cls(q.chg), sign = q.chg > 0 ? '+' : q.chg < 0 ? '−' : '';
+    tr.append(nm, last, el('td', 'r q-hide', fmtQ(q.prev, dg)), el('td', 'r q-hide2', fmtQ(q.high, dg)), el('td', 'r q-hide2', fmtQ(q.low, dg)),
+      el('td', 'r ' + c, sign + fmtQ(Math.abs(q.chg), dg)), el('td', 'r ' + c, sign + Math.abs(q.pct).toFixed(2).replace('.', ',') + ' %'),
+      el('td', 'r q-hide q-time', q.at || ''));
+    tr.title = q.symbol;
+    body.appendChild(tr);
+  }
+}
+let lastQuotes = null;
+async function quotesTick() {
+  clearTimeout(quotesTimer);
+  const visible = state.page === 'dash' && !document.hidden && state.accounts.length > 0;
+  if (visible && state.quotes.length) {
+    try { lastQuotes = await api('/api/quotes?keys=' + encodeURIComponent(state.quotes.join(',')) + '&login=' + encodeURIComponent(state.sel || '')); }
+    catch (e) { lastQuotes = { status: 'error', error: 'Cours indisponibles : ' + e.message }; }
+    renderQuotes(lastQuotes);
+  } else if (visible) renderQuotes({ status: 'idle', quotes: [] });
+  quotesTimer = setTimeout(quotesTick, visible ? 2000 : 3000);
+}
+function saveQuotes() {
+  api('/api/prefs', { quotes: state.quotes }).catch(() => {});
+  buildQuotesPick(); if (lastQuotes) renderQuotes(lastQuotes); quotesTick();
+}
+function toggleQuote(k) {
+  state.quotes = state.quotes.includes(k) ? state.quotes.filter(x => x !== k) : [...state.quotes, k].slice(0, 30);
+  saveQuotes();
+}
+function buildQuotesPick() {
+  const box = $('#quotesPickList'); box.innerHTML = '';
+  $('#quotesPickCount').textContent = state.quotes.length + ' suivi' + (state.quotes.length > 1 ? 's' : '');
+  if (!quotesCatalog) { box.appendChild(el('div', 'muted', 'Chargement…')); return; }
+  const cats = [...new Set(quotesCatalog.items.map(x => x.cat))];
+  for (const cat of cats) {
+    box.appendChild(el('div', 'q-cat', cat));
+    const row = el('div', 'q-chips');
+    for (const it of quotesCatalog.items.filter(x => x.cat === cat)) {
+      const on = state.quotes.includes(it.key);
+      const c = el('button', 'chip theme-chip' + (on ? ' on' : '') + (it.available === false ? ' na' : '')); c.type = 'button';
+      c.append(el('span', 'ck', on ? '✓' : ''), it.flag + ' ' + it.name);
+      if (it.available === false) c.title = 'Pas proposé par ton broker';
+      c.onclick = () => toggleQuote(it.key);
+      row.appendChild(c);
+    }
+    box.appendChild(row);
+  }
+  const extras = state.quotes.filter(k => k.startsWith('x:'));
+  if (extras.length) {
+    box.appendChild(el('div', 'q-cat', 'Mes symboles'));
+    const row = el('div', 'q-chips');
+    for (const k of extras) {
+      const c = el('button', 'chip on'); c.type = 'button'; c.append('📈 ' + k.slice(2), el('span', 'x', '✕'));
+      c.title = 'Retirer'; c.onclick = () => toggleQuote(k); row.appendChild(c);
+    }
+    box.appendChild(row);
+  }
+}
+async function openQuotesPick() {
+  const p = $('#quotesPick'); p.hidden = !p.hidden;
+  if (p.hidden) return;
+  buildQuotesPick();
+  try { quotesCatalog = await api('/api/quotes/catalog'); } catch (e) {}
+  buildQuotesPick();
+}
+$('#quotesPickBtn').onclick = e => { e.stopPropagation(); openQuotesPick(); };
+$('#quotesPickClose').onclick = () => { $('#quotesPick').hidden = true; };
+$('#quotesReset').onclick = () => { state.quotes = QUOTES_DEFAULT.slice(); saveQuotes(); };
+function addExtraQuote() {
+  const v = $('#quotesExtra').value.trim().replace(/[^\w.#/+\-]/g, '').slice(0, 30);
+  if (!v) return;
+  const k = 'x:' + v;
+  if (!state.quotes.includes(k)) { state.quotes.push(k); saveQuotes(); }
+  $('#quotesExtra').value = '';
+}
+$('#quotesExtraAdd').onclick = addExtraQuote;
+$('#quotesExtra').onkeydown = e => { if (e.key === 'Enter') addExtraQuote(); };
+document.addEventListener('pointerdown', e => {
+  const p = $('#quotesPick');
+  if (!p.hidden && !p.contains(e.target) && e.target.id !== 'quotesPickBtn') p.hidden = true;
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) quotesTick(); });
+api('/api/prefs').then(p => { if (Array.isArray(p.quotes)) state.quotes = p.quotes; }).catch(() => {}).finally(quotesTick);
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
