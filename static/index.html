@@ -471,7 +471,7 @@
   .week .p { font-weight: 650; }
   .notice { background: var(--gold-soft); border: 1px solid rgba(196,138,69,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
   .notice.error { background: var(--loss-soft); border-color: rgba(239,68,68,.4); }
-  /* ---------- page Nos offres ---------- */
+  /* ---------- page Tarification ---------- */
   #offres { max-width: 980px; margin: 0 auto; padding: 8px 0 40px; }
   .of-head { text-align: center; margin: 6px 0 30px; }
   .of-logo { width: 120px; display: block; margin: 0 auto 10px; }
@@ -600,7 +600,7 @@
       </div>
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
-      <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Nos offres</span></button>
+      <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
     </nav>
     <div class="spacer"></div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
@@ -797,7 +797,7 @@
     <div id="offres" hidden>
       <div class="of-head">
         <img class="of-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
-        <h1>Nos offres</h1>
+        <h1>Tarification</h1>
         <p>Ton dashboard de trading complet : capital, résultats, journal, suivi en direct et calendrier économique.</p>
       </div>
       <div class="of-active" id="ofActive" hidden></div>
@@ -1787,7 +1787,7 @@ $('#refreshBtn').onclick = async () => {
 };
 let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && renderChart(), 150); });
 
-// ---------- abonnement : page « Nos offres » et verrouillage ----------
+// ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 function applyLock() { document.body.classList.toggle('locked', !licOk()); }

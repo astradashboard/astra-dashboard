@@ -1807,7 +1807,7 @@ def _paywall():
     if p == "/" or p.startswith(_OPEN_PATHS):
         return None
     if not licence_active():
-        return jsonify({"error": "Abonnement requis : choisis une offre dans « Nos offres ».", "licence": False}), 402
+        return jsonify({"error": "Abonnement requis : choisis une offre dans « Tarification ».", "licence": False}), 402
     return None
 
 
@@ -1915,7 +1915,7 @@ def api_connect():
     real = [l for l in accounts0 if not cache0.get(l, {}).get("demo")]
     if limit is not None and login not in accounts0 and len(real) >= limit:
         bigger = max(load_offers().get("plans") or [{}], key=lambda x: int(x.get("accounts", 1)))
-        more = (f"Passe à l'offre {bigger.get('name', 'supérieure')} dans « Nos offres » pour en connecter jusqu'à "
+        more = (f"Passe à l'offre {bigger.get('name', 'supérieure')} dans « Tarification » pour en connecter jusqu'à "
                 f"{bigger.get('accounts')}, ou retire d'abord un compte." if int(bigger.get("accounts", 1)) > limit
                 else "Retire d'abord un compte pour en connecter un autre.")
         return jsonify({"error": f"Ton offre permet de connecter {limit} compte{'s' if limit > 1 else ''}. " + more,
