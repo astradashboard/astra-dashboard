@@ -216,6 +216,22 @@
   .eco-line-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; padding-bottom: 6px; flex-wrap: wrap; }
   .eco-line-tools .seg button { padding: 6px 10px; border: none; margin: 0; font-size: 13px; }
   .eco-line-tools .seg button.on { color: var(--gold); }
+  .eco-zones { position: relative; }
+  .eco-zones-btn { padding: 7px 12px; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
+  .eco-tabs .eco-zones-btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; margin: 0; color: var(--fg); padding: 8px 12px; }
+  .eco-tabs .eco-zones-btn:hover { border-color: rgba(196,138,69,.6); }
+  .eco-zones-btn .flags { color: var(--muted); }
+  .eco-zones-btn .car { color: var(--muted); font-size: 10px; }
+  .eco-zones-menu[hidden] { display: none; }
+  .eco-zones-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; width: 250px; max-height: 420px; overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 40px rgba(0,0,0,.5); padding: 8px; }
+  .eco-zones-menu .zq { display: flex; gap: 6px; padding: 2px 4px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .eco-zones-menu .zq button { flex: 1; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 5px; font-size: 12px; }
+  .eco-zones-menu .zq button:hover { color: var(--fg); }
+  .eco-zones-menu label { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--fg); }
+  .eco-zones-menu label:hover { background: var(--panel-2); }
+  .eco-zones-menu input { accent-color: var(--gold); width: 15px; height: 15px; margin: 0; }
+  .eco-zones-menu .cur { margin-left: auto; color: var(--muted); font-size: 11.5px; }
   .eco-tz { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
   .eco-tz select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; font: inherit; font-size: 13px; cursor: pointer; max-width: 230px; }
   .eco-tabs button.on { color: var(--fg); border-bottom-color: var(--gold); font-weight: 600; }
@@ -670,6 +686,10 @@
         <button type="button" data-range="week">Cette semaine</button>
         <button type="button" data-range="nextweek">Semaine prochaine</button>
         <div class="eco-line-tools">
+          <div class="eco-zones" id="ecoZones">
+            <button type="button" class="btn eco-zones-btn" id="ecoZonesBtn" title="Zones et pays des annonces"></button>
+            <div class="eco-zones-menu" id="ecoCountries" hidden></div>
+          </div>
           <div class="seg" id="ecoImp" title="Importance des annonces">
             <button type="button" data-imp="-1,0,1" title="Toutes les annonces"><span class="bulls b1"><i></i></span></button>
             <button type="button" data-imp="0,1" title="2 étoiles et plus"><span class="bulls b2"><i></i></span> et plus</button>
@@ -679,7 +699,6 @@
           <span class="eco-upd" id="ecoUpd"></span>
         </div>
       </div>
-      <div class="chips" id="ecoCountries"></div>
       <div class="card eco-card">
         <table class="eco-table">
           <thead><tr><th class="c-time">Heure</th><th class="c-cur">Dev.</th><th class="c-imp">Imp.</th><th>Événement</th>
@@ -2089,16 +2108,28 @@ function buildEcoFilters() {
     b.classList.toggle('on', b.dataset.range === state.eco.range);
     b.onclick = () => { state.eco.range = b.dataset.range; saveEco(); buildEcoFilters(); renderEco(true); };
   });
+  // menu déroulant des zones (cases à cocher)
+  const btn = $('#ecoZonesBtn'); btn.innerHTML = '';
+  const chosen = ECO_COUNTRIES.filter(c => state.eco.countries.includes(c[0]));
+  btn.append('🌍 Zones', el('span', 'flags', chosen.length === ECO_COUNTRIES.length ? 'toutes' : chosen.length <= 4 ? chosen.map(c => c[1]).join('') : chosen.length + ' choisies'), el('span', 'car', '▾'));
+  btn.title = chosen.map(c => c[2]).join(', ');
   const box = $('#ecoCountries'); box.innerHTML = '';
-  for (const [code, flag, label] of ECO_COUNTRIES) {
-    const c = el('button', 'chip' + (state.eco.countries.includes(code) ? ' on' : ''), flag + ' ' + label); c.type = 'button';
-    c.onclick = () => {
-      const on = state.eco.countries.includes(code);
-      if (on && state.eco.countries.length === 1) return; // au moins un pays
-      state.eco.countries = on ? state.eco.countries.filter(x => x !== code) : state.eco.countries.concat(code);
+  const zq = el('div', 'zq');
+  const setAll = list => { state.eco.countries = list; saveEco(); buildEcoFilters(); renderEco(true); };
+  const bAll = el('button', null, 'Toutes'); bAll.type = 'button'; bAll.onclick = () => setAll(ECO_COUNTRIES.map(c => c[0]));
+  const bMaj = el('button', null, 'Principales'); bMaj.type = 'button'; bMaj.onclick = () => setAll(['US', 'EU', 'DE', 'FR', 'GB', 'CH', 'JP', 'CN']);
+  const bUs = el('button', null, 'US seul'); bUs.type = 'button'; bUs.onclick = () => setAll(['US']);
+  zq.append(bAll, bMaj, bUs); box.appendChild(zq);
+  for (const [code, flag, label, cur] of ECO_COUNTRIES) {
+    const lb = el('label'); const cb = document.createElement('input'); cb.type = 'checkbox';
+    cb.checked = state.eco.countries.includes(code);
+    cb.onchange = () => {
+      if (!cb.checked && state.eco.countries.length === 1) { cb.checked = true; return; } // au moins une zone
+      state.eco.countries = cb.checked ? state.eco.countries.concat(code) : state.eco.countries.filter(x => x !== code);
       saveEco(); buildEcoFilters(); renderEco(true);
     };
-    box.appendChild(c);
+    lb.append(cb, el('span', null, flag + ' ' + label), el('span', 'cur', cur));
+    box.appendChild(lb);
   }
 }
 const ECO_INVERSE = /unemploy|jobless|claims|chômage|deficit|déficit/i; // une hausse est une mauvaise nouvelle
@@ -2167,6 +2198,11 @@ async function renderEco(force) {
   ecoTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) renderEco(); }, 60000);
   if (force && nextIdx > 0) { const r = body.querySelector('tr.next'); if (r) r.scrollIntoView({ block: 'center' }); }
 }
+$('#ecoZonesBtn').onclick = e => { e.stopPropagation(); $('#ecoCountries').hidden = !$('#ecoCountries').hidden; };
+document.addEventListener('pointerdown', e => {
+  const m = $('#ecoCountries');
+  if (!m.hidden && !$('#ecoZones').contains(e.target)) m.hidden = true;
+});
 function saveEco() { api('/api/prefs', { eco: state.eco }).catch(() => {}); }
 buildEcoFilters(); buildEcoTz();
 
