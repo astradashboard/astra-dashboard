@@ -1740,6 +1740,11 @@ def _creem_call(action, fields):
     msg = data.get("error") or data.get("message")
     if isinstance(msg, list):
         msg = " ".join(map(str, msg))
+    if code in (401, 403) and not data.get("status"):
+        # le relais n'a pas une clé API Creem valide pour ce mode (test / réel)
+        if action == "activate":
+            return {"activated": False, "error": "relais mal configuré (clé API Creem refusée)", "license_key": lk}
+        raise ConnectionError("relais mal configuré")
     if action == "activate":
         if code == 200 and data.get("status") == "active":
             return {"activated": True, "license_key": lk, "instance": inst or {}, "meta": meta}
@@ -1998,7 +2003,10 @@ def api_licence_activate():
     meta, lk = r.get("meta") or {}, r.get("license_key") or {}
     if not r.get("activated"):
         err = str(r.get("error") or "Clé invalide.")
-        if "limit" in err.lower():
+        if "relais mal configuré" in err:
+            err = ("Le service de vérification des clés est mal configuré (clé API Creem refusée). "
+                   "Vérifie la clé API dans le Worker Cloudflare : clé de test avec CREEM_TEST = 1, ou clé réelle sans CREEM_TEST.")
+        elif "limit" in err.lower():
             err = (f"Cette clé est déjà utilisée sur {lk.get('activation_usage', 'plusieurs')} PC "
                    f"(maximum {lk.get('activation_limit', '?')}). Retire-la d'un autre PC d'abord.")
         elif "not found" in err.lower() or "invalid" in err.lower():
