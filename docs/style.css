@@ -163,9 +163,9 @@ footer .risk { grid-column: 1 / -1; font-size: 12.5px; color: #677084; border-to
   footer .wrap { grid-template-columns: 1fr; }
   .over { right: 0; bottom: -24px; }
 }
-.burger { display: none; width: 44px; height: 44px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel2); padding: 0 11px;
+.burger { display: none; -webkit-appearance: none; appearance: none; flex: none; width: 44px; height: 44px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel2); padding: 0 11px; color: var(--fg);
   flex-direction: column; justify-content: center; gap: 5px; cursor: pointer; }
-.burger span { display: block; height: 2px; border-radius: 2px; background: var(--fg); transition: transform .2s, opacity .2s; }
+.burger span { display: block; width: 100%; height: 2px; border-radius: 2px; background: var(--fg); transition: transform .2s, opacity .2s; }
 @media (max-width: 720px) {
   .burger { display: flex; }
   .nav .wrap { gap: 10px; }
