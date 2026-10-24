@@ -1723,7 +1723,7 @@ def _ls_call(action, **fields):
 
 def _plan_from_meta(meta):
     offers = load_offers()
-    plans = offers.get("plans") or []
+    plans = [p for p in offers.get("plans") or [] if not p.get("trial")]  # l'essai n'est jamais une clé payante
     vid = meta.get("variant_id")
     for p in plans:
         if p.get("variant_id") and str(p["variant_id"]) == str(vid):
@@ -1740,15 +1740,67 @@ def _store_ok(meta):
     return not want or str(meta.get("store_id")) == str(want)
 
 
+TRIAL_DAYS = 7
+
+
+def _trial_marks():
+    """Dates de début d'essai déjà enregistrées sur ce PC (fichier caché + registre Windows)."""
+    found = []
+    try:
+        lic = _load(LICENCE_FILE, {})
+        if lic.get("trial_start"):
+            found.append(float(lic["trial_start"]))
+    except Exception:
+        pass
+    mark = os.path.join(os.environ.get("LOCALAPPDATA") or DATA_DIR, "ASTRA", ".essai")
+    try:
+        with open(mark, encoding="utf-8") as f:
+            found.append(float(f.read().strip()))
+    except Exception:
+        pass
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\ASTRA Dashboard") as k:
+            found.append(float(winreg.QueryValueEx(k, "Essai")[0]))
+    except Exception:
+        pass
+    return found
+
+
+def _trial_mark(ts):
+    mark = os.path.join(os.environ.get("LOCALAPPDATA") or DATA_DIR, "ASTRA", ".essai")
+    try:
+        os.makedirs(os.path.dirname(mark), exist_ok=True)
+        with open(mark, "w", encoding="utf-8") as f:
+            f.write(str(ts))
+    except Exception:
+        pass
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\ASTRA Dashboard") as k:
+            winreg.SetValueEx(k, "Essai", 0, winreg.REG_SZ, str(ts))
+    except Exception:
+        pass
+
+
 def _lic_public(lic):
     if not lic or not lic.get("key"):
-        return {"active": False, "status": "none"}
+        return {"active": False, "status": "none", "trial_used": bool(_trial_marks())}
+    if lic.get("trial"):
+        import time
+        end = float(lic.get("trial_end", 0))
+        left = max(0, end - time.time())
+        return {"active": bool(lic.get("active")), "status": lic.get("status"), "owner": False, "trial": True, "trial_used": True,
+                "plan": lic.get("plan"), "plan_name": lic.get("plan_name"), "max_accounts": lic.get("max_accounts"),
+                "renews_at": dt.datetime.fromtimestamp(end).isoformat(timespec="seconds"), "days_left": int(-(-left // 86400)),
+                "key_hint": "Essai gratuit", "error": lic.get("error")}
     k = lic["key"]
     hint = k[:4] + "…" + k[-4:] if len(k) > 10 else "…"
     return {"active": bool(lic.get("active")), "status": lic.get("status"), "owner": bool(lic.get("owner")),
             "plan": lic.get("plan"), "plan_name": lic.get("plan_name"), "max_accounts": lic.get("max_accounts"),
             "email": lic.get("email"), "renews_at": lic.get("expires_at"), "key_hint": hint,
-            "checked_at": lic.get("checked_at"), "offline": bool(lic.get("offline")), "error": lic.get("error")}
+            "checked_at": lic.get("checked_at"), "offline": bool(lic.get("offline")), "error": lic.get("error"),
+            "trial_used": bool(_trial_marks())}
 
 
 def licence(force=False):
@@ -1763,6 +1815,11 @@ def licence(force=False):
             lic["active"] = _owner_key(lic["key"])
             return lic
         now = time.time()
+        if lic.get("trial"):  # essai gratuit : actif jusqu'à la date de fin, sans vérification en ligne
+            lic["active"] = now < float(lic.get("trial_end", 0))
+            lic["status"] = "trial" if lic["active"] else "expired"
+            lic["error"] = None if lic["active"] else "Ton essai gratuit de 7 jours est terminé : choisis une offre pour continuer."
+            return lic
         if not force and lic.get("active") and now - lic.get("last_ok", 0) < LIC_RECHECK:
             return lic
         if not force and now - lic.get("last_try", 0) < 60:
@@ -1891,7 +1948,29 @@ def api_licence_activate():
            "status": lk.get("status", "active"), "plan": plan.get("id"), "plan_name": plan.get("name"),
            "max_accounts": int(plan.get("accounts", 1)), "email": meta.get("customer_email"), "expires_at": lk.get("expires_at"),
            "checked_at": dt.datetime.now().isoformat(timespec="seconds"), "last_ok": time.time()}
+    old = _load(LICENCE_FILE, {})
+    if old.get("trial_start"):
+        lic["trial_start"] = old["trial_start"]
     _save(LICENCE_FILE, lic)
+    return jsonify(_lic_public(lic))
+
+
+@app.post("/api/licence/trial")
+def api_licence_trial():
+    import time
+
+    cur = licence()
+    if cur.get("active") and not cur.get("trial"):
+        return jsonify({"error": "Tu as déjà un abonnement actif."}), 400
+    if _trial_marks():
+        return jsonify({"error": "L'essai gratuit a déjà été utilisé sur ce PC. Choisis une offre pour continuer."}), 400
+    plan = next((p for p in load_offers().get("plans", []) if p.get("trial")), {"id": "essai", "name": "Essai gratuit", "accounts": 1})
+    now = time.time()
+    days = int(plan.get("trial_days", TRIAL_DAYS))
+    lic = {"key": "ESSAI", "trial": True, "trial_start": now, "trial_end": now + days * 86400, "active": True, "status": "trial",
+           "plan": plan.get("id"), "plan_name": plan.get("name"), "max_accounts": int(plan.get("accounts", 1)), "owner": False}
+    _save(LICENCE_FILE, lic)
+    _trial_mark(now)
     return jsonify(_lic_public(lic))
 
 
@@ -1903,7 +1982,7 @@ def api_licence_remove():
             _ls_call("deactivate", license_key=lic["key"], instance_id=lic["instance_id"])  # libère la place pour un autre PC
         except Exception:
             pass
-    _save(LICENCE_FILE, {})
+    _save(LICENCE_FILE, {"trial_start": lic["trial_start"]} if lic.get("trial_start") else {})  # l'essai reste « utilisé »
     return jsonify({"ok": True})
 
 

@@ -514,12 +514,13 @@
   .notice { background: var(--gold-soft); border: 1px solid rgba(196,138,69,.35); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
   .notice.error { background: var(--loss-soft); border-color: rgba(239,68,68,.4); }
   /* ---------- page Tarification ---------- */
-  #offres { max-width: 980px; margin: 0 auto; padding: 8px 0 40px; }
+  #offres { max-width: 1180px; margin: 0 auto; padding: 8px 0 40px; }
   .of-head { text-align: center; margin: 6px 0 30px; }
   .of-logo { width: 120px; display: block; margin: 0 auto 10px; }
   .of-head h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
   .of-head p { margin: 8px auto 0; color: var(--muted); font-size: 15px; max-width: 560px; }
-  .of-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: stretch; }
+  .of-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; align-items: stretch; }
+  .of-plan.trial .of-price b { color: var(--win); }
   .of-plan { cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s, transform .15s;
     position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 28px 28px 24px; display: flex; flex-direction: column; }
   .of-plan.best { border-color: rgba(196,138,69,.75); background: linear-gradient(180deg, rgba(196,138,69,.10), var(--panel) 45%); box-shadow: 0 18px 50px rgba(196,138,69,.10); }
@@ -848,6 +849,7 @@
       <div class="of-trust">
         <span><b>Sans engagement</b> · résiliable à tout moment</span>
         <span><b>Paiement sécurisé</b> par carte, Apple Pay ou PayPal</span>
+        <span><b>Essai gratuit 7 jours</b> sans carte bancaire</span>
         <span><b>Accès immédiat</b> : ta clé arrive par e-mail</span>
       </div>
       <div class="card of-key" id="ofKeyBox">
@@ -2169,18 +2171,19 @@ async function renderOffres() {
     box.hidden = false;
     if (!lic.active) box.classList.add('warn');
     const tx = el('div', 'tx');
-    tx.appendChild(el('b', null, lic.active ? (lic.owner ? 'Accès propriétaire' : 'Abonnement ' + (lic.plan_name || '') + ' actif') : 'Abonnement inactif'));
+    tx.appendChild(el('b', null, lic.trial ? (lic.active ? 'Essai gratuit en cours · plus que ' + lic.days_left + ' jour' + (lic.days_left > 1 ? 's' : '') : 'Essai gratuit terminé')
+      : lic.active ? (lic.owner ? 'Accès propriétaire' : 'Abonnement ' + (lic.plan_name || '') + ' actif') : 'Abonnement inactif'));
     const parts = [];
     if (lic.owner) parts.push('Accès illimité, tous les comptes');
     else if (lic.max_accounts) parts.push(lic.max_accounts + ' compte' + (lic.max_accounts > 1 ? 's' : '') + ' maximum (' + (lic.real_accounts || 0) + ' connecté' + ((lic.real_accounts || 0) > 1 ? 's' : '') + ')');
     if (lic.email) parts.push(lic.email);
-    if (lic.renews_at && !lic.owner) parts.push((lic.active ? 'valable jusqu\'au ' : 'expiré le ') + fmtLicDay(lic.renews_at));
-    parts.push('clé ' + lic.key_hint);
+    if (lic.renews_at && !lic.owner) parts.push((lic.active ? (lic.trial ? 'jusqu\'au ' : 'valable jusqu\'au ') : (lic.trial ? 'terminé le ' : 'expiré le ')) + fmtLicDay(lic.renews_at));
+    if (!lic.trial) parts.push('clé ' + lic.key_hint);
     if (lic.offline && lic.active) parts.push('vérifié hors ligne');
     tx.appendChild(el('div', null, parts.join(' · ')));
     if (lic.error) tx.appendChild(el('div', null, lic.error));
     const acts = el('div', 'acts');
-    if (!lic.owner && offresData.portal_url) {
+    if (!lic.owner && !lic.trial && offresData.portal_url) {
       const g = el('button', 'btn', 'Gérer mon abonnement'); g.type = 'button'; g.onclick = () => openPay(offresData.portal_url); acts.appendChild(g);
     }
     const v = el('button', 'btn', 'Vérifier'); v.type = 'button';
@@ -2190,23 +2193,23 @@ async function renderOffres() {
       if (!confirmRemoveLic) { confirmRemoveLic = true; rm.textContent = 'Confirmer ?'; setTimeout(() => { confirmRemoveLic = false; rm.textContent = 'Retirer de ce PC'; }, 3000); return; }
       await api('/api/licence/remove', {}); confirmRemoveLic = false; await refreshLicence(); toast('Licence retirée de ce PC.');
     };
-    acts.append(v, rm);
+    if (lic.trial) acts.innerHTML = ''; else acts.append(v, rm);
     box.append(el('div', 'st', lic.active ? '✓' : '!'), tx, acts);
   } else box.hidden = true;
-  $('#ofKeyBox').hidden = !!lic.active;
+  $('#ofKeyBox').hidden = !!lic.active && !lic.trial;
   // les offres
   const wrap = $('#ofPlans'); wrap.innerHTML = '';
   const plans = offresData.plans || [];
   if (!plans.some(p => p.id === state.ofSel)) state.ofSel = (plans.find(p => lic.active && lic.plan === p.id) || plans.find(p => p.badge) || plans[0] || {}).id;
   plans.forEach((p, i) => {
     const best = p.id === state.ofSel; // l'offre sélectionnée est mise en avant
-    const c = el('div', 'of-plan' + (best ? ' best' : '') + (lic.active && lic.plan === p.id ? ' current' : ''));
+    const c = el('div', 'of-plan' + (p.trial ? ' trial' : '') + (best ? ' best' : '') + (lic.active && lic.plan === p.id ? ' current' : ''));
     c.tabIndex = 0; c.setAttribute('role', 'radio'); c.setAttribute('aria-checked', best ? 'true' : 'false');
     c.onclick = ev => { if (ev.target.closest('button')) return; if (state.ofSel !== p.id) { state.ofSel = p.id; renderOffres(); } };
     c.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); state.ofSel = p.id; renderOffres(); } };
     if (p.badge) c.appendChild(el('div', 'of-badge', p.badge));
     c.appendChild(el('h2', null, p.name));
-    c.appendChild(el('div', 'of-acc', p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
+    c.appendChild(el('div', 'of-acc', p.trial ? 'Sans carte bancaire · 1 compte connecté' : p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
     const pr = el('div', 'of-price'); pr.append(el('b', null, p.price), el('span', null, p.period || 'par mois')); c.appendChild(pr);
     const ul = el('ul');
     const feats = (offresData.features || []).length ? offresData.features : (p.features || []).map(f => ({ label: f, values: { [p.id]: true } }));
@@ -2219,16 +2222,25 @@ async function renderOffres() {
     }
     c.appendChild(ul);
     let label = 'S\'abonner', dis = false;
-    if (lic.active && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
+    if (p.trial) {
+      label = lic.trial && lic.active ? 'Essai en cours' : lic.trial_used ? 'Essai déjà utilisé' : lic.active ? 'Inclus dans ton abonnement' : 'Commencer l\'essai gratuit';
+      dis = lic.active || !!lic.trial_used;
+    } else if (lic.active && !lic.trial && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
     else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
     else if (!p.checkout_url) { label = 'Bientôt disponible'; dis = true; }
-    else if (lic.active) label = 'Changer pour cette offre';
+    else if (lic.active && !lic.trial) label = 'Changer pour cette offre';
     const b = el('button', 'btn' + (best || plans.length === 1 ? ' primary' : ''), label); b.type = 'button'; b.disabled = dis;
-    b.onclick = () => state.ofSel !== p.id ? (state.ofSel = p.id, renderOffres(), openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url)) : openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url);
+    if (p.trial) b.onclick = () => startTrial(b);
+    else b.onclick = () => state.ofSel !== p.id ? (state.ofSel = p.id, renderOffres(), openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url)) : openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url);
     c.appendChild(b); wrap.appendChild(c);
   });
 }
 let confirmRemoveLic = false;
+async function startTrial(btn) {
+  btn.disabled = true; btn.textContent = 'Activation…';
+  try { await api('/api/licence/trial', {}); await refreshLicence(); toast('Essai gratuit activé : 7 jours pour tout découvrir !'); }
+  catch (e) { toast(e.message); btn.disabled = false; btn.textContent = 'Commencer l\'essai gratuit'; }
+}
 async function openPay(url) {
   try { await api('/api/open-url', { url }); toast('La page de paiement s\'ouvre dans ton navigateur. Ta clé arrive ensuite par e-mail.'); }
   catch (e) { window.open(url, '_blank', 'noopener'); }
