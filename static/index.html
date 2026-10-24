@@ -376,6 +376,32 @@
   .live-table tfoot td { border-top: 1px solid var(--line); border-bottom: none; font-weight: 650; }
   .live-empty { color: var(--muted); text-align: center; padding: 22px 10px; }
   .perk-box { display: grid; justify-items: center; gap: 12px; }
+  /* assistant d'aide */
+  .help-fab { position: fixed; right: 22px; bottom: 22px; z-index: 9; display: inline-flex; align-items: center; gap: 8px; background: var(--gold); color: #0a0d14;
+    border: none; border-radius: 999px; padding: 10px 16px 10px 10px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .help-fab[hidden], .help-panel[hidden] { display: none; }
+  .help-fab .q { width: 26px; height: 26px; border-radius: 50%; background: #0a0d14; color: var(--gold); display: grid; place-items: center; font-size: 15px; }
+  .help-fab.open { opacity: .85; }
+  .help-panel { position: fixed; right: 22px; bottom: 82px; z-index: 9; width: min(390px, calc(100vw - 28px)); height: min(560px, calc(100vh - 110px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.6); display: flex; flex-direction: column; overflow: hidden; }
+  .h-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+  .h-head b { display: block; font-size: 15px; } .h-head small { color: var(--muted); font-size: 12px; }
+  .h-head button { background: none; border: none; color: var(--muted); font-size: 15px; padding: 4px 6px; }
+  .h-head button:hover { color: var(--fg); }
+  .h-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .h-msg { max-width: 88%; }
+  .h-msg.me { align-self: flex-end; }
+  .h-msg .h-txt { padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; }
+  .h-msg.bot .h-txt { background: var(--panel-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .h-msg.me .h-txt { background: var(--gold-soft); border: 1px solid rgba(196,138,69,.45); border-top-right-radius: 4px; }
+  .h-msg .h-txt b { color: var(--gold); font-weight: 650; }
+  .h-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; } .h-acts .btn { padding: 6px 11px; font-size: 12.5px; }
+  .h-sugg { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 8px; }
+  .h-sugg .chip { text-align: left; font-size: 12.5px; padding: 6px 11px; }
+  .h-sugg .chip:hover { color: var(--fg); border-color: rgba(196,138,69,.6); }
+  .h-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  .h-form input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 9px 11px; font: inherit; font-size: 13.5px; }
+  .h-form input:focus { outline: none; border-color: var(--gold); }
   /* cartes de résultats */
   .modal.card-modal { max-width: 1040px; display: grid; grid-template-columns: 330px 1fr; gap: 26px; padding: 24px; }
   .card-side { display: flex; flex-direction: column; }
@@ -910,6 +936,13 @@
       </div>
     </div>
   </form>
+</div>
+
+<button class="help-fab" id="helpFab" type="button" title="Aide sur l'application" hidden><span class="q">?</span><span class="t">Aide</span></button>
+<div class="help-panel" id="helpPanel" hidden>
+  <div class="h-head"><div><b>Assistant ASTRA</b><small>Aide sur l'application</small></div><button type="button" id="helpClose" title="Fermer">✕</button></div>
+  <div class="h-msgs" id="helpMsgs"></div>
+  <form class="h-form" id="helpForm"><input id="helpInput" placeholder="Pose ta question…" autocomplete="off" maxlength="200"><button class="btn primary" type="submit">Envoyer</button></form>
 </div>
 
 <div class="modal-bg" id="cardBg">
@@ -2160,12 +2193,145 @@ api('/api/prefs').then(p => { if (p.card && typeof p.card === 'object') Object.a
   handle: String(p.card.handle || '').slice(0, 30), hideAcc: !!p.card.hideAcc, qr: p.card.qr !== false,
   links: p.card.links && typeof p.card.links === 'object' ? p.card.links : {} }); }).catch(() => {});
 
+// ---------- assistant d'aide (hors ligne) ----------
+const HELP_KB = [
+  { q: 'Comment ajouter un compte MT5 ?', k: 'ajouter compte connecte mt5 ftmo prop firm brancher relier login identifiant premier',
+    a: 'Dans la colonne de gauche, sous **Tableau de bord**, clique sur **+ Ajouter un compte**.\nRemplis le **numéro de compte**, le **serveur** (exactement comme dans MT5, ex. FTMO-Server) et le **mot de passe**. Coche « Mémoriser le mot de passe » pour ne plus avoir à le retaper.\nL\'app lit ensuite ton capital et tout ton historique toute seule.', act: [['Ajouter un compte', 'add']] },
+  { q: 'Quel mot de passe utiliser ?', k: 'mot passe password investisseur principal lecture seule master trader securite',
+    a: 'Le **mot de passe investisseur** (lecture seule) suffit : l\'app ne passe jamais d\'ordres, elle lit seulement ton capital et tes trades. Tu le trouves dans les identifiants du compte, dans ton espace client FTMO.\nLe mot de passe principal marche aussi.' },
+  { q: 'La connexion au compte est refusée', k: 'connexion refusee erreur impossible connecter connecte echec serveur introuvable mauvais invalide marche arrive probleme bug bloque fonctionne',
+    a: 'Vérifie trois choses :\n1. Le **serveur** doit être écrit exactement comme dans MT5 (dans MT5 : Fichier → Se connecter à un compte de trading).\n2. Le **numéro de compte** et le **mot de passe** (attention aux majuscules).\n3. Que le compte est toujours actif chez ta prop firm.\nSi plusieurs MT5 sont installés sur ton PC, indique le chemin du terminal dans « Options avancées ».' },
+  { q: 'Mes données ne sont pas à jour', k: 'actualiser rafraichir mise jour donnees anciennes historique manquant trades manquants charger recharger',
+    a: 'Clique sur **↻ Actualiser** en haut à droite du tableau de bord. Pour un seul compte : clic droit sur le compte → **Actualiser ce compte**.\nLa toute première lecture peut prendre jusqu\'à une minute, le temps de récupérer tout l\'historique.' },
+  { q: 'Renommer ou supprimer un compte', k: 'renommer nom supprimer retirer effacer compte clic droit changer nom',
+    a: 'Fais un **clic droit** sur le compte dans la colonne de gauche : tu peux le **renommer**, régler son **risque par trade**, l\'**actualiser** ou le **supprimer**.' },
+  { q: 'Comment sont calculés les R ?', k: 'r rr risque reward ratio risk calcul resultat definir trade',
+    a: '1 R = le **risque que tu prends par trade**, que tu définis toi-même pour chaque compte (en % du capital ou en montant).\nPour le régler : clic droit sur le compte → **Risque par trade…**. Un trade qui gagne 2 fois ce risque vaut +2 R.\nL\'indicateur « Résultat du mois en R » s\'affiche alors dans les indicateurs.' },
+  { q: 'Personnaliser les indicateurs', k: 'indicateur indicateurs kpi personnaliser ajouter retirer enlever statistiques choisir case',
+    a: 'Sous les indicateurs, clique sur **＋ Ajouter / ⚙ Personnaliser** pour en ajouter ou en retirer.\nTu peux aussi les **glisser** pour changer l\'ordre et les retirer directement avec la croix au survol.\nLe sélecteur de **période** (mois ou depuis le début) change les chiffres affichés.', act: [['Personnaliser', 'custom']] },
+  { q: 'Déplacer les blocs du tableau de bord', k: 'deplacer bouger organiser ordre bloc blocs disposition glisser poignee ranger',
+    a: 'Chaque bloc a une **poignée ⠿** en haut à gauche : maintiens-la et glisse le bloc plus haut ou plus bas. L\'ordre est gardé.\nEntre l\'évolution du capital et les marchés, la **poignée verticale** permet de régler leur largeur (double-clic : 2/3 – 1/3).' },
+  { q: 'Zoomer sur l\'évolution du capital', k: 'zoom zoomer graphique courbe evolution capital periode agrandir',
+    a: 'Utilise les boutons **1S, 1M, 3M, 6M, 1A, Tout** ou **− / +**. **Clique-glisse** pour te déplacer, **double-clic** pour tout revoir.' },
+  { q: 'Le calendrier des profits et pertes', k: 'calendrier profit perte pnl jour mois vert rouge journee',
+    a: 'En bas du tableau de bord, chaque jour est **vert** (gain) ou **rouge** (perte) avec son résultat et son nombre de trades. Change de mois avec les flèches au-dessus.' },
+  { q: 'Changer la devise affichée', k: 'devise monnaie euro dollar usd eur chf jpy aud conversion',
+    a: 'Dans le grand bloc du capital, choisis la devise (EUR, USD, CHF, JPY, AUD) dans le menu en haut à droite. La conversion utilise le cours du jour.' },
+  { q: 'Voir les trades en cours en direct', k: 'direct live trade cours ouvert position temps reel seconde equite equity',
+    a: 'Le bloc **Trades en cours** affiche tes positions ouvertes et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans l\'offre **Pro**.', act: [['Voir les offres', 'offres']] },
+  { q: 'Utiliser le journal de trading', k: 'journal trading historique liste trades detail position filtre gagnant perdant',
+    a: 'Ouvre **Journal de trading** dans la colonne de gauche : tous les trades du compte (date, symbole, PnL). Clique sur un trade pour voir son détail : ouverture, volume, sens, frais, profit en % et en R.\nFiltre par mois ou par gagnants / perdants.', act: [['Ouvrir le journal', 'journal']] },
+  { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document',
+    a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois, regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
+  { q: 'Partager mes résultats sur TikTok / Instagram', k: 'partager carte image tiktok instagram reseaux post story publier resultats photo',
+    a: 'Clique sur **Partager mes résultats** en haut du tableau de bord : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
+  { q: 'Ajouter un QR code de vérification', k: 'qr code verification verifier preuve myfxbook lien officiel reel',
+    a: 'Dans la fenêtre **Partager mes résultats**, colle ton lien (par exemple ta page **Myfxbook** publique) dans « Lien de vérification » et coche « Afficher le QR code ». Le lien est gardé pour chaque compte.' },
+  { q: 'Les graphiques TradingView', k: 'tradingview graphique chart symbole bougie analyse nombre graphiques compte tv',
+    a: 'Dans le bloc **Graphiques TradingView**, choisis **1 à 4 graphiques** et, pour chacun, le symbole et l\'unité de temps. Le bouton pour ouvrir ton compte TradingView ouvre ta session avec tes indicateurs.' },
+  { q: 'Le tableau des marchés', k: 'marches indices cours dow jones nasdaq dax or petrole bitcoin cotation choisir ordre',
+    a: 'À droite de l\'évolution du capital : les cours de ton broker toutes les 2 secondes. **⚙ Marchés** pour choisir lesquels suivre (ou ajouter un symbole), et **glisse les lignes** pour changer l\'ordre.' },
+  { q: 'Le calendrier économique', k: 'calendrier economique annonce annonces nfp cpi fed bce etoile importance zone pays fuseau horaire',
+    a: 'Page **Calendrier économique** : choisis le jour ou la semaine, l\'**importance** (toutes, 2 étoiles et plus, 3 étoiles), les **zones** (menu Zones) et le **fuseau horaire**. Tes choix sont gardés.', act: [['Ouvrir le calendrier', 'eco']] },
+  { q: 'Les actualités économiques', k: 'actualite actualites article news presse theme crypto europe asie recherche',
+    a: 'Sous le calendrier économique : coche les **thèmes** (US, Europe, Asie, Australie, Crypto) et utilise la **recherche** (ex. « BCE », « pétrole »). Clique sur un article pour l\'ouvrir.', act: [['Voir les actualités', 'eco']] },
+  { q: 'Masquer mes numéros de compte', k: 'masquer cacher numero compte confidentiel video capture anonyme',
+    a: 'Sous « + Ajouter un compte », clique sur **👁 Masquer les n° de compte** : les numéros sont cachés partout (pratique pour tes vidéos et captures).' },
+  { q: 'Comment fonctionnent les mises à jour ?', k: 'mise jour version nouvelle telecharger automatique update bandeau',
+    a: 'L\'app vérifie toute seule les nouvelles versions. Quand une mise à jour est prête, un **bandeau** apparaît : clique dessus, l\'app se met à jour et redémarre. Rien à retélécharger.' },
+  { q: 'Les offres et l\'abonnement', k: 'offre offres abonnement prix tarif tarification payer paiement essentiel pro annuel mensuel',
+    a: 'Page **Tarification** : **Essai gratuit** 7 jours, **Essentiel** (1 compte) et **Pro** (jusqu\'à 50 comptes, suivi en direct, PDF, cartes de résultats). En **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
+  { q: 'Activer ma clé de licence', k: 'cle licence activer code debloquer achat email recu',
+    a: 'Après ton achat, ta **clé** arrive par e-mail. Page **Tarification** → cadre **Déjà abonné ?** → colle la clé → **Activer**.', act: [['Tarification', 'offres']] },
+  { q: 'Changer d\'offre ou résilier', k: 'changer offre resilier annuler arreter abonnement gerer facture remboursement',
+    a: 'Page **Tarification** → **Gérer mon abonnement** : tu peux changer d\'offre, mettre à jour ta carte ou résilier à tout moment, sans engagement.', act: [['Tarification', 'offres']] },
+  { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
+    a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
+  { q: 'Utiliser l\'app sur un autre PC', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable',
+    a: 'Sur l\'ancien PC : Tarification → **Retirer de ce PC** pour libérer ta clé. Installe l\'app sur le nouveau PC et colle la même clé.' },
+  { q: 'Mes identifiants sont-ils en sécurité ?', k: 'securite securise donnees confidentialite stocke mot passe serveur prive',
+    a: 'Oui : tout reste **sur ton PC**. Les mots de passe mémorisés sont rangés dans le **Gestionnaire d\'identification Windows**, et l\'app ne les envoie à aucun serveur.' },
+  { q: 'Faut-il installer MetaTrader 5 ?', k: 'metatrader mt5 installer installe terminal ouvre fenetre programme',
+    a: 'L\'app utilise sa **propre copie cachée** de MT5 pour lire tes comptes : rien ne s\'ouvre à l\'écran et ton MT5 habituel n\'est pas touché. MetaTrader 5 doit simplement être installé sur le PC (Windows).' },
+  { q: 'Le compte démo', k: 'demo demonstration essayer tester fictif exemple',
+    a: 'Le **compte démo** affiche des données fictives pour découvrir l\'app sans connecter de vrai compte. Tu peux le supprimer par clic droit.' },
+  { q: 'Voir tous mes comptes ensemble', k: 'tous comptes ensemble cumul cumule total global vue combinee',
+    a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans l\'offre **Pro**.' },
+  { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor drawdown definition signifie veut dire statistique moyenne',
+    a: '**Taux de réussite** : % de trades gagnants. **Profit factor** : gains ÷ pertes (au-dessus de 1 = rentable). **Drawdown max** : plus forte baisse du capital depuis un sommet. **Jours gagnants** : jours clôturés en positif.' },
+];
+const HELP_STOP = new Set('c j l d n qu a au aux avec ce ces comment dans de des du elle en est et faire fait il je la le les leur ma mais me mes mon ne nos notre on ou par pas peut peux pour quand que quel quelle qui sa se ses son sur ta te tes ton tu un une vos votre vous y est-ce quoi ca cela svp stp aide moi est'.split(' '));
+const hNorm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const hStem = w => { w = w.replace(/(s|x)$/, w.length > 3 ? '' : '$1'); if (w.length > 5) w = w.replace(/(er|ez|ee|e)$/, ''); return w; };
+const hTokens = s => hNorm(s).split(' ').filter(w => w && !HELP_STOP.has(w)).map(hStem);
+HELP_KB.forEach(e => { e._t = new Set(hTokens(e.k + ' ' + e.q)); });
+function helpSearch(text) {
+  const qt = hTokens(text); if (!qt.length) return [];
+  return HELP_KB.map(e => {
+    let sc = 0;
+    for (const w of qt) {
+      if (e._t.has(w)) { sc += 2; continue; }
+      if (w.length >= 4) for (const t of e._t) if (t.length >= 4 && (t.startsWith(w) || w.startsWith(t))) { sc += 1; break; }
+    }
+    return { e, sc };
+  }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+}
+const HELP_ACTS = {
+  add: () => openLogin(), custom: () => { state.page = 'dash'; showPage(); setTimeout(() => $('#customBtn').click(), 50); },
+  offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
+  eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'dash'; showPage(); openCard(); },
+};
+function helpBubble(who, text, acts, sugg) {
+  const m = el('div', 'h-msg ' + who);
+  const p = el('div', 'h-txt');
+  String(text).split('\n').forEach((line, i) => {
+    if (i) p.appendChild(document.createElement('br'));
+    line.split(/\*\*(.+?)\*\*/g).forEach((part, j) => p.appendChild(j % 2 ? el('b', null, part) : document.createTextNode(part)));
+  });
+  m.appendChild(p);
+  if (acts && acts.length) {
+    const r = el('div', 'h-acts');
+    for (const [lab, k] of acts) { const b = el('button', 'btn', lab); b.type = 'button'; b.onclick = () => { HELP_ACTS[k] && HELP_ACTS[k](); if (innerWidth < 900) toggleHelp(false); }; r.appendChild(b); }
+    m.appendChild(r);
+  }
+  if (sugg && sugg.length) {
+    const r = el('div', 'h-sugg');
+    for (const e of sugg) { const b = el('button', 'chip', e.q); b.type = 'button'; b.onclick = () => helpAsk(e.q); r.appendChild(b); }
+    m.appendChild(r);
+  }
+  const box = $('#helpMsgs'); box.appendChild(m); box.scrollTop = box.scrollHeight;
+}
+function helpAsk(text) {
+  text = String(text || '').trim(); if (!text) return;
+  helpBubble('me', text);
+  const n = hNorm(text);
+  setTimeout(() => {
+    if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, indicateurs, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
+    if (/^(merci|top|parfait|super|ok|d accord|nickel)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
+    const res = helpSearch(text);
+    if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, ou regarde ces sujets :', null, (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
+    const best = res[0].e, others = res.slice(1, 4).filter(x => x.sc >= Math.max(2, res[0].sc - 2)).map(x => x.e);
+    helpBubble('bot', best.a, best.act, others.length ? others : null);
+  }, 250);
+}
+function toggleHelp(open) {
+  const p = $('#helpPanel'), o = open === undefined ? p.hidden : open;
+  p.hidden = !o; $('#helpFab').classList.toggle('open', o);
+  if (o && !$('#helpMsgs').children.length) helpBubble('bot', 'Salut ! Je suis l\'assistant ASTRA. Pose-moi une question sur l\'app, ou choisis un sujet :', null,
+    [HELP_KB[0], HELP_KB[5], HELP_KB[14], HELP_KB[22]]);
+  if (o) setTimeout(() => $('#helpInput').focus(), 50);
+}
+$('#helpFab').onclick = () => toggleHelp();
+$('#helpClose').onclick = () => toggleHelp(false);
+$('#helpForm').onsubmit = e => { e.preventDefault(); const v = $('#helpInput').value; $('#helpInput').value = ''; helpAsk(v); };
+function syncHelpFab() { $('#helpFab').hidden = !licOk(); if (!licOk()) $('#helpPanel').hidden = true; }
+
 // ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
 function perkUpsell(what) { toast(what + ' est inclus dans l\'offre Pro.'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
-function applyLock() { document.body.classList.toggle('locked', !licOk()); }
+function applyLock() { document.body.classList.toggle('locked', !licOk()); if (typeof syncHelpFab === 'function') syncHelpFab(); }
 function licenceLost() {
   if (state.lic && !state.lic.active) return;
   state.lic = Object.assign({}, state.lic || {}, { active: false });
