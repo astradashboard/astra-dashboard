@@ -50,6 +50,24 @@
   .btn.danger:hover { border-color: var(--loss); color: var(--loss); }
   aside .spacer { flex: 1; }
   .social { display: grid; gap: 6px; }
+  .login-btn { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--gold-soft); border: 1px solid rgba(196,138,69,.55); color: var(--fg);
+    border-radius: 10px; padding: 10px 12px; font-size: 13.5px; font-weight: 650; text-align: left; }
+  .login-btn svg { color: var(--gold); flex: none; }
+  .login-btn:hover { border-color: var(--gold); }
+  .login-btn.on { background: var(--panel-2); border-color: var(--line); }
+  .login-btn.on .lk-t::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--win); margin-right: 7px; vertical-align: 1px; }
+  .modal.key-modal { max-width: 430px; text-align: center; }
+  .key-ic { width: 60px; height: 60px; border-radius: 16px; background: var(--gold-soft); color: var(--gold); display: grid; place-items: center; margin: 0 auto 14px; }
+  #keyForm input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 12px; font: inherit; font-size: 14px;
+    font-family: ui-monospace, Consolas, monospace; text-align: center; }
+  #keyForm input:focus { outline: none; border-color: var(--gold); }
+  .key-err { color: var(--loss); font-size: 13px; min-height: 18px; margin: 8px 0 4px; }
+  .key-acts { display: flex; gap: 8px; justify-content: flex-end; }
+  .key-acts .btn { flex: 1; }
+  .key-foot { margin-top: 16px; color: var(--muted); font-size: 13px; }
+  .key-foot a { color: var(--gold); }
+  .key-state { background: var(--panel-2); border: 1px solid rgba(34,197,94,.4); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 13.5px; text-align: left; }
+  .key-state b { color: var(--win); }
   .soc { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--fg);
     border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; text-align: left; }
   .soc svg { color: var(--gold); flex: none; }
@@ -674,6 +692,7 @@
       <img class="brand-mark" src="/static/logo-emblem.png" alt="">
       <div><b>ASTRA CAPITAL</b><span>Dashboard des comptes</span></div>
     </div>
+    <button type="button" class="login-btn" id="loginKeyBtn" title="Connexion avec ta clé de licence"><svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="12.5" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M10 9.6l6.5-6.5M14 5.6l2 2M12.4 7.2l1.6 1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="lk-t" id="loginKeyTxt">Connexion</span></button>
     <nav class="nav" id="nav">
       <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="chev" id="accToggle" title="Afficher / masquer les comptes">▾</span></button>
       <div class="sub" id="accSub">
@@ -956,6 +975,21 @@
   <div class="h-head"><div><b>Assistant ASTRA</b><small>Aide sur l'application</small></div><button type="button" id="helpClose" title="Fermer">✕</button></div>
   <div class="h-msgs" id="helpMsgs"></div>
   <form class="h-form" id="helpForm"><input id="helpInput" placeholder="Pose ta question…" autocomplete="off" maxlength="200"><button class="btn primary" type="submit">Envoyer</button></form>
+</div>
+
+<div class="modal-bg" id="keyBg">
+  <div class="modal key-modal">
+    <div class="key-ic"><svg width="30" height="30" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="12.5" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M10 9.6l6.5-6.5M14 5.6l2 2M12.4 7.2l1.6 1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+    <h2 id="keyTitle">Connexion</h2>
+    <p class="sub" id="keySub">Colle la clé de licence reçue par e-mail après ton achat pour débloquer l'application sur ce PC.</p>
+    <div id="keyState" class="key-state" hidden></div>
+    <form id="keyForm">
+      <input id="keyInput" placeholder="Ta clé de licence" autocomplete="off" spellcheck="false">
+      <div class="key-err" id="keyErr"></div>
+      <div class="key-acts"><button class="btn ghost" type="button" id="keyClose">Annuler</button><button class="btn primary" type="submit" id="keyGo">Se connecter</button></div>
+    </form>
+    <div class="key-foot">Pas encore de clé ? <a href="#" id="keyOffers">Voir les offres et l'essai gratuit</a></div>
+  </div>
 </div>
 
 <div class="modal-bg" id="cardBg">
@@ -2255,7 +2289,7 @@ const HELP_KB = [
   { q: 'Les offres et l\'abonnement', k: 'offre offres abonnement prix tarif tarification payer paiement essentiel pro annuel mensuel',
     a: 'Page **Tarification** : **Essai gratuit** 7 jours, **Essentiel** (1 compte) et **Pro** (jusqu\'à 50 comptes, suivi en direct, PDF, cartes de résultats). En **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
   { q: 'Activer ma clé de licence', k: 'cle licence activer code debloquer achat email recu',
-    a: 'Après ton achat, ta **clé** arrive par e-mail. Page **Tarification** → cadre **Déjà abonné ?** → colle la clé → **Activer**.', act: [['Tarification', 'offres']] },
+    a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
   { q: 'Changer d\'offre ou résilier', k: 'changer offre resilier annuler arreter abonnement gerer facture remboursement',
     a: 'Utilise le lien **gérer mon abonnement** de l\'e-mail de confirmation envoyé par Creem : tu peux y changer de carte ou résilier à tout moment, sans engagement. Pour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
@@ -2295,7 +2329,7 @@ const HELP_ACTS = {
   add: () => openLogin(), custom: () => { state.page = 'dash'; showPage(); setTimeout(() => $('#customBtn').click(), 50); },
   offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
   eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'dash'; showPage(); openCard(); },
-  discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'),
+  discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'), login: () => openKey(),
 };
 function helpBubble(who, text, acts, sugg) {
   const m = el('div', 'h-msg ' + who);
@@ -2347,7 +2381,7 @@ state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
 function perkUpsell(what) { toast(what + ' est inclus dans l\'offre Pro.'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
-function applyLock() { document.body.classList.toggle('locked', !licOk()); if (typeof syncHelpFab === 'function') syncHelpFab(); }
+function applyLock() { document.body.classList.toggle('locked', !licOk()); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
 function licenceLost() {
   if (state.lic && !state.lic.active) return;
   state.lic = Object.assign({}, state.lic || {}, { active: false });
@@ -2473,6 +2507,43 @@ async function refreshLicence(force) {
   else if (!licOk()) { state.page = 'offres'; showPage(); }
   else if (state.page === 'offres') renderOffres();
 }
+async function activateKey(key) {
+  await api('/api/licence', { key });
+  await refreshLicence(); toast('Application débloquée, bienvenue !');
+}
+function syncLoginBtn() {
+  const b = $('#loginKeyBtn'), lic = state.lic || {};
+  b.classList.toggle('on', licOk());
+  $('#loginKeyTxt').textContent = licOk() ? (lic.owner ? 'Connecté · Propriétaire' : lic.trial ? 'Essai gratuit · ' + lic.days_left + ' j' : 'Connecté · ' + (lic.plan_name || 'abonné')) : 'Connexion';
+}
+function openKey() {
+  const lic = state.lic || {}, st = $('#keyState');
+  $('#keyErr').textContent = ''; $('#keyInput').value = '';
+  if (licOk() && !lic.trial) {
+    st.hidden = false; st.innerHTML = '';
+    st.append(el('b', null, lic.owner ? 'Accès propriétaire actif' : 'Abonnement ' + (lic.plan_name || '') + ' actif'),
+      el('div', null, (lic.email ? lic.email + ' · ' : '') + 'clé ' + (lic.key_hint || '')));
+    $('#keyTitle').textContent = 'Tu es connecté';
+    $('#keySub').textContent = 'Pour utiliser une autre clé, colle-la ci-dessous : elle remplacera la clé actuelle sur ce PC.';
+  } else {
+    st.hidden = true; $('#keyTitle').textContent = 'Connexion';
+    $('#keySub').textContent = 'Colle la clé de licence reçue par e-mail après ton achat pour débloquer l\'application sur ce PC.';
+  }
+  $('#keyBg').classList.add('open'); setTimeout(() => $('#keyInput').focus(), 50);
+}
+$('#loginKeyBtn').onclick = openKey;
+$('#keyClose').onclick = () => $('#keyBg').classList.remove('open');
+$('#keyBg').addEventListener('click', e => { if (e.target.id === 'keyBg') $('#keyBg').classList.remove('open'); });
+$('#keyOffers').onclick = e => { e.preventDefault(); $('#keyBg').classList.remove('open'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); };
+$('#keyForm').onsubmit = async e => {
+  e.preventDefault();
+  const key = $('#keyInput').value.trim(), btn = $('#keyGo'); $('#keyErr').textContent = '';
+  if (!key) { $('#keyErr').textContent = 'Colle ta clé de licence.'; return; }
+  btn.disabled = true; btn.textContent = 'Vérification…';
+  try { await activateKey(key); $('#keyBg').classList.remove('open'); }
+  catch (err) { $('#keyErr').textContent = err.message; }
+  btn.disabled = false; btn.textContent = 'Se connecter';
+};
 $('#ofKeyForm').onsubmit = async e => {
   e.preventDefault();
   const key = $('#ofKey').value.trim(), btn = $('#ofKeyBtn'); $('#ofKeyErr').textContent = '';
