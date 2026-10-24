@@ -18,14 +18,14 @@
 <header class="nav"><div class="wrap">
   <a class="brand" href="#"><img src="img/logo-emblem.png" alt=""><div>ASTRA <span>CAPITAL</span></div></a>
   <nav><a href="#fonctions">Fonctions</a><a href="#tarifs">Tarifs</a><a href="#demarrer">Démarrer</a><a href="#faq">FAQ</a></nav>
-  <a class="btn primary" href="#demarrer">Essai gratuit</a>
+  <a class="btn primary" href="#offre-essai" data-essai>Essai gratuit</a>
 </div></header>
 
 <main>
 <div class="hero"><div class="wrap">
   <h1>Le dashboard des traders <span class="gold">prop firm</span>.</h1>
   <p class="lead">Ton capital en direct, des statistiques personnalisables, un journal de trading qui se remplit tout seul, ton rapport mensuel en PDF en un clic et le calendrier économique. Tous tes comptes, au même endroit.</p>
-  <div class="ctas"><a class="btn primary" href="#demarrer">Essai gratuit 7 jours</a><a class="btn" href="#tarifs">Voir les offres</a></div>
+  <div class="ctas"><a class="btn primary" href="#offre-essai" data-essai>Essai gratuit 7 jours</a><a class="btn" href="#tarifs">Voir les offres</a></div>
   <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/dashboard.webp" alt="Tableau de bord ASTRA : capital en direct, trades en cours et indicateurs" width="1600" height="1355"></div>
   <div class="demo">Capture réelle de l'application · données de démonstration</div>
 </div></div>
@@ -168,6 +168,7 @@ function render() {
     const yr = billing === 'year' && p.year, pr = yr ? p.year : p.month;
     const on = p.id === sel;
     const c = document.createElement('div'); c.className = 'plan' + (on ? ' best' : ''); c.tabIndex = 0; c.setAttribute('role', 'radio'); c.setAttribute('aria-checked', on);
+    if (p.id === 'essai') c.id = 'offre-essai';
     c.onclick = e => { if (!e.target.closest('a') && sel !== p.id) { sel = p.id; render(); } };
     c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = p.id; render(); } };
     let h = (p.badge ? `<div class="badge">${p.badge}</div>` : '') + `<h3>${p.name}</h3><div class="acc">${p.acc}</div>`;
@@ -184,6 +185,11 @@ document.querySelectorAll('#billing button').forEach(b => b.onclick = () => {
   billing = b.dataset.v; document.querySelectorAll('#billing button').forEach(x => x.classList.toggle('on', x === b)); render();
 });
 render();
+// « Essai gratuit » : va pile sur la carte de l'essai et la sélectionne
+document.querySelectorAll('[data-essai]').forEach(a => a.onclick = e => {
+  e.preventDefault(); sel = 'essai'; render();
+  document.getElementById('offre-essai').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 </script>
 </body>
 </html>

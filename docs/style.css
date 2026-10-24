@@ -51,7 +51,8 @@ img { max-width: 100%; height: auto; display: block; }
 .strip b { color: var(--fg); }
 
 /* sections */
-section { padding: 96px 0; }
+section { padding: 96px 0; scroll-margin-top: 70px; }
+.plan { scroll-margin-top: 90px; }
 .sec-head { text-align: center; max-width: 720px; margin: 0 auto 56px; }
 .kicker { color: var(--gold2); font-weight: 800; letter-spacing: .16em; font-size: 12.5px; text-transform: uppercase; }
 .sec-head h2, .feat h3 { letter-spacing: -.025em; }
