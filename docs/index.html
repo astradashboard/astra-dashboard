@@ -163,19 +163,22 @@ const FEATS = [
   ['Graphiques TradingView et cours des marchés', 1, 1, 1],
   ['Mises à jour automatiques', 1, 1, 1],
 ];
-let billing = 'month';
+let billing = 'month', sel = 'pro';
 function render() {
   const box = document.getElementById('plans'); box.innerHTML = '';
   PLANS.forEach((p, i) => {
     const yr = billing === 'year' && p.year, pr = yr ? p.year : p.month;
-    const c = document.createElement('div'); c.className = 'plan' + (p.badge ? ' best' : '');
+    const on = p.id === sel;
+    const c = document.createElement('div'); c.className = 'plan' + (on ? ' best' : ''); c.tabIndex = 0; c.setAttribute('role', 'radio'); c.setAttribute('aria-checked', on);
+    c.onclick = e => { if (!e.target.closest('a') && sel !== p.id) { sel = p.id; render(); } };
+    c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = p.id; render(); } };
     let h = (p.badge ? `<div class="badge">${p.badge}</div>` : '') + `<h3>${p.name}</h3><div class="acc">${p.acc}</div>`;
     h += `<div class="price">${yr ? `<s>${pr[2]}</s>` : ''}<b>${pr[0]}</b><span>${pr[1]}</span></div>`;
     h += `<div class="bill">${yr ? `Facturé ${pr[3]} par an · <b>−20 %</b>` : p.bill || (p.year ? `Ou ${p.year[0]}/mois en annuel` : '')}</div><ul>`;
     for (const f of FEATS) { const v = f[i + 1]; h += `<li class="${v ? '' : 'no'}">${f[0]}${typeof v === 'string' ? ` · <b style="color:var(--gold2)">${v}</b>` : ''}</li>`; }
     h += '</ul>';
-    if (p.id === 'essai') h += `<a class="btn" href="#demarrer">Commencer l'essai gratuit</a>`;
-    else { const url = CHECKOUT[p.id][billing]; h += url ? `<a class="btn${p.badge ? ' primary' : ''}" href="${url}">S'abonner</a>` : `<a class="btn${p.badge ? ' primary' : ''}" aria-disabled="true">Bientôt disponible</a>`; }
+    if (p.id === 'essai') h += `<a class="btn${on ? ' primary' : ''}" href="#demarrer">Commencer l'essai gratuit</a>`;
+    else { const url = CHECKOUT[p.id][billing]; h += url ? `<a class="btn${on ? ' primary' : ''}" href="${url}">S'abonner</a>` : `<a class="btn${on ? ' primary' : ''}" aria-disabled="true">Bientôt disponible</a>`; }
     c.innerHTML = h; box.appendChild(c);
   });
 }
