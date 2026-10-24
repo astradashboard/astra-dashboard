@@ -686,8 +686,8 @@
     </nav>
     <div class="spacer"></div>
     <div class="social" id="socialBox">
-      <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H7l-3 2.5v-2.5h0.5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Rejoindre le Discord</span></button>
-      <button type="button" class="soc" data-soc="tiktok" title="Suivre ASTRA CAPITAL sur TikTok"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="12" height="11" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.7v4.6l3.8-2.3z" fill="currentColor"/></svg><span>Suivre sur TikTok</span></button>
+      <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H7l-3 2.5v-2.5h0.5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Rejoindre la communauté</span></button>
+      <button type="button" class="soc" data-soc="tiktok" title="Suivre ASTRA CAPITAL sur TikTok"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="12" height="11" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.7v4.6l3.8-2.3z" fill="currentColor"/></svg><span>Suis-moi sur TikTok</span></button>
     </div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
     <div class="label" id="appVersion" style="text-align:center"></div>
@@ -2270,7 +2270,7 @@ const HELP_KB = [
   { q: 'Voir tous mes comptes ensemble', k: 'tous comptes ensemble cumul cumule total global vue combinee',
     a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans l\'offre **Pro**.' },
   { q: 'Contacter ASTRA / rejoindre la communauté', k: 'contact contacter support aide humain question communaute discord tiktok groupe serveur coach rejoindre suivre probleme',
-    a: 'Rejoins la **communauté ASTRA sur Discord** pour poser tes questions, échanger avec les autres traders et obtenir de l\'aide. Tu peux aussi suivre **@astracapital1** sur TikTok.\nLes boutons sont aussi en bas de la colonne de gauche.', act: [['Rejoindre le Discord', 'discord'], ['TikTok', 'tiktok']] },
+    a: 'Rejoins la **communauté ASTRA sur Discord** pour poser tes questions, échanger avec les autres traders et obtenir de l\'aide. Tu peux aussi suivre **@astracapital1** sur TikTok.\nLes boutons sont aussi en bas de la colonne de gauche.', act: [['Rejoindre la communauté', 'discord'], ['Suis-moi sur TikTok', 'tiktok']] },
   { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor drawdown definition signifie veut dire statistique moyenne',
     a: '**Taux de réussite** : % de trades gagnants. **Profit factor** : gains ÷ pertes (au-dessus de 1 = rentable). **Drawdown max** : plus forte baisse du capital depuis un sommet. **Jours gagnants** : jours clôturés en positif.' },
 ];
@@ -2324,7 +2324,7 @@ function helpAsk(text) {
     if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, indicateurs, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
     if (/^(merci|top|parfait|super|ok|d accord|nickel)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
     const res = helpSearch(text);
-    if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, regarde ces sujets, ou pose ta question sur le **Discord** :', [['Rejoindre le Discord', 'discord']], (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
+    if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, regarde ces sujets, ou pose ta question sur le **Discord** :', [['Rejoindre la communauté', 'discord']], (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
     const best = res[0].e, others = res.slice(1, 4).filter(x => x.sc >= Math.max(2, res[0].sc - 2)).map(x => x.e);
     helpBubble('bot', best.a, best.act, others.length ? others : null);
   }, 250);
