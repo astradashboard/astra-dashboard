@@ -5,7 +5,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="nav"><div class="wrap"><a class="brand" href="index.html"><img src="img/logo-emblem.png" alt=""><div>ASTRA <span>CAPITAL</span></div></a>
-<nav><a href="index.html#fonctions">Fonctions</a><a href="index.html#tarifs">Tarifs</a><a href="index.html#faq">FAQ</a></nav><a class="btn primary" href="index.html#demarrer">Essai gratuit</a></div></header>
+<nav onclick="document.body.classList.remove('menu-open')"><a href="index.html#fonctions">Fonctions</a><a href="index.html#tarifs">Tarifs</a><a href="index.html#faq">FAQ</a></nav><a class="btn primary" href="index.html#demarrer">Essai gratuit</a><button class="burger" type="button" aria-label="Menu" aria-expanded="false" onclick="const o=document.body.classList.toggle('menu-open');this.setAttribute('aria-expanded',o)"><span></span><span></span><span></span></button></div></header>
 <main class="wrap"><article class="legal"><h1>Politique de confidentialité</h1><div class="upd">Dernière mise à jour : 24 octobre 2026</div>
 
 <p>ASTRA CAPITAL (Belgique) est responsable du traitement des données décrites ici. Nous collectons le minimum de données nécessaire au fonctionnement de l'application, conformément au Règlement général sur la protection des données (RGPD).</p>

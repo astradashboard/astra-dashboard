@@ -163,9 +163,23 @@ footer .risk { grid-column: 1 / -1; font-size: 12.5px; color: #677084; border-to
   footer .wrap { grid-template-columns: 1fr; }
   .over { right: 0; bottom: -24px; }
 }
+.burger { display: none; width: 44px; height: 44px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel2); padding: 0 11px;
+  flex-direction: column; justify-content: center; gap: 5px; cursor: pointer; }
+.burger span { display: block; height: 2px; border-radius: 2px; background: var(--fg); transition: transform .2s, opacity .2s; }
 @media (max-width: 720px) {
-  .nav nav { display: none; }
-  .nav .btn { margin-left: auto; }
+  .burger { display: flex; }
+  .nav .wrap { gap: 10px; }
+  .nav nav { display: none; position: absolute; top: 68px; left: 0; right: 0; flex-direction: column; gap: 0; margin: 0; padding: 8px 16px 16px;
+    background: #080b12; border-bottom: 1px solid var(--line); box-shadow: 0 30px 60px rgba(0,0,0,.7); }
+  .nav nav a { padding: 14px 6px; font-size: 17px; font-weight: 600; color: var(--fg); border-bottom: 1px solid rgba(255,255,255,.06); }
+  .nav nav a:last-child { border-bottom: none; }
+  body.menu-open .nav nav { display: flex; }
+  body.menu-open .burger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  body.menu-open .burger span:nth-child(2) { opacity: 0; }
+  body.menu-open .burger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .nav .btn { margin-left: auto; white-space: nowrap; padding: 10px 14px; font-size: 13.5px; }
+  .brand { letter-spacing: .12em; font-size: 13px; white-space: nowrap; gap: 8px; }
+  .brand img { height: 30px; }
   section { padding: 70px 0; }
   .hero { padding-top: 48px; }
 }

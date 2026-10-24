@@ -17,8 +17,8 @@
 
 <header class="nav"><div class="wrap">
   <a class="brand" href="#"><img src="img/logo-emblem.png" alt=""><div>ASTRA <span>CAPITAL</span></div></a>
-  <nav><a href="#fonctions">Fonctions</a><a href="#tarifs">Tarifs</a><a href="#demarrer">Démarrer</a><a href="#faq">FAQ</a></nav>
-  <a class="btn primary" href="#offre-essai" data-essai>Essai gratuit</a>
+  <nav onclick="document.body.classList.remove('menu-open')"><a href="#fonctions">Fonctions</a><a href="#tarifs">Tarifs</a><a href="#demarrer">Démarrer</a><a href="#faq">FAQ</a></nav>
+  <a class="btn primary" href="#offre-essai" data-essai>Essai gratuit</a><button class="burger" type="button" aria-label="Menu" aria-expanded="false" onclick="const o=document.body.classList.toggle('menu-open');this.setAttribute('aria-expanded',o)"><span></span><span></span><span></span></button>
 </div></header>
 
 <main>
@@ -28,13 +28,6 @@
   <div class="ctas"><a class="btn primary" href="#offre-essai" data-essai>Essai gratuit 7 jours</a><a class="btn" href="#tarifs">Voir les offres</a></div>
   <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/dashboard.webp" alt="Tableau de bord ASTRA : capital en direct, trades en cours et indicateurs" width="1600" height="1355"></div>
   <div class="demo">Capture réelle de l'application · données de démonstration</div>
-</div></div>
-
-<div class="strip"><div class="wrap">
-  <span><b>Compatible MT5</b> · FTMO et autres prop firms</span>
-  <span><b>Multi-comptes</b> · jusqu'à 50</span>
-  <span><b>Tes identifiants</b> restent sur ton PC</span>
-  <span><b>Mises à jour</b> automatiques</span>
 </div></div>
 
 <section id="fonctions"><div class="wrap">
