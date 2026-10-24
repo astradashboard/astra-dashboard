@@ -1,5 +1,5 @@
 {
-  "version": "1.41.1",
+  "version": "1.41.2",
   "files": [
     "app.py",
     "requirements.txt",
@@ -10,6 +10,7 @@
     "static/logo.png",
     "static/logo-emblem.png",
     "offres.json",
-    "static/qrcode.js"
+    "static/qrcode.js",
+    "static/discord.png"
   ]
 }

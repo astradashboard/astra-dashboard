@@ -53,6 +53,7 @@
   .soc { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--fg);
     border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; text-align: left; }
   .soc svg { color: var(--gold); flex: none; }
+  .soc .soc-ic { flex: none; width: 18px; height: 18px; }
   .soc:hover { border-color: rgba(196,138,69,.6); }
   .of-community { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; color: var(--muted); font-size: 13.5px; }
   .of-community .soc { width: auto; }
@@ -686,7 +687,7 @@
     </nav>
     <div class="spacer"></div>
     <div class="social" id="socialBox">
-      <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H7l-3 2.5v-2.5h0.5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Rejoindre la communauté</span></button>
+      <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><img class="soc-ic" src="/static/discord.png" alt="" width="18" height="18"><span>Rejoindre la communauté</span></button>
       <button type="button" class="soc" data-soc="tiktok" title="Suivre ASTRA CAPITAL sur TikTok"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="12" height="11" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.7v4.6l3.8-2.3z" fill="currentColor"/></svg><span>Suis-moi sur TikTok</span></button>
     </div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
