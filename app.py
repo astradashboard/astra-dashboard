@@ -1703,11 +1703,67 @@ def _owner_key(key):
     return hashlib.sha256(key.strip().encode()).hexdigest() in OWNER_KEYS
 
 
+def _creem_call(action, fields):
+    """Licences Creem, via le relais (Cloudflare) qui garde la clé API secrète hors de l'app.
+    Les réponses sont remises au même format que Lemon Squeezy pour le reste du code."""
+    import urllib.error
+    import urllib.request
+
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    if not api:
+        raise ConnectionError("service de licence pas encore configuré")
+    body = {"key": fields.get("license_key", "")}
+    if action == "activate":
+        body["instance_name"] = fields.get("instance_name", "ASTRA Dashboard")
+    else:
+        body["instance_id"] = fields.get("instance_id", "")
+    req = urllib.request.Request(f"{api}/{action}", data=json.dumps(body).encode(), method="POST", headers={
+        "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    code, data = 200, {}
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        code = e.code
+        try:
+            data = json.loads(e.read().decode("utf-8") or "{}")
+        except Exception:
+            data = {}
+        if code >= 500:
+            raise ConnectionError(f"Creem HTTP {code}")
+    inst = data.get("instance")
+    if isinstance(inst, list):
+        inst = inst[-1] if inst else None
+    lk = {"status": data.get("status"), "expires_at": data.get("expires_at"),
+          "activation_limit": data.get("activation_limit"), "activation_usage": data.get("activation")}
+    meta = {"variant_id": data.get("product_id")} if data.get("product_id") else {}
+    msg = data.get("error") or data.get("message")
+    if isinstance(msg, list):
+        msg = " ".join(map(str, msg))
+    if action == "activate":
+        if code == 200 and data.get("status") == "active":
+            return {"activated": True, "license_key": lk, "instance": inst or {}, "meta": meta}
+        if code == 404:
+            msg = "license not found"
+        elif msg and "limit" in str(msg).lower():
+            msg = "activation limit reached"
+        return {"activated": False, "error": msg or f"HTTP {code}", "license_key": lk}
+    if action == "validate":
+        if code == 200:
+            return {"valid": data.get("status") == "active", "license_key": lk, "meta": meta}
+        status = "expired" if code == 410 else "disabled" if code == 403 else "invalid"
+        return {"valid": False, "license_key": {"status": status}, "error": msg}
+    return {"deactivated": code == 200}
+
+
 def _ls_call(action, **fields):
-    """Appel à l'API des licences Lemon Squeezy (aucune clé API nécessaire)."""
+    """Appel à l'API des licences (Lemon Squeezy, ou Creem via son relais)."""
     import urllib.error
     import urllib.request
     from urllib.parse import urlencode
+
+    if load_offers().get("provider") == "creem":
+        return _creem_call(action, fields)
 
     req = urllib.request.Request(LS_API + action, data=urlencode(fields).encode(), headers={
         "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "ASTRA-Dashboard"})
@@ -1938,7 +1994,7 @@ def api_licence_activate():
     try:
         r = _ls_call("activate", license_key=key, instance_name=f"ASTRA Dashboard – {_s.gethostname()}"[:100])
     except Exception:
-        return jsonify({"error": "Impossible de joindre le service de paiement. Vérifie ta connexion internet."}), 502
+        return jsonify({"error": "Impossible de vérifier la clé pour le moment (connexion internet ou service de licence). Réessaie dans quelques minutes."}), 502
     meta, lk = r.get("meta") or {}, r.get("license_key") or {}
     if not r.get("activated"):
         err = str(r.get("error") or "Clé invalide.")
@@ -2003,7 +2059,7 @@ def api_open_url():
     allowed = ({p.get("checkout_url") for p in o.get("plans", [])} | {(p.get("annual") or {}).get("checkout_url") for p in o.get("plans", [])}
                | {o.get("portal_url")} | set((o.get("social") or {}).values())) - {None, ""}
     host = urlparse(url).hostname or ""
-    if url not in allowed and not (url.startswith("https://") and (host == "lemonsqueezy.com" or host.endswith(".lemonsqueezy.com"))):
+    if url not in allowed and not (url.startswith("https://") and any(host == d or host.endswith("." + d) for d in ("lemonsqueezy.com", "creem.io"))):
         return jsonify({"error": "Adresse non autorisée."}), 400
     webbrowser.open(url)
     return jsonify({"ok": True})

@@ -1,7 +1,7 @@
 {
   "_aide": "Configuration des offres. Remplis store_id, variant_id et checkout_url avec les valeurs de ton tableau de bord Lemon Squeezy.",
   "store_id": null,
-  "portal_url": "https://app.lemonsqueezy.com/my-orders",
+  "portal_url": "",
   "plans": [
     {
       "id": "essai",
@@ -21,15 +21,15 @@
       "price": "24,95 €",
       "period": "par mois",
       "accounts": 1,
-      "variant_id": null,
-      "checkout_url": "",
+      "variant_id": "prod_J9E4RND5WxferOtBagLse",
+      "checkout_url": "https://www.creem.io/payment/prod_J9E4RND5WxferOtBagLse",
       "perks": [],
       "annual": {
         "price": "20,00 €",
         "total": "239,95 €",
         "was": "24,95 €",
-        "checkout_url": "",
-        "variant_id": null
+        "checkout_url": "https://www.creem.io/payment/prod_75iJoLnVkW6P9oRJKezVY7",
+        "variant_id": "prod_75iJoLnVkW6P9oRJKezVY7"
       }
     },
     {
@@ -39,8 +39,8 @@
       "period": "par mois",
       "accounts": 50,
       "badge": "Le plus complet",
-      "variant_id": null,
-      "checkout_url": "",
+      "variant_id": "prod_Q6IVnV9x4c7YWEf84cjIg",
+      "checkout_url": "https://www.creem.io/payment/prod_Q6IVnV9x4c7YWEf84cjIg",
       "perks": [
         "live",
         "pdf",
@@ -50,8 +50,8 @@
         "price": "28,00 €",
         "total": "335,95 €",
         "was": "34,95 €",
-        "checkout_url": "",
-        "variant_id": null
+        "checkout_url": "https://www.creem.io/payment/prod_TW2zwHrN4UZRp6hHAtzPi",
+        "variant_id": "prod_TW2zwHrN4UZRp6hHAtzPi"
       }
     }
   ],
@@ -141,5 +141,7 @@
   "social": {
     "discord": "https://discord.gg/YSep3qMT9",
     "tiktok": "https://www.tiktok.com/@astracapital1"
-  }
+  },
+  "provider": "creem",
+  "licence_api": ""
 }
