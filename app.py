@@ -1726,7 +1726,8 @@ def _plan_from_meta(meta):
     plans = [p for p in offers.get("plans") or [] if not p.get("trial")]  # l'essai n'est jamais une clé payante
     vid = meta.get("variant_id")
     for p in plans:
-        if p.get("variant_id") and str(p["variant_id"]) == str(vid):
+        ids = [p.get("variant_id"), (p.get("annual") or {}).get("variant_id")]  # variante mensuelle ou annuelle
+        if any(i and str(i) == str(vid) for i in ids):
             return p
     name = (str(meta.get("variant_name", "")) + " " + str(meta.get("product_name", ""))).lower()
     for p in sorted(plans, key=lambda x: -int(x.get("accounts", 1))):  # repli : d'après le nom de l'offre
@@ -1901,7 +1902,12 @@ def _paywall():
 @app.get("/api/offres")
 def api_offres():
     o = load_offers()
-    return jsonify({"plans": [{k: v for k, v in p.items() if k != "variant_id"} for p in o.get("plans", [])],
+    def clean(p):
+        q = {k: v for k, v in p.items() if k != "variant_id"}
+        if isinstance(q.get("annual"), dict):
+            q["annual"] = {k: v for k, v in q["annual"].items() if k != "variant_id"}
+        return q
+    return jsonify({"plans": [clean(p) for p in o.get("plans", [])], "annual_discount": o.get("annual_discount"),
                     "features": o.get("features") or [], "portal_url": o.get("portal_url")})
 
 
@@ -1993,7 +1999,8 @@ def api_open_url():
 
     url = str((request.get_json(force=True) or {}).get("url", ""))
     o = load_offers()
-    allowed = {p.get("checkout_url") for p in o.get("plans", [])} | {o.get("portal_url")}
+    allowed = ({p.get("checkout_url") for p in o.get("plans", [])} | {(p.get("annual") or {}).get("checkout_url") for p in o.get("plans", [])}
+               | {o.get("portal_url")}) - {None, ""}
     host = urlparse(url).hostname or ""
     if url not in allowed and not (url.startswith("https://") and (host == "lemonsqueezy.com" or host.endswith(".lemonsqueezy.com"))):
         return jsonify({"error": "Adresse non autorisée."}), 400

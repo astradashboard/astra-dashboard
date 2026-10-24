@@ -23,7 +23,14 @@
       "accounts": 1,
       "variant_id": null,
       "checkout_url": "",
-      "perks": []
+      "perks": [],
+      "annual": {
+        "price": "20,00 €",
+        "total": "239,95 €",
+        "was": "24,95 €",
+        "checkout_url": "",
+        "variant_id": null
+      }
     },
     {
       "id": "pro",
@@ -38,7 +45,14 @@
         "live",
         "pdf",
         "cards"
-      ]
+      ],
+      "annual": {
+        "price": "28,00 €",
+        "total": "335,95 €",
+        "was": "34,95 €",
+        "checkout_url": "",
+        "variant_id": null
+      }
     }
   ],
   "features": [
@@ -122,5 +136,6 @@
         "pro": true
       }
     }
-  ]
+  ],
+  "annual_discount": 20
 }

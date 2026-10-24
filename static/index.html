@@ -520,7 +520,13 @@
   .of-head h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
   .of-head p { margin: 8px auto 0; color: var(--muted); font-size: 15px; max-width: 560px; }
   .of-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; align-items: stretch; }
-  .of-plan.trial .of-price b { color: var(--win); }
+  .of-billing { display: flex; justify-content: center; margin: -8px 0 30px; }
+  .of-billing .seg { padding: 4px; border-radius: 12px; }
+  .of-billing .seg button { padding: 9px 22px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; border-radius: 9px; }
+  .of-save { background: var(--win); color: #06210f; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+  .of-was { color: var(--muted); font-size: 18px; font-weight: 600; text-decoration: line-through; align-self: center; }
+  .of-bill { color: var(--muted); font-size: 13px; margin-bottom: 2px; min-height: 19px; }
+  .of-bill b { color: var(--win); font-weight: 700; }
   .of-plan { cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s, transform .15s;
     position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 28px 28px 24px; display: flex; flex-direction: column; }
   .of-plan.best { border-color: rgba(196,138,69,.75); background: linear-gradient(180deg, rgba(196,138,69,.10), var(--panel) 45%); box-shadow: 0 18px 50px rgba(196,138,69,.10); }
@@ -845,6 +851,10 @@
         <p>Ton dashboard de trading complet : capital, résultats, journal, suivi en direct et calendrier économique.</p>
       </div>
       <div class="of-active" id="ofActive" hidden></div>
+      <div class="of-billing"><div class="seg" id="ofBilling">
+        <button type="button" data-v="month">Mensuel</button>
+        <button type="button" data-v="year">Annuel <span class="of-save" id="ofSave">−20 %</span></button>
+      </div></div>
       <div class="of-plans" id="ofPlans"></div>
       <div class="of-trust">
         <span><b>Sans engagement</b> · résiliable à tout moment</span>
@@ -2197,6 +2207,12 @@ async function renderOffres() {
     box.append(el('div', 'st', lic.active ? '✓' : '!'), tx, acts);
   } else box.hidden = true;
   $('#ofKeyBox').hidden = !!lic.active && !lic.trial;
+  // mensuel / annuel
+  document.querySelectorAll('#ofBilling button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === state.ofBilling);
+    b.onclick = () => { state.ofBilling = b.dataset.v; try { localStorage.setItem('ofBilling', state.ofBilling); } catch (e) {} renderOffres(); };
+  });
+  $('#ofSave').textContent = '−' + (offresData.annual_discount || 20) + ' %';
   // les offres
   const wrap = $('#ofPlans'); wrap.innerHTML = '';
   const plans = offresData.plans || [];
@@ -2210,7 +2226,15 @@ async function renderOffres() {
     if (p.badge) c.appendChild(el('div', 'of-badge', p.badge));
     c.appendChild(el('h2', null, p.name));
     c.appendChild(el('div', 'of-acc', p.trial ? 'Sans carte bancaire · 1 compte connecté' : p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
-    const pr = el('div', 'of-price'); pr.append(el('b', null, p.price), el('span', null, p.period || 'par mois')); c.appendChild(pr);
+    const yr = state.ofBilling === 'year' && p.annual;
+    const pr = el('div', 'of-price');
+    if (yr) pr.append(el('span', 'of-was', p.annual.was || p.price));
+    pr.append(el('b', null, yr ? p.annual.price : p.price), el('span', null, yr ? 'par mois' : (p.period || 'par mois'))); c.appendChild(pr);
+    const bill = el('div', 'of-bill');
+    if (yr) { bill.append('Facturé ' + p.annual.total + ' par an · '); bill.appendChild(el('b', null, '−' + (offresData.annual_discount || 20) + ' %')); }
+    else if (p.trial) bill.textContent = 'Puis choisis ton offre, sans obligation';
+    else if (p.annual) bill.textContent = 'Ou ' + p.annual.price + '/mois en annuel';
+    c.appendChild(bill);
     const ul = el('ul');
     const feats = (offresData.features || []).length ? offresData.features : (p.features || []).map(f => ({ label: f, values: { [p.id]: true } }));
     for (const f of feats) {
@@ -2221,21 +2245,24 @@ async function renderOffres() {
       ul.appendChild(li);
     }
     c.appendChild(ul);
+    const payUrl = yr ? p.annual.checkout_url : p.checkout_url;
+    const target = lic.active && !lic.trial && offresData.portal_url ? offresData.portal_url : payUrl;
     let label = 'S\'abonner', dis = false;
     if (p.trial) {
       label = lic.trial && lic.active ? 'Essai en cours' : lic.trial_used ? 'Essai déjà utilisé' : lic.active ? 'Inclus dans ton abonnement' : 'Commencer l\'essai gratuit';
       dis = lic.active || !!lic.trial_used;
     } else if (lic.active && !lic.trial && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
     else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
-    else if (!p.checkout_url) { label = 'Bientôt disponible'; dis = true; }
+    else if (!payUrl) { label = 'Bientôt disponible'; dis = true; }
     else if (lic.active && !lic.trial) label = 'Changer pour cette offre';
     const b = el('button', 'btn' + (best || plans.length === 1 ? ' primary' : ''), label); b.type = 'button'; b.disabled = dis;
     if (p.trial) b.onclick = () => startTrial(b);
-    else b.onclick = () => state.ofSel !== p.id ? (state.ofSel = p.id, renderOffres(), openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url)) : openPay(lic.active && offresData.portal_url ? offresData.portal_url : p.checkout_url);
+    else b.onclick = () => { if (state.ofSel !== p.id) { state.ofSel = p.id; renderOffres(); } openPay(target); };
     c.appendChild(b); wrap.appendChild(c);
   });
 }
 let confirmRemoveLic = false;
+state.ofBilling = 'month'; try { if (localStorage.getItem('ofBilling') === 'year') state.ofBilling = 'year'; } catch (e) {}
 async function startTrial(btn) {
   btn.disabled = true; btn.textContent = 'Activation…';
   try { await api('/api/licence/trial', {}); await refreshLicence(); toast('Essai gratuit activé : 7 jours pour tout découvrir !'); }
