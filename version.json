@@ -1,5 +1,5 @@
 {
-  "version": "1.36.0",
+  "version": "1.37.0",
   "files": [
     "app.py",
     "requirements.txt",
@@ -9,6 +9,7 @@
     "LISEZMOI.txt",
     "static/logo.png",
     "static/logo-emblem.png",
-    "offres.json"
+    "offres.json",
+    "static/qrcode.js"
   ]
 }

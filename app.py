@@ -1057,7 +1057,10 @@ def api_prefs_set():
         cd = body["card"]
         prefs["card"] = {"mode": cd.get("mode") if cd.get("mode") in ("both", "pct", "r") else "both",
                          "format": cd.get("format") if cd.get("format") in ("post", "story", "square") else "post",
-                         "handle": str(cd.get("handle", ""))[:30], "hideAcc": bool(cd.get("hideAcc"))}
+                         "handle": str(cd.get("handle", ""))[:30], "hideAcc": bool(cd.get("hideAcc")),
+                         "qr": cd.get("qr") is not False,
+                         "links": {str(k)[:30]: str(v)[:300] for k, v in list((cd.get("links") or {}).items())[:60]
+                                   if isinstance(v, str) and v.startswith(("http://", "https://"))}}
     if isinstance(body.get("quotes"), list):
         prefs["quotes"] = [str(x)[:40] for x in body["quotes"] if isinstance(x, str)][:30]
     if isinstance(body.get("mask"), bool):

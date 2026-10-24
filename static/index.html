@@ -387,6 +387,8 @@
   input.c-sel { margin-top: 0; } input.c-sel:focus, select.c-sel:focus { outline: none; border-color: var(--gold); }
   .c-check { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 13.5px; cursor: pointer; }
   .c-check input { accent-color: var(--gold); }
+  .c-hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin-top: 6px; }
+  .c-hint.err { color: var(--loss); }
   .c-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 20px; flex-wrap: wrap; }
   .card-prev { background: #05070b; border: 1px solid var(--line); border-radius: 14px; display: grid; place-items: center; padding: 16px; min-height: 420px; }
   .card-prev canvas { max-width: 100%; max-height: calc(100vh - 120px); width: auto; height: auto; border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.6); }
@@ -889,9 +891,13 @@
       <div class="seg c-seg" id="cardMode"><button type="button" data-v="both">Montant + %</button><button type="button" data-v="pct">% seulement</button><button type="button" data-v="r">En R</button></div>
       <label class="c-lab">Format</label>
       <div class="seg c-seg" id="cardFormat"><button type="button" data-v="post">Post 4:5</button><button type="button" data-v="story">Story 9:16</button><button type="button" data-v="square">Carré</button></div>
-      <label class="c-lab">Ton pseudo (en bas à droite)</label>
+      <label class="c-lab">Ton pseudo</label>
       <input id="cardHandle" class="c-sel" placeholder="@astracapital" maxlength="30">
       <label class="c-check"><input type="checkbox" id="cardHideAcc"> Masquer le nom du compte</label>
+      <label class="c-lab">Lien de vérification (QR code)</label>
+      <input id="cardLink" class="c-sel" placeholder="https://www.myfxbook.com/members/…" maxlength="300" spellcheck="false">
+      <div class="c-hint" id="cardLinkHint">Ex. ta page Myfxbook vérifiée : en scannant le QR code, on voit que les trades sont réels. Lien gardé pour ce compte.</div>
+      <label class="c-check"><input type="checkbox" id="cardQr"> Afficher le QR code sur la carte</label>
       <div class="c-actions">
         <button class="btn primary" id="cardSave" type="button">Enregistrer l'image</button>
         <button class="btn" id="cardCopy" type="button">Copier</button>
@@ -980,6 +986,7 @@
   </form>
 </div>
 
+<script src="/static/qrcode.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const state = { accounts: [], sel: 'all', data: null, month: null, mt5: true, keyring: true };
@@ -1834,7 +1841,9 @@ let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); re
 
 // ---------- cartes de résultats à partager (TikTok, Instagram…) ----------
 const CARD_FORMATS = { post: [1080, 1350, 'Post 4:5'], story: [1080, 1920, 'Story 9:16'], square: [1080, 1080, 'Carré 1:1'] };
-state.card = { kind: 'month', key: null, mode: 'both', format: 'post', handle: '', hideAcc: false };
+state.card = { kind: 'month', key: null, mode: 'both', format: 'post', handle: '', hideAcc: false, qr: true, links: {} };
+const cardLinkOk = u => /^https?:\/\/[^\s/]+\.[^\s]{2,}/i.test(u || '');
+const cardLinkOf = () => state.card.links[state.sel] || '';
 const cardLogo = new Image(); cardLogo.src = '/static/logo.png';
 const isoD = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const mondayOf = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return isoD(d); };
@@ -1886,6 +1895,7 @@ function drawCard(cv) {
   const GOLD = '#c48a45', WIN = '#22c55e', LOSS = '#ef4444', FG = '#eef1f6', MUT = '#8a93a6';
   const pos = st.pnl >= 0, ACC = st.pnl > 0 ? WIN : st.pnl < 0 ? LOSS : FG;
   const tall = H / W > 1.5, sq = H === W, post = !tall && !sq;
+  const link = cardLinkOf(), withQr = c.qr && cardLinkOk(link) && typeof qrcode === 'function';
   // fond
   const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#111827'); bg.addColorStop(1, '#070a10');
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
@@ -1927,18 +1937,19 @@ function drawCard(cv) {
     c.kind === 'day' ? ['Gagnants / perdants', st.wins + ' / ' + st.losses] : ['Jours gagnants', st.winDays + ' / ' + st.daily.length],
     ['Meilleur trade', st.best ? (c.mode === 'r' ? (st.rOk ? fmtR(st.best.n / riskAmount(state.data.per_account[st.best.a]), true) : '—') : c.mode === 'pct' ? cardFmt(st.best.n, st, 'pct') : money(st.best.n, st.cur, true)) : '—'],
   ];
-  const cols = 2, gap = 22, tw = (W - 120 - gap) / cols, th = sq ? 118 : post ? 120 : 138;
+  const cols = sq && withQr ? 4 : 2, rows = Math.ceil(tiles.length / cols), gap = cols > 2 ? 16 : 22, tw = (W - 120 - gap * (cols - 1)) / cols, th = sq ? 118 : post ? 120 : 138;
   tiles.forEach(([lab, val], i) => {
     const tx = 60 + (i % cols) * (tw + gap), ty = y + Math.floor(i / cols) * (th + gap);
     g.fillStyle = 'rgba(255,255,255,.045)'; g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 2;
     g.beginPath(); g.roundRect(tx, ty, tw, th, 22); g.fill(); g.stroke();
-    g.fillStyle = MUT; g.font = F(600, 26); g.fillText(lab, tx + tw / 2, ty + (sq ? 44 : 52));
+    let ls = 26; g.font = F(600, ls); while (g.measureText(lab).width > tw - 24 && ls > 18) { ls -= 1; g.font = F(600, ls); }
+    g.fillStyle = MUT; g.fillText(lab, tx + tw / 2, ty + (sq ? 44 : 52));
     let vs = 46; g.font = F(750, vs); while (g.measureText(val).width > tw - 30 && vs > 26) { vs -= 2; g.font = F(750, vs); }
     g.fillStyle = lab === 'Meilleur trade' && st.best ? (st.best.n >= 0 ? WIN : LOSS) : FG; g.fillText(val, tx + tw / 2, ty + (sq ? 92 : 108));
   });
-  y += 2 * th + gap + (sq ? 40 : post ? 36 : 60);
+  y += rows * th + (rows - 1) * gap + (sq ? 40 : post ? 36 : 60);
   // graphique : courbe cumulée (jour) ou barres par jour (semaine / mois), centré dans la place restante
-  const footH = 120, lblH = c.kind === 'week' && st.daily.length >= 2 ? 50 : 0;
+  const footH = withQr ? 230 : 120, lblH = c.kind === 'week' && st.daily.length >= 2 ? 50 : 0;
   const avail = H - y - footH - 40, ch = Math.min(avail - lblH, tall ? 520 : 380);
   y += Math.max(0, (avail - ch - lblH) / 2);
   if (ch > 120) {
@@ -1973,13 +1984,31 @@ function drawCard(cv) {
     }
   }
   // pied de carte
-  const fy = H - 76;
-  g.strokeStyle = 'rgba(196,138,69,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(80, fy - 50); g.lineTo(W - 80, fy - 50); g.stroke();
-  g.font = F(600, 28); g.fillStyle = MUT; g.textAlign = 'left';
   const accName = state.sel === 'all' ? 'Tous les comptes' : shownName((state.accounts.find(a => a.login === state.sel) || {}).name || '');
-  g.fillText(c.hideAcc ? '' : accName, 80, fy);
-  g.textAlign = 'right'; g.fillStyle = GOLD; g.font = F(700, 28);
-  g.fillText(c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : 'ASTRA CAPITAL', W - 80, fy);
+  const handleTxt = c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : 'ASTRA CAPITAL';
+  if (withQr) {
+    const qs = 150, pd = 12, qx = W - 80 - qs - 2 * pd, qy = H - 72 - qs - 2 * pd, lineY = qy - 26;
+    g.strokeStyle = 'rgba(196,138,69,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(80, lineY); g.lineTo(W - 80, lineY); g.stroke();
+    const qr = qrcode(0, 'M'); qr.addData(link); qr.make();
+    const n = qr.getModuleCount(), m = qs / n;
+    g.fillStyle = '#ffffff'; g.beginPath(); g.roundRect(qx, qy, qs + 2 * pd, qs + 2 * pd, 16); g.fill();
+    g.fillStyle = '#0a0d14';
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect(qx + pd + k * m, qy + pd + r * m, Math.ceil(m), Math.ceil(m));
+    let host = ''; try { host = new URL(link).hostname.replace(/^www\./, ''); } catch (e) {}
+    g.textAlign = 'right';
+    g.fillStyle = GOLD; g.font = F(700, 30); g.fillText('Scanne pour vérifier', qx - 28, qy + 62);
+    g.fillStyle = MUT; g.font = F(500, 26); g.fillText(host ? 'Trades réels · ' + host : 'Trades réels', qx - 28, qy + 102);
+    g.textAlign = 'left';
+    g.fillStyle = FG; g.font = F(700, 30); g.fillText(handleTxt, 80, qy + 62);
+    g.fillStyle = MUT; g.font = F(600, 26); g.fillText(c.hideAcc ? '' : accName, 80, qy + 102);
+  } else {
+    const fy = H - 76;
+    g.strokeStyle = 'rgba(196,138,69,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(80, fy - 50); g.lineTo(W - 80, fy - 50); g.stroke();
+    g.font = F(600, 28); g.fillStyle = MUT; g.textAlign = 'left';
+    g.fillText(c.hideAcc ? '' : accName, 80, fy);
+    g.textAlign = 'right'; g.fillStyle = GOLD; g.font = F(700, 28);
+    g.fillText(handleTxt, W - 80, fy);
+  }
   g.textAlign = 'center';
 }
 function cardOptions() {
@@ -1995,6 +2024,12 @@ function cardOptions() {
   const rBtn = document.querySelector('#cardMode button[data-v="r"]');
   rBtn.disabled = !!st && !st.rOk; rBtn.title = st && !st.rOk ? 'Définis ton risque par trade sur le compte pour afficher les R' : '';
   if (c.mode === 'r' && st && !st.rOk) { c.mode = 'both'; return cardOptions(); }
+  const lk = cardLinkOf();
+  if (document.activeElement !== $('#cardLink')) $('#cardLink').value = lk;
+  $('#cardQr').checked = c.qr;
+  const hint = $('#cardLinkHint'), bad = lk && !cardLinkOk(lk);
+  hint.classList.toggle('err', !!bad);
+  hint.textContent = bad ? 'Lien invalide : il doit commencer par https://' : 'Ex. ta page Myfxbook vérifiée : en scannant le QR code, on voit que les trades sont réels. Lien gardé pour ce compte.';
   $('#cardEmpty').hidden = !!c.key; $('#cardCanvas').hidden = !c.key;
   $('#cardSave').disabled = $('#cardCopy').disabled = !c.key;
   if (c.key) drawCard($('#cardCanvas'));
@@ -2008,7 +2043,13 @@ function openCard() {
   const go = () => cardOptions();
   if (cardLogo.complete) go(); else cardLogo.onload = go;
 }
-function saveCardPrefs() { api('/api/prefs', { card: { mode: state.card.mode, format: state.card.format, handle: state.card.handle, hideAcc: state.card.hideAcc } }).catch(() => {}); }
+function saveCardPrefs() { api('/api/prefs', { card: { mode: state.card.mode, format: state.card.format, handle: state.card.handle, hideAcc: state.card.hideAcc, qr: state.card.qr, links: state.card.links } }).catch(() => {}); }
+$('#cardLink').oninput = e => {
+  const v = e.target.value.trim().slice(0, 300);
+  if (v) state.card.links[state.sel] = v; else delete state.card.links[state.sel];
+  cardOptions(); clearTimeout(saveCardPrefs.t); saveCardPrefs.t = setTimeout(saveCardPrefs, 600);
+};
+$('#cardQr').onchange = e => { state.card.qr = e.target.checked; saveCardPrefs(); cardOptions(); };
 const cardFile = () => 'ASTRA-' + { day: 'jour', week: 'semaine', month: 'mois' }[state.card.kind] + '-' + state.card.key + '.png';
 document.querySelectorAll('#cardKind button').forEach(b => b.onclick = () => { state.card.kind = b.dataset.v; state.card.key = null; cardOptions(); });
 document.querySelectorAll('#cardMode button').forEach(b => b.onclick = () => { if (b.disabled) return; state.card.mode = b.dataset.v; saveCardPrefs(); cardOptions(); });
@@ -2030,7 +2071,8 @@ $('#cardCopy').onclick = () => $('#cardCanvas').toBlob(async b => {
 $('#shareBtn').onclick = openCard;
 api('/api/prefs').then(p => { if (p.card && typeof p.card === 'object') Object.assign(state.card, {
   mode: ['both', 'pct', 'r'].includes(p.card.mode) ? p.card.mode : 'both', format: CARD_FORMATS[p.card.format] ? p.card.format : 'post',
-  handle: String(p.card.handle || '').slice(0, 30), hideAcc: !!p.card.hideAcc }); }).catch(() => {});
+  handle: String(p.card.handle || '').slice(0, 30), hideAcc: !!p.card.hideAcc, qr: p.card.qr !== false,
+  links: p.card.links && typeof p.card.links === 'object' ? p.card.links : {} }); }).catch(() => {});
 
 // ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;
