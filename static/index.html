@@ -49,6 +49,13 @@
   .btn.ghost { background: transparent; }
   .btn.danger:hover { border-color: var(--loss); color: var(--loss); }
   aside .spacer { flex: 1; }
+  .social { display: grid; gap: 6px; }
+  .soc { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--fg);
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; text-align: left; }
+  .soc svg { color: var(--gold); flex: none; }
+  .soc:hover { border-color: rgba(196,138,69,.6); }
+  .of-community { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; color: var(--muted); font-size: 13.5px; }
+  .of-community .soc { width: auto; }
   main { padding: 24px 28px 40px; min-width: 0; }
   header.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
   header.top h1 { margin: 0; font-size: 22px; font-weight: 650; }
@@ -678,6 +685,10 @@
       <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
     </nav>
     <div class="spacer"></div>
+    <div class="social" id="socialBox">
+      <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H7l-3 2.5v-2.5h0.5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Rejoindre le Discord</span></button>
+      <button type="button" class="soc" data-soc="tiktok" title="Suivre ASTRA CAPITAL sur TikTok"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="12" height="11" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.7v4.6l3.8-2.3z" fill="currentColor"/></svg><span>Suivre sur TikTok</span></button>
+    </div>
     <button class="btn ghost danger" id="removeBtn" hidden>Retirer ce compte</button>
     <div class="label" id="appVersion" style="text-align:center"></div>
   </aside>
@@ -899,6 +910,7 @@
         </form>
         <div class="of-key-err" id="ofKeyErr"></div>
       </div>
+      <div class="of-community" id="ofCommunity"><span>Une question avant de t'abonner ? Rejoins la communauté :</span></div>
     </div>
 
     <div class="empty-state" id="emptyState" hidden>
@@ -2257,6 +2269,8 @@ const HELP_KB = [
     a: 'Le **compte démo** affiche des données fictives pour découvrir l\'app sans connecter de vrai compte. Tu peux le supprimer par clic droit.' },
   { q: 'Voir tous mes comptes ensemble', k: 'tous comptes ensemble cumul cumule total global vue combinee',
     a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans l\'offre **Pro**.' },
+  { q: 'Contacter ASTRA / rejoindre la communauté', k: 'contact contacter support aide humain question communaute discord tiktok groupe serveur coach rejoindre suivre probleme',
+    a: 'Rejoins la **communauté ASTRA sur Discord** pour poser tes questions, échanger avec les autres traders et obtenir de l\'aide. Tu peux aussi suivre **@astracapital1** sur TikTok.\nLes boutons sont aussi en bas de la colonne de gauche.', act: [['Rejoindre le Discord', 'discord'], ['TikTok', 'tiktok']] },
   { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor drawdown definition signifie veut dire statistique moyenne',
     a: '**Taux de réussite** : % de trades gagnants. **Profit factor** : gains ÷ pertes (au-dessus de 1 = rentable). **Drawdown max** : plus forte baisse du capital depuis un sommet. **Jours gagnants** : jours clôturés en positif.' },
 ];
@@ -2280,6 +2294,7 @@ const HELP_ACTS = {
   add: () => openLogin(), custom: () => { state.page = 'dash'; showPage(); setTimeout(() => $('#customBtn').click(), 50); },
   offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
   eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'dash'; showPage(); openCard(); },
+  discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'),
 };
 function helpBubble(who, text, acts, sugg) {
   const m = el('div', 'h-msg ' + who);
@@ -2309,7 +2324,7 @@ function helpAsk(text) {
     if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, indicateurs, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
     if (/^(merci|top|parfait|super|ok|d accord|nickel)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
     const res = helpSearch(text);
-    if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, ou regarde ces sujets :', null, (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
+    if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, regarde ces sujets, ou pose ta question sur le **Discord** :', [['Rejoindre le Discord', 'discord']], (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
     const best = res[0].e, others = res.slice(1, 4).filter(x => x.sc >= Math.max(2, res[0].sc - 2)).map(x => x.e);
     helpBubble('bot', best.a, best.act, others.length ? others : null);
   }, 250);
@@ -2428,6 +2443,17 @@ async function renderOffres() {
   });
 }
 let confirmRemoveLic = false;
+let socialLinks = { discord: 'https://discord.gg/YSep3qMT9', tiktok: 'https://www.tiktok.com/@astracapital1' };
+async function openSocial(k) {
+  const url = socialLinks[k]; if (!url) return;
+  try { await api('/api/open-url', { url }); } catch (e) { window.open(url, '_blank', 'noopener'); }
+}
+document.querySelectorAll('#socialBox .soc').forEach(b => b.onclick = () => openSocial(b.dataset.soc));
+(() => { // mêmes boutons sur la page Tarification
+  const box = $('#ofCommunity');
+  document.querySelectorAll('#socialBox .soc').forEach(b => { const c = b.cloneNode(true); c.onclick = () => openSocial(c.dataset.soc); box.appendChild(c); });
+})();
+api('/api/offres').then(o => { if (o.social) Object.assign(socialLinks, o.social); }).catch(() => {});
 state.ofBilling = 'month'; try { if (localStorage.getItem('ofBilling') === 'year') state.ofBilling = 'year'; } catch (e) {}
 async function startTrial(btn) {
   btn.disabled = true; btn.textContent = 'Activation…';

@@ -137,5 +137,9 @@
       }
     }
   ],
-  "annual_discount": 20
+  "annual_discount": 20,
+  "social": {
+    "discord": "https://discord.gg/YSep3qMT9",
+    "tiktok": "https://www.tiktok.com/@astracapital1"
+  }
 }

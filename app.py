@@ -1908,7 +1908,8 @@ def api_offres():
             q["annual"] = {k: v for k, v in q["annual"].items() if k != "variant_id"}
         return q
     return jsonify({"plans": [clean(p) for p in o.get("plans", [])], "annual_discount": o.get("annual_discount"),
-                    "features": o.get("features") or [], "portal_url": o.get("portal_url")})
+                    "features": o.get("features") or [], "portal_url": o.get("portal_url"),
+                    "social": o.get("social") or {}})
 
 
 @app.get("/api/licence")
@@ -2000,7 +2001,7 @@ def api_open_url():
     url = str((request.get_json(force=True) or {}).get("url", ""))
     o = load_offers()
     allowed = ({p.get("checkout_url") for p in o.get("plans", [])} | {(p.get("annual") or {}).get("checkout_url") for p in o.get("plans", [])}
-               | {o.get("portal_url")}) - {None, ""}
+               | {o.get("portal_url")} | set((o.get("social") or {}).values())) - {None, ""}
     host = urlparse(url).hostname or ""
     if url not in allowed and not (url.startswith("https://") and (host == "lemonsqueezy.com" or host.endswith(".lemonsqueezy.com"))):
         return jsonify({"error": "Adresse non autorisée."}), 400
