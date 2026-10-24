@@ -35,7 +35,7 @@ img { max-width: 100%; height: auto; display: block; }
 .hero .wrap { position: relative; text-align: center; }
 .pill { display: inline-flex; gap: 8px; align-items: center; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(196,138,69,.5); background: var(--gold-soft);
   color: var(--gold2); font-size: 13px; font-weight: 700; letter-spacing: .04em; }
-.hero h1 { font-size: clamp(38px, 6.2vw, 72px); line-height: 1.04; letter-spacing: -.035em; margin: 22px auto 18px; max-width: 900px; font-weight: 850; }
+.hero h1 { font-size: clamp(38px, 6.2vw, 72px); line-height: 1.04; letter-spacing: -.035em; margin: 8px auto 18px; max-width: 900px; font-weight: 850; }
 .hero p.lead { font-size: clamp(16px, 2vw, 19px); color: var(--muted); max-width: 720px; margin: 0 auto 30px; }
 .hero .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .hero .note { color: var(--muted); font-size: 13px; margin-top: 14px; }
