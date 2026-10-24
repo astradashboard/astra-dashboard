@@ -387,6 +387,27 @@
   input.c-sel { margin-top: 0; } input.c-sel:focus, select.c-sel:focus { outline: none; border-color: var(--gold); }
   .c-check { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 13.5px; cursor: pointer; }
   .c-check input { accent-color: var(--gold); }
+  .c-cal { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .c-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .c-cal-head b { font-size: 14px; }
+  .c-cal-head button { background: none; border: 1px solid var(--line); color: var(--fg); width: 28px; height: 28px; border-radius: 8px; font-size: 15px; line-height: 1; }
+  .c-cal-head button:hover:not([disabled]) { border-color: var(--gold); color: var(--gold); }
+  .c-cal-head button[disabled] { opacity: .3; cursor: default; }
+  .c-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .c-cal-grid.months { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .c-cal-grid .dw { color: var(--muted); font-size: 10.5px; font-weight: 600; text-align: center; padding: 2px 0 4px; text-transform: uppercase; }
+  .c-cal-grid .cd { position: relative; border: 1px solid transparent; background: none; color: var(--muted); border-radius: 7px; height: 32px; font-size: 12.5px;
+    display: grid; place-items: center; padding: 0; opacity: .45; cursor: default; }
+  .c-cal-grid.months .cd { height: 44px; font-size: 13px; }
+  .c-cal-grid .cd.has { opacity: 1; color: var(--fg); cursor: pointer; font-weight: 600; }
+  .c-cal-grid .cd.has.win { background: rgba(34,197,94,.13); }
+  .c-cal-grid .cd.has.loss { background: rgba(239,68,68,.13); }
+  .c-cal-grid .cd.has:hover { border-color: rgba(196,138,69,.6); }
+  .c-cal-grid .cd.sel { border-color: var(--gold) !important; box-shadow: 0 0 0 1px var(--gold) inset; color: var(--gold); }
+  .c-cal-grid .cd.out { visibility: hidden; }
+  .c-cal-grid .cd small { display: block; font-size: 10px; font-weight: 600; margin-top: -2px; }
+  .c-cal-grid .cd.win small { color: var(--win); } .c-cal-grid .cd.loss small { color: var(--loss); }
+  .c-cal-sel { color: var(--gold); font-size: 12.5px; font-weight: 600; margin-top: 8px; text-align: center; }
   .c-hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin-top: 6px; }
   .c-hint.err { color: var(--loss); }
   .c-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 20px; flex-wrap: wrap; }
@@ -886,7 +907,7 @@
       <p class="sub">Une image prête à poster sur TikTok, Instagram ou dans ton groupe.</p>
       <label class="c-lab">Période</label>
       <div class="seg c-seg" id="cardKind"><button type="button" data-v="day">Jour</button><button type="button" data-v="week">Semaine</button><button type="button" data-v="month">Mois</button></div>
-      <select id="cardPeriod" class="c-sel"></select>
+      <div class="c-cal" id="cardCal"></div>
       <label class="c-lab">Afficher</label>
       <div class="seg c-seg" id="cardMode"><button type="button" data-v="both">Montant + %</button><button type="button" data-v="pct">% seulement</button><button type="button" data-v="r">En R</button></div>
       <label class="c-lab">Format</label>
@@ -2014,9 +2035,7 @@ function drawCard(cv) {
 function cardOptions() {
   const c = state.card, per = cardPeriods(c.kind);
   if (!per.some(p => p.key === c.key)) c.key = per.length ? per[0].key : null;
-  const sel = $('#cardPeriod'); sel.innerHTML = '';
-  for (const p of per) sel.appendChild(new Option(p.label, p.key));
-  sel.value = c.key || '';
+  renderCardCal(per);
   document.querySelectorAll('#cardKind button').forEach(b => b.classList.toggle('on', b.dataset.v === c.kind));
   document.querySelectorAll('#cardMode button').forEach(b => b.classList.toggle('on', b.dataset.v === c.mode));
   document.querySelectorAll('#cardFormat button').forEach(b => b.classList.toggle('on', b.dataset.v === c.format));
@@ -2038,6 +2057,7 @@ function openCard() {
   if (!hasPerk('cards')) return perkUpsell('Les cartes de résultats');
   if (!state.data) return;
   state.card.hideAcc = state.mask || state.card.hideAcc;
+  state.card.calView = null;
   $('#cardHandle').value = state.card.handle; $('#cardHideAcc').checked = state.card.hideAcc;
   $('#cardBg').classList.add('open');
   const go = () => cardOptions();
@@ -2051,10 +2071,64 @@ $('#cardLink').oninput = e => {
 };
 $('#cardQr').onchange = e => { state.card.qr = e.target.checked; saveCardPrefs(); cardOptions(); };
 const cardFile = () => 'ASTRA-' + { day: 'jour', week: 'semaine', month: 'mois' }[state.card.kind] + '-' + state.card.key + '.png';
-document.querySelectorAll('#cardKind button').forEach(b => b.onclick = () => { state.card.kind = b.dataset.v; state.card.key = null; cardOptions(); });
+document.querySelectorAll('#cardKind button').forEach(b => b.onclick = () => { state.card.kind = b.dataset.v; state.card.key = null; state.card.calView = null; cardOptions(); });
 document.querySelectorAll('#cardMode button').forEach(b => b.onclick = () => { if (b.disabled) return; state.card.mode = b.dataset.v; saveCardPrefs(); cardOptions(); });
 document.querySelectorAll('#cardFormat button').forEach(b => b.onclick = () => { state.card.format = b.dataset.v; saveCardPrefs(); cardOptions(); });
-$('#cardPeriod').onchange = e => { state.card.key = e.target.value; cardOptions(); };
+// calendrier de choix de la période (jour, semaine ou mois)
+function renderCardCal(per) {
+  const c = state.card, box = $('#cardCal'); box.innerHTML = '';
+  const pnlByDay = {}; for (const x of state.data.daily || []) if (x.trades || x.pnl) pnlByDay[x.date] = x.pnl;
+  for (const t of state.data.trades || []) if (!(t.d in pnlByDay)) pnlByDay[t.d] = 0;
+  const keys = new Set(per.map(p => p.key));
+  const sum = (from, to) => Object.entries(pnlByDay).filter(([d]) => d >= from && d <= to).reduce((s, [, v]) => s + v, 0);
+  const tone = v => v > 0 ? ' win' : v < 0 ? ' loss' : '';
+  const first = per.length ? per[per.length - 1].key : null, last = per.length ? per[0].key : null;
+  const head = el('div', 'c-cal-head'), prev = el('button', null, '‹'), next = el('button', null, '›'); prev.type = next.type = 'button';
+  const grid = el('div', 'c-cal-grid');
+  if (c.kind === 'month') {
+    if (!c.calView || c.calView.length !== 4) c.calView = (c.key || last || isoD(new Date())).slice(0, 4);
+    const y = Number(c.calView);
+    head.append(prev, el('b', null, String(y)), next);
+    prev.disabled = !first || String(y - 1) < first.slice(0, 4); next.disabled = !last || String(y + 1) > last.slice(0, 4);
+    prev.onclick = () => { c.calView = String(y - 1); renderCardCal(per); }; next.onclick = () => { c.calView = String(y + 1); renderCardCal(per); };
+    grid.classList.add('months');
+    for (let m = 1; m <= 12; m++) {
+      const k = y + '-' + pad(m), has = keys.has(k), v = has ? sum(k + '-01', k + '-31') : 0;
+      const b = el('button', 'cd' + (has ? ' has' + tone(v) : '') + (c.key === k ? ' sel' : '')); b.type = 'button';
+      b.append(['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'][m - 1]);
+      if (has) { b.appendChild(el('small', null, (v > 0 ? '+' : v < 0 ? '−' : '') + compactMoney(Math.abs(v)))); b.onclick = () => { c.key = k; cardOptions(); }; }
+      grid.appendChild(b);
+    }
+  } else {
+    if (!c.calView || c.calView.length !== 7) c.calView = (c.key || last || isoD(new Date())).slice(0, 7);
+    const [yy, mm] = c.calView.split('-').map(Number);
+    const lbl = MONTHS[mm - 1]; head.append(prev, el('b', null, lbl[0].toUpperCase() + lbl.slice(1) + ' ' + yy), next);
+    const shift = n => { const d = new Date(yy, mm - 1 + n, 1); c.calView = d.getFullYear() + '-' + pad(d.getMonth() + 1); renderCardCal(per); };
+    const firstM = first && first.slice(0, 7), lastM = last && (c.kind === 'week' ? cardRange('week', last)[1] : last).slice(0, 7);
+    prev.disabled = !firstM || c.calView <= firstM; next.disabled = !lastM || c.calView >= lastM;
+    prev.onclick = () => shift(-1); next.onclick = () => shift(1);
+    for (const d of ['lu', 'ma', 'me', 'je', 've', 'sa', 'di']) grid.appendChild(el('div', 'dw', d));
+    const start = new Date(yy, mm - 1, 1); start.setDate(1 - (start.getDay() + 6) % 7);
+    const selRange = c.key ? cardRange(c.kind, c.key) : null;
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const k = isoD(d), inMonth = d.getMonth() === mm - 1;
+      if (i >= 35 && !inMonth && d.getDate() < 8 && (d.getDay() + 6) % 7 === 0) break; // pas de 6e ligne vide
+      const wk = mondayOf(k), has = c.kind === 'day' ? keys.has(k) : keys.has(wk) && (k in pnlByDay || true);
+      const dayHas = k in pnlByDay, v = pnlByDay[k] || 0;
+      const b = el('button', 'cd' + (!inMonth ? ' dim' : '') + (dayHas ? ' has' + tone(v) : (c.kind === 'week' && keys.has(wk) ? ' has' : ''))
+        + (selRange && k >= selRange[0] && k <= selRange[1] ? ' sel' : ''), String(d.getDate()));
+      b.type = 'button'; if (!inMonth) b.style.opacity = dayHas ? '.55' : '.2';
+      if (c.kind === 'day' ? dayHas : keys.has(wk)) b.onclick = () => { c.key = c.kind === 'day' ? k : wk; cardOptions(); };
+      else b.classList.remove('has');
+      grid.appendChild(b);
+    }
+  }
+  box.append(head, grid);
+  if (c.key) box.appendChild(el('div', 'c-cal-sel', cardLabel(c.kind, c.key)));
+  else box.appendChild(el('div', 'c-cal-sel', 'Aucun trade pour cette période'));
+}
+const compactMoney = v => v >= 1000 ? (v / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + 'k' : Math.round(v).toString();
 $('#cardHandle').oninput = e => { state.card.handle = e.target.value.trim().slice(0, 30); cardOptions(); clearTimeout(saveCardPrefs.t); saveCardPrefs.t = setTimeout(saveCardPrefs, 600); };
 $('#cardHideAcc').onchange = e => { state.card.hideAcc = e.target.checked; saveCardPrefs(); cardOptions(); };
 $('#cardClose').onclick = () => $('#cardBg').classList.remove('open');
