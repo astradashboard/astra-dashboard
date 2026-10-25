@@ -193,6 +193,7 @@
   .blk:hover > .blk-handle { opacity: 1; }
   .blk-handle:hover { color: var(--gold); border-color: var(--gold); }
   /* déplacement : la place du bloc reste visible, une miniature suit la souris */
+  .blk.live-off { display: none; }
   .blk.placeholder { outline: 2px dashed var(--gold); outline-offset: 4px; background: var(--gold-soft); }
   .blk.placeholder > * { visibility: hidden; }
   body.reordering, body.reordering * { cursor: grabbing !important; user-select: none !important; }
@@ -2345,7 +2346,7 @@ const HELP_KB = [
   { q: 'Changer la devise affichée', k: 'devise monnaie euro dollar usd eur chf jpy aud conversion',
     a: 'Dans le grand bloc du capital, choisis la devise (EUR, USD, CHF, JPY, AUD) dans le menu en haut à droite. La conversion utilise le cours du jour.' },
   { q: 'Voir les trades en cours en direct', k: 'direct live trade cours ouvert position temps reel seconde equite equity',
-    a: 'Le bloc **Trades en cours** affiche tes positions ouvertes et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans l\'offre **Pro**.', act: [['Voir les offres', 'offres']] },
+    a: 'Le bloc **Trades en cours** apparaît automatiquement dès qu\'une position est ouverte (et disparaît quand tout est clôturé). Il affiche tes positions et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans l\'offre **Pro**.', act: [['Voir les offres', 'offres']] },
   { q: 'Utiliser le journal de trading', k: 'journal trading historique liste trades detail position filtre gagnant perdant',
     a: 'Ouvre **Journal de trading** dans la colonne de gauche : tous les trades du compte (date, symbole, PnL). Clique sur un trade pour voir son détail : ouverture, volume, sens, frais, profit en % et en R.\nFiltre par mois ou par gagnants / perdants.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document',
@@ -3430,6 +3431,8 @@ function renderLiveTable(snap) {
   }
   body.appendChild(t);
 }
+function setLiveVisible(on) { const b = document.querySelector('.blk[data-block="live"]'); if (b) b.classList.toggle('live-off', !on); }
+setLiveVisible(false);
 function setLiveStatus(nodes) { const st = $('#liveStatus'); st.innerHTML = ''; nodes.forEach(n => st.append(n)); }
 function applyLive(r) {
   const body = $('#liveBody');
@@ -3437,6 +3440,7 @@ function applyLive(r) {
     state.live = { login: state.sel, snap: r.snap };
     setLiveStatus([el('span', 'ok', '● En direct'), ' · ' + new Date().toLocaleTimeString('fr-BE')]);
     renderLiveTable(r.snap);
+    setLiveVisible(r.snap.positions.length > 0);
     if (state.data) {
       state.data.equity = r.snap.equity; state.data.balance = r.snap.balance;
       renderHero();
@@ -3446,6 +3450,7 @@ function applyLive(r) {
     liveRev = r.rev;
     return;
   }
+  setLiveVisible(false); // pas de trade en cours connu : le bloc disparaît
   const hadLive = !!state.live; state.live = null;
   if (hadLive && state.data) renderHero();
   if (r.status === 'starting' || (r.status === 'running' && !r.snap)) {
@@ -3476,7 +3481,7 @@ async function liveTick() {
       const b = el('button', 'btn primary', 'Voir les offres'); b.type = 'button'; b.onclick = () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); };
       bx.appendChild(b); body.appendChild(bx);
     }
-    liveTimer = setTimeout(liveTick, 3000); return;
+    setLiveVisible(false); liveTimer = setTimeout(liveTick, 3000); return;
   }
   if ($('#liveBody').querySelector('.perk-box')) $('#liveBody').innerHTML = '';
   if (!liveActive()) {
@@ -3486,7 +3491,7 @@ async function liveTick() {
       const body = $('#liveBody'); body.innerHTML = '';
       body.appendChild(el('div', 'live-empty', 'Choisis un compte dans la colonne de gauche pour suivre ses trades en direct.'));
     }
-    liveTimer = setTimeout(liveTick, 1500); return;
+    setLiveVisible(false); liveTimer = setTimeout(liveTick, 1500); return;
   }
   const login = state.sel; let r;
   try { r = await api('/api/live?login=' + encodeURIComponent(login)); } catch (e) { r = { status: 'error', error: e.message }; }
