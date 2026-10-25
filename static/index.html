@@ -2362,7 +2362,7 @@ async function buildDetailsUrl() {
   const order = all.map((t, i) => i).sort((i, j) => Math.abs(all[j][6]) - Math.abs(all[i][6]));
   for (let n = all.length; n >= 0; n = n > 12 ? 12 : n - 1) {
     const keep = new Set(order.slice(0, n)), t = all.filter((x, i) => keep.has(i));
-    const url = 'https://astradashboard.github.io/r/#d=' + await b64deflate(JSON.stringify({ ...base, t, m: all.length - t.length || undefined }));
+    const url = 'https://astracapital.app/r/#d=' + await b64deflate(JSON.stringify({ ...base, t, m: all.length - t.length || undefined }));
     if (url.length <= 420 || n === 0) return url;
   }
 }
