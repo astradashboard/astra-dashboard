@@ -131,7 +131,9 @@
   .kpi.big { grid-column: span 3; }
   .kpi.big.pair1 { grid-column: 1 / span 3; }
   .kpi.big.full { grid-column: 1 / -1; }
-  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi, .kpi.big { grid-column: span 1; } .kpi.big.pair1 { grid-column: 1 / span 1; } .kpi.big.full { grid-column: 1 / -1; } }
+  .kpi.d-half { grid-column: span 3; }
+  .kpi.d-full { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi, .kpi.big { grid-column: span 1; } .kpi.big.pair1 { grid-column: 1 / span 1; } .kpi.big.full { grid-column: 1 / -1; } .kpi.d-half, .kpi.d-full { grid-column: span 1; } .kpi.m-full { grid-column: 1 / -1; } }
   .kpi { position: relative; cursor: grab; transition: opacity .15s, border-color .15s; }
   .kpi:hover { border-color: #34405a; }
   .kpi .k { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -1716,6 +1718,17 @@ function renderKpis() {
     if (prevBig) { t.dataset.paired = '1'; t.previousElementSibling.dataset.paired = '1'; t.previousElementSibling.classList.add('pair1'); }
     else if (!nextBig) t.classList.add('full');
   });
+  // petites cases : la dernière ligne incomplète s'étire pour remplir toute la largeur
+  let seg = [];
+  const flush = () => {
+    const r3 = seg.length % 3, r2 = seg.length % 2;
+    if (r3 === 1) seg[seg.length - 1].classList.add('d-full');
+    if (r3 === 2) seg.slice(-2).forEach(t => t.classList.add('d-half'));
+    if (r2 === 1) seg[seg.length - 1].classList.add('m-full');
+    seg = [];
+  };
+  for (const t of box.querySelectorAll('.kpi')) { if (t.classList.contains('big') || t.classList.contains('empty-kpi')) flush(); else seg.push(t); }
+  flush();
 }
 
 /* ---------- capital du compte ---------- */
