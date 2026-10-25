@@ -656,12 +656,13 @@ def _live_loop():
 
 
 # ---------------------------------------------------------------- cotations des indices
+QUOTE_CATS = ["Devises", "Indices", "Matières premières", "Obligations", "Actions", "ETF", "Crypto"]
 QUOTE_LIST = [  # (clé, nom, drapeau, catégorie, noms possibles du symbole selon le broker)
-    ("us30", "Dow Jones", "🇺🇸", "Indices", ["US30.cash", "US30", "US30Cash", "DJ30", "WS30", "DJI30", "USA30"]),
-    ("us500", "S&P 500", "🇺🇸", "Indices", ["US500.cash", "US500", "US500Cash", "SPX500", "SP500", "USA500"]),
-    ("us100", "Nasdaq 100", "🇺🇸", "Indices", ["US100.cash", "US100", "US100Cash", "NAS100", "USTEC", "NDX100", "USTECH"]),
+    ("us30", "US 30", "🇺🇸", "Indices", ["US30.cash", "US30", "US30Cash", "DJ30", "WS30", "DJI30", "USA30"]),
+    ("us500", "US 500", "🇺🇸", "Indices", ["US500.cash", "US500", "US500Cash", "SPX500", "SP500", "USA500"]),
+    ("us100", "US Tech 100", "🇺🇸", "Indices", ["US100.cash", "US100", "US100Cash", "NAS100", "USTEC", "NDX100", "USTECH"]),
     ("us2000", "Russell 2000", "🇺🇸", "Indices", ["US2000.cash", "US2000", "RUSS2000", "US2000Cash"]),
-    ("vix", "VIX", "🇺🇸", "Indices", ["VIX", "VIX.cash", "VIXX", "VOLX"]),
+    ("vix", "S&P 500 VIX", "🇺🇸", "Indices", ["VIX", "VIX.cash", "VIXX", "VOLX"]),
     ("ger40", "DAX", "🇩🇪", "Indices", ["GER40.cash", "GER40", "DE40", "GER30", "DAX40", "DE30"]),
     ("fra40", "CAC 40", "🇫🇷", "Indices", ["FRA40.cash", "FRA40", "FR40", "F40"]),
     ("eu50", "Euro Stoxx 50", "🇪🇺", "Indices", ["EU50.cash", "EU50", "EUSTX50", "STOXX50"]),
@@ -674,18 +675,51 @@ QUOTE_LIST = [  # (clé, nom, drapeau, catégorie, noms possibles du symbole sel
     ("oil", "Pétrole WTI", "🛢", "Matières premières", ["USOIL.cash", "USOIL", "WTI", "XTIUSD", "CL.cash"]),
     ("brent", "Pétrole Brent", "🛢", "Matières premières", ["UKOIL.cash", "UKOIL", "BRENT", "XBRUSD"]),
     ("natgas", "Gaz naturel", "🔥", "Matières premières", ["NATGAS.cash", "NATGAS", "XNGUSD", "NGAS"]),
-    ("eurusd", "EUR/USD", "🇪🇺", "Forex", ["EURUSD"]),
-    ("gbpusd", "GBP/USD", "🇬🇧", "Forex", ["GBPUSD"]),
-    ("usdjpy", "USD/JPY", "🇯🇵", "Forex", ["USDJPY"]),
-    ("usdchf", "USD/CHF", "🇨🇭", "Forex", ["USDCHF"]),
-    ("audusd", "AUD/USD", "🇦🇺", "Forex", ["AUDUSD"]),
-    ("usdcad", "USD/CAD", "🇨🇦", "Forex", ["USDCAD"]),
-    ("dxy", "Dollar Index", "💵", "Forex", ["DXY", "DXY.cash", "USDX", "DX.cash"]),
+    ("copper", "Cuivre", "🟤", "Matières premières", ["COPPER", "COPPER.cash", "XCUUSD", "HG.cash"]),
+    ("xptusd", "Platine", "⚪", "Matières premières", ["XPTUSD", "PLATINUM"]),
+    ("us10y", "US 10 ans", "🇺🇸", "Obligations", ["US10Y", "UST10Y", "USTN10", "TNOTE", "US10YR", "T-NOTE", "UST10Y.f", "USTN10.f"]),
+    ("us30y", "US 30 ans", "🇺🇸", "Obligations", ["US30Y", "UST30Y", "USTBOND", "TBOND", "US30YR", "T-BOND", "UST30Y.f"]),
+    ("bund", "Bund allemand", "🇩🇪", "Obligations", ["BUND", "EUBUND", "GER10Y", "DE10Y", "FGBL", "BUND.f", "EUBUND.f"]),
+    ("gilt", "Gilt britannique", "🇬🇧", "Obligations", ["GILT", "UK10Y", "UKGILT", "GILT.f", "UKGB"]),
+    ("jgb", "JGB japonais", "🇯🇵", "Obligations", ["JGB", "JP10Y", "JGB.f"]),
+    ("aapl", "Apple", "🇺🇸", "Actions", ["AAPL", "AAPL.US", "#AAPL", "AAPL.NAS", "AAPL.OQ", "Apple"]),
+    ("msft", "Microsoft", "🇺🇸", "Actions", ["MSFT", "MSFT.US", "#MSFT", "MSFT.NAS", "MSFT.OQ", "Microsoft"]),
+    ("nvda", "Nvidia", "🇺🇸", "Actions", ["NVDA", "NVDA.US", "#NVDA", "NVDA.NAS", "NVDA.OQ", "Nvidia"]),
+    ("tsla", "Tesla", "🇺🇸", "Actions", ["TSLA", "TSLA.US", "#TSLA", "TSLA.NAS", "TSLA.OQ", "Tesla"]),
+    ("amzn", "Amazon", "🇺🇸", "Actions", ["AMZN", "AMZN.US", "#AMZN", "AMZN.NAS", "AMZN.OQ", "Amazon"]),
+    ("meta", "Meta", "🇺🇸", "Actions", ["META", "META.US", "#META", "META.NAS", "META.OQ", "FB", "Meta"]),
+    ("googl", "Alphabet", "🇺🇸", "Actions", ["GOOGL", "GOOGL.US", "#GOOGL", "GOOG", "GOOGL.NAS", "GOOGL.OQ", "Alphabet"]),
+    ("nflx", "Netflix", "🇺🇸", "Actions", ["NFLX", "NFLX.US", "#NFLX", "NFLX.NAS", "NFLX.OQ", "Netflix"]),
+    ("spy", "SPDR S&P 500", "🇺🇸", "ETF", ["SPY", "SPY.US", "#SPY", "SPY.ARCA"]),
+    ("qqq", "Invesco QQQ", "🇺🇸", "ETF", ["QQQ", "QQQ.US", "#QQQ", "QQQ.NAS"]),
+    ("iwm", "iShares Russell 2000", "🇺🇸", "ETF", ["IWM", "IWM.US", "#IWM", "IWM.ARCA"]),
+    ("gld", "SPDR Gold", "🇺🇸", "ETF", ["GLD", "GLD.US", "#GLD", "GLD.ARCA"]),
+    ("eurusd", "EUR/USD", "🇪🇺", "Devises", ["EURUSD"]),
+    ("gbpusd", "GBP/USD", "🇬🇧", "Devises", ["GBPUSD"]),
+    ("usdjpy", "USD/JPY", "🇯🇵", "Devises", ["USDJPY"]),
+    ("usdchf", "USD/CHF", "🇨🇭", "Devises", ["USDCHF"]),
+    ("audusd", "AUD/USD", "🇦🇺", "Devises", ["AUDUSD"]),
+    ("usdcad", "USD/CAD", "🇨🇦", "Devises", ["USDCAD"]),
+    ("eurgbp", "EUR/GBP", "🇪🇺", "Devises", ["EURGBP"]),
+    ("nzdusd", "NZD/USD", "🇳🇿", "Devises", ["NZDUSD"]),
+    ("dxy", "Dollar Index", "💵", "Devises", ["DXY", "DXY.cash", "USDX", "DX.cash"]),
     ("btcusd", "Bitcoin", "₿", "Crypto", ["BTCUSD", "BTCUSD.cash", "BTC/USD"]),
     ("ethusd", "Ethereum", "Ξ", "Crypto", ["ETHUSD", "ETHUSD.cash", "ETH/USD"]),
     ("solusd", "Solana", "◎", "Crypto", ["SOLUSD", "SOLUSD.cash"]),
+    ("xrpusd", "XRP", "✕", "Crypto", ["XRPUSD", "XRPUSD.cash"]),
+    ("ltcusd", "Litecoin", "Ł", "Crypto", ["LTCUSD", "LTCUSD.cash"]),
 ]
 QUOTE_DEFAULT = ["us30", "us500", "us100", "vix", "ger40", "jp225"]
+QUOTE_TAB_DEFAULT = {
+    "Devises": ["eurusd", "gbpusd", "usdjpy", "usdchf", "audusd", "usdcad", "dxy"],
+    "Indices": ["us30", "us500", "us100", "us2000", "vix", "ger40", "jp225"],
+    "Matières premières": ["xauusd", "xagusd", "oil", "brent", "natgas", "copper"],
+    "Obligations": ["us10y", "us30y", "bund", "gilt", "jgb"],
+    "Actions": ["aapl", "msft", "nvda", "tsla", "amzn", "meta", "googl"],
+    "ETF": ["spy", "qqq", "iwm", "gld"],
+    "Crypto": ["btcusd", "ethusd", "solusd", "xrpusd", "ltcusd"],
+}
+QUOTE_TABS_ON = ["Indices", "Matières premières", "Obligations", "Actions"]
 _quote_symbols = {"exe": None, "map": {}, "names": {}}
 _quote_state = {}
 
@@ -729,7 +763,7 @@ def _quote_row(key, name, flag, real):
         st["last"], st["at"] = last, time.time()
     return {"key": key, "name": name, "flag": flag, "symbol": real, "digits": getattr(info, "digits", 2) if info else 2,
             "last": last, "prev": prev, "high": max(float(today["high"]), last), "low": min(float(today["low"]), last),
-            "chg": last - prev, "pct": (last - prev) / prev * 100 if prev else 0.0,
+            "chg": last - prev, "pct": (last - prev) / prev * 100 if prev else 0.0, "tt": int(getattr(tick, "time", 0) or 0),
             "at": dt.datetime.fromtimestamp(st["at"]).strftime("%H:%M:%S") if st["at"] else None}
 
 
@@ -750,7 +784,35 @@ def _read_quotes(keys):
             out.append(row)
         else:
             missing.append(key)
+    _mark_open(out)
     return out, missing
+
+
+_server_offset = {"h": None}
+
+
+def _mark_open(rows):
+    """Marché ouvert = dernier prix reçu il y a moins de 15 min (heure du serveur du broker).
+    Le décalage horaire du serveur est déduit du tick le plus récent quand un marché tourne."""
+    import time
+
+    tts = [r.get("tt") or 0 for r in rows]
+    try:  # les paires de devises cotent 24 h/24 en semaine : bon repère pour l'heure du serveur
+        ref = mt5.symbol_info_tick("EURUSD")
+        if ref is not None and getattr(ref, "time", 0):
+            tts.append(int(ref.time))
+    except Exception:
+        pass
+    latest = max(tts or [0])
+    if latest:
+        off = (latest - time.time()) / 3600
+        if -12.5 <= off <= 14.5 and abs(off - round(off * 2) / 2) < 0.2:
+            _server_offset["h"] = round(off * 2) / 2
+    off = _server_offset["h"] if _server_offset["h"] is not None else 2
+    now_srv = time.time() + off * 3600
+    for r in rows:
+        tt = r.pop("tt", 0)
+        r["open"] = bool(tt) and now_srv - tt < 15 * 60
 
 
 _demo_quotes = {"rnd": random.Random(11), "v": None}
@@ -762,7 +824,26 @@ QUOTE_DEMO_BASE = {"us30": (52449, 53068, 2), "us500": (7671.25, 7704.5, 2), "us
                    "xauusd": (4105.2, 4088.9, 2), "xagusd": (48.62, 48.10, 3), "oil": (61.85, 62.40, 2), "brent": (65.70, 66.12, 2),
                    "natgas": (3.412, 3.385, 3), "eurusd": (1.1652, 1.1640, 5), "gbpusd": (1.3375, 1.3390, 5), "usdjpy": (151.82, 151.40, 3),
                    "usdchf": (0.7962, 0.7975, 5), "audusd": (0.6545, 0.6530, 5), "usdcad": (1.3990, 1.4005, 5), "dxy": (98.62, 98.75, 3),
-                   "btcusd": (108250.0, 106900.0, 2), "ethusd": (3890.5, 3842.0, 2), "solusd": (186.4, 181.9, 2)}
+                   "btcusd": (108250.0, 106900.0, 2), "ethusd": (3890.5, 3842.0, 2), "solusd": (186.4, 181.9, 2),
+                   "copper": (5.12, 5.08, 4), "xptusd": (1585.4, 1572.0, 2), "us10y": (110.84, 110.62, 3), "us30y": (114.5, 114.9, 2),
+                   "bund": (129.12, 129.40, 2), "gilt": (91.35, 91.20, 2), "jgb": (136.1, 136.25, 2),
+                   "aapl": (262.8, 259.6, 2), "msft": (523.6, 520.5, 2), "nvda": (186.3, 182.2, 2), "tsla": (433.7, 448.9, 2),
+                   "amzn": (224.2, 221.1, 2), "meta": (738.4, 733.3, 2), "googl": (259.9, 253.1, 2), "nflx": (1094.0, 1115.2, 2),
+                   "spy": (677.3, 671.6, 2), "qqq": (617.1, 610.6, 2), "iwm": (249.6, 247.0, 2), "gld": (377.5, 375.9, 2),
+                   "eurgbp": (0.8712, 0.8705, 5), "nzdusd": (0.5735, 0.5722, 5), "xrpusd": (2.452, 2.398, 4), "ltcusd": (96.3, 94.1, 2)}
+
+
+def _demo_open(cat, now=None):
+    """Mode démo : horaires d'ouverture approximatifs (heure UTC)."""
+    now = now or dt.datetime.utcnow()
+    if cat == "Crypto":
+        return True
+    wd, h = now.weekday(), now.hour + now.minute / 60
+    if wd == 5 or (wd == 6 and h < 22) or (wd == 4 and h >= 21):
+        return False
+    if cat in ("Actions", "ETF"):
+        return wd < 5 and 13.5 <= h < 20
+    return not (21 <= h < 22)
 
 
 def _demo_quote_list(keys):
@@ -780,11 +861,12 @@ def _demo_quote_list(keys):
         _k, name, flag, _cat, _c = meta[key]
         last0, prev, dg = QUOTE_DEMO_BASE[key]
         q = _demo_quotes["v"][key]
-        if rnd.random() < 0.6:
+        if rnd.random() < 0.6 and _demo_open(_cat):
             q["last"] = round(q["last"] * (1 + rnd.gauss(0, 0.00025)), dg)
             q["at"] = time.time()
             q["high"], q["low"] = max(q["high"], q["last"]), min(q["low"], q["last"])
         out.append({"key": key, "name": name, "flag": flag, "symbol": key.upper(), "digits": dg, "last": q["last"], "prev": prev,
+                    "open": _demo_open(_cat),
                     "high": q["high"], "low": q["low"], "chg": q["last"] - prev, "pct": (q["last"] - prev) / prev * 100,
                     "at": dt.datetime.fromtimestamp(q["at"]).strftime("%H:%M:%S")})
     return out, missing
@@ -801,8 +883,76 @@ def _quote_keys():
 def api_quotes_catalog():
     """Liste des marchés proposés, et ceux que le broker connecté propose vraiment."""
     avail = set(_quote_symbols["map"]) if _quote_symbols["map"] else None
-    return jsonify({"default": QUOTE_DEFAULT, "items": [
+    return jsonify({"default": QUOTE_DEFAULT, "cats": QUOTE_CATS, "tab_default": QUOTE_TAB_DEFAULT, "tabs_on": QUOTE_TABS_ON, "items": [
         {"key": k, "name": n, "flag": f, "cat": c, "available": None if avail is None else k in avail} for k, n, f, c, _x in QUOTE_LIST]})
+
+
+QUOTE_RANGES = {  # période → (unité de temps MT5, nombre de barres)
+    "1D": ("M5", 288), "1W": ("M30", 336), "1M": ("H4", 186), "6M": ("D1", 130),
+    "1Y": ("D1", 260), "5Y": ("W1", 262), "MAX": ("MN1", 600)}
+
+
+def _demo_history(key, rng):
+    import math
+    import time
+
+    if key not in QUOTE_DEMO_BASE:
+        return None
+    tf, n = QUOTE_RANGES[rng]
+    step = {"M5": 300, "M30": 1800, "H4": 14400, "D1": 86400, "W1": 604800, "MN1": 2629800}[tf]
+    last = (_demo_quotes["v"] or {}).get(key, {}).get("last") or QUOTE_DEMO_BASE[key][0]
+    prev = QUOTE_DEMO_BASE[key][1]
+    rnd = random.Random(hash((key, rng)) & 0xffffffff)
+    vol = {"M5": .00028, "M30": .0012, "H4": .004, "D1": .011, "W1": .024, "MN1": .05}[tf]
+    pts, v = [], last
+    now = int(time.time()) // step * step
+    for i in range(n):
+        pts.append([now - i * step, round(v, 6)])
+        v = v / (1 + rnd.gauss(0.0004 if tf in ("W1", "MN1") else 0, vol))
+    pts.reverse()
+    if rng == "1D":  # la courbe du jour part de la clôture de la veille
+        w0, wn, m = pts[0][1], pts[-1][1], len(pts) - 1
+        pts = [[t, round(prev + (p - w0) - (wn - w0) * i / m + (last - prev) * i / m, 6)] for i, (t, p) in enumerate(pts)]
+        pts[-1][1] = last
+    return pts
+
+
+@app.get("/api/quotes/history")
+def api_quotes_history():
+    """Historique d'un marché pour le petit graphique (barres MT5 du broker)."""
+    key = str(request.args.get("key", ""))[:40]
+    rng = str(request.args.get("range", "1D")).upper()
+    if rng not in QUOTE_RANGES:
+        rng = "1D"
+    accounts, cache = load_accounts(), load_cache()
+    if mt5 is None or not accounts or all(cache.get(l, {}).get("demo") for l in accounts):
+        pts = _demo_history(key, rng)
+        return jsonify({"status": "demo", "points": pts or [], "prev": QUOTE_DEMO_BASE.get(key, (0, 0))[1]})
+    if not mt5_lock.acquire(timeout=3):
+        return jsonify({"status": "busy"})
+    try:
+        if SESSION.term is None:
+            return jsonify({"status": "starting"})
+        sym = _resolve_symbols()
+        real = (_quote_symbols.get("names") or {}).get(key[2:].lower()) if key.startswith("x:") else sym.get(key)
+        if not real:
+            return jsonify({"status": "missing", "points": []})
+        tf, n = QUOTE_RANGES[rng]
+        mt5.symbol_select(real, True)
+        rates = mt5.copy_rates_from_pos(real, getattr(mt5, "TIMEFRAME_" + tf), 0, n)
+        d1 = mt5.copy_rates_from_pos(real, mt5.TIMEFRAME_D1, 0, 2)
+        off = (_server_offset["h"] if _server_offset["h"] is not None else 2) * 3600
+        pts = [[int(r["time"] - off), float(r["close"])] for r in (rates if rates is not None else [])]
+        if rng == "1D" and d1 is not None and len(d1):  # séance du jour uniquement
+            start = int(d1[-1]["time"] - off)
+            day = [p for p in pts if p[0] >= start]
+            pts = day if len(day) >= 6 else pts
+        prev = float(d1[-2]["close"]) if d1 is not None and len(d1) > 1 else None
+        return jsonify({"status": "running", "points": pts, "prev": prev})
+    except Exception as ex:
+        return jsonify({"status": "error", "error": str(ex), "points": []})
+    finally:
+        mt5_lock.release()
 
 
 @app.get("/api/quotes")
@@ -1067,6 +1217,15 @@ def api_prefs_set():
                                    if isinstance(v, str) and v.startswith(("http://", "https://"))}}
     if isinstance(body.get("quotes"), list):
         prefs["quotes"] = [str(x)[:40] for x in body["quotes"] if isinstance(x, str)][:30]
+    if isinstance(body.get("mk"), dict):  # onglets du bloc Marchés
+        mk = body["mk"]
+        tabs = [c for c in mk.get("tabs", []) if c in QUOTE_CATS][:4]
+        lists = {c: [str(x)[:40] for x in v if isinstance(x, str)][:30]
+                 for c, v in (mk.get("lists") or {}).items() if c in QUOTE_CATS and isinstance(v, list)}
+        selk = {c: str(v)[:40] for c, v in (mk.get("sel") or {}).items() if c in QUOTE_CATS and isinstance(v, str)}
+        prefs["mk"] = {"tabs": tabs or QUOTE_TABS_ON, "lists": lists, "sel": selk,
+                       "tab": mk.get("tab") if mk.get("tab") in QUOTE_CATS else (tabs or QUOTE_TABS_ON)[0],
+                       "range": str(mk.get("range", "1D")).upper() if str(mk.get("range", "1D")).upper() in QUOTE_RANGES else "1D"}
     if isinstance(body.get("mask"), bool):
         prefs["mask"] = body["mask"]
     if body.get("tvCount") in (1, 2, 3, 4):

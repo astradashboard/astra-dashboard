@@ -517,6 +517,41 @@
   .disc-row .bar b { display: block; height: 100%; border-radius: 4px; }
   .disc-row small { color: var(--muted); font-size: 12px; }
   .tv-card .tv-grid.n4 .tv-box, .tv-card .tv-grid.n3 .tv-box { height: 360px; }
+  .mk-top { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 18px; }
+  .mk-tabs { flex: 1; display: flex; align-items: center; min-width: 0; overflow: hidden; }
+  .mk-tab { background: none; border: none; color: var(--fg); font-weight: 650; font-size: 14px; padding: 6px 12px; white-space: nowrap; position: relative; opacity: .82; }
+  .mk-tab:first-child { padding-left: 0; }
+  .mk-tab + .mk-tab::before { content: ''; position: absolute; left: 0; top: 25%; bottom: 25%; width: 1px; background: var(--line); }
+  .mk-tab.on { color: var(--gold); opacity: 1; }
+  .mk-tab:hover { opacity: 1; }
+  .mk-more { width: 32px; height: 32px; padding: 0; font-size: 18px; font-weight: 800; line-height: 1; flex: none; }
+  .mk-menu[hidden] { display: none; }
+  .mk-menu { position: absolute; right: 12px; top: 40px; z-index: 7; width: 270px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.5); }
+  .mk-menu-head { font-weight: 700; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  #mkMenuList { padding: 8px 0; }
+  .mk-opt { display: flex; align-items: center; gap: 12px; padding: 9px 18px; cursor: pointer; font-size: 14.5px; user-select: none; }
+  .mk-opt:hover { background: rgba(255,255,255,.03); }
+  .mk-opt .ck { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid #4a5468; display: grid; place-items: center; font-size: 13px; color: #0a0d14; flex: none; }
+  .mk-opt.on .ck { background: var(--gold); border-color: var(--gold); }
+  .mk-opt.off { color: var(--muted); }
+  .mk-opt.dis { opacity: .45; cursor: not-allowed; }
+  .mk-menu-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .mk-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 4px 18px; }
+  .mk-ranges { display: flex; gap: 2px; flex-wrap: wrap; }
+  .mk-ranges button { background: none; border: none; color: var(--muted); font-size: 13px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+  .mk-ranges button:first-child { padding-left: 0; }
+  .mk-ranges button.on { color: var(--fg); text-decoration: underline; text-underline-offset: 5px; text-decoration-color: var(--gold); text-decoration-thickness: 2px; }
+  .mk-ranges button:hover { color: var(--fg); }
+  .quotes-card { display: flex; flex-direction: column; }
+  .mk-chart { position: relative; flex: 1 1 210px; min-height: 180px; max-height: 300px; margin: 4px 0 8px; }
+  .mk-chart svg { display: block; width: 100%; height: 100%; }
+  .mk-chart-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12.5px; text-align: center; padding: 0 20px; }
+  .mk-table td { padding: 10px 8px; }
+  .mk-table tr.sel td { background: var(--gold-soft); }
+  .mk-table tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+  .mk-clock { width: 18px; vertical-align: -4px; }
+  .mk-table td.ck { width: 30px; text-align: center; padding-left: 4px; }
   .quotes-card { padding: 16px 0 6px; }
   .quotes-card .card-head { padding: 0 18px; }
   .q-arrow { color: var(--gold); }
@@ -866,23 +901,31 @@
       </section>
       <div class="split-handle" id="tvSplit" title="Glisser pour redimensionner · double-clic : 2/3 – 1/3"><span></span></div>
       <section class="card quotes-card">
-        <div class="card-head">
-          <h2>Marchés <span class="q-arrow">»</span></h2>
+        <div class="mk-top">
+          <div class="mk-tabs" id="mkTabs" role="tablist"></div>
+          <button class="btn mk-more" id="mkMore" type="button" title="Personnaliser les onglets" aria-label="Personnaliser les onglets">⋮</button>
+          <div class="mk-menu" id="mkMenu" hidden>
+            <div class="mk-menu-head">Personnaliser les onglets</div>
+            <div id="mkMenuList"></div>
+            <div class="mk-menu-foot"><span id="mkMenuCount">0/4</span><button class="btn primary" id="mkApply" type="button">Appliquer</button></div>
+          </div>
+        </div>
+        <div class="mk-bar">
+          <div class="mk-ranges" id="mkRanges"></div>
           <div class="q-tools"><span class="live-status" id="quotesStatus"></span>
-            <button class="btn q-btn" id="quotesPickBtn" type="button" title="Choisir les marchés à suivre">⚙ Marchés</button></div>
+            <button class="btn q-btn" id="quotesPickBtn" type="button" title="Choisir les marchés de cet onglet">⚙</button></div>
         </div>
         <div class="q-pick" id="quotesPick" hidden>
-          <div class="q-pick-head"><b>Marchés à suivre</b><span class="muted" id="quotesPickCount"></span></div>
+          <div class="q-pick-head"><b id="quotesPickTitle">Marchés à suivre</b><span class="muted" id="quotesPickCount"></span></div>
           <div id="quotesPickList"></div>
           <div class="q-pick-add"><input id="quotesExtra" placeholder="Autre symbole de ton broker (ex. NVDA, US30.cash…)" maxlength="30">
             <button class="btn" id="quotesExtraAdd" type="button">Ajouter</button></div>
           <div class="q-pick-foot"><button class="btn" id="quotesReset" type="button">Par défaut</button>
             <button class="btn primary" id="quotesPickClose" type="button">Terminé</button></div>
         </div>
-        <table class="q-table">
-          <thead><tr><th>Indice</th><th class="r">Dernier</th><th class="r q-hide">Préc.</th><th class="r q-hide2">Haut</th><th class="r q-hide2">Bas</th>
-            <th class="r">Var.</th><th class="r">Var. %</th><th class="r q-hide">Heure</th></tr></thead>
-          <tbody id="quotesBody"><tr><td colspan="8" class="q-empty">Chargement des cours…</td></tr></tbody>
+        <div class="mk-chart" id="mkChart"><div class="mk-chart-msg">Chargement…</div></div>
+        <table class="q-table mk-table">
+          <tbody id="quotesBody"><tr><td colspan="5" class="q-empty">Chargement des cours…</td></tr></tbody>
         </table>
       </section>
       </div>
@@ -2426,8 +2469,8 @@ const HELP_KB = [
     a: 'Le **Score de discipline** (à droite de l\'évolution du capital) note de 0 à 100 % le respect de tes règles sur la période choisie dans « Statistiques » : **stop-loss placé**, **perte journalière sous 5 %**, **taille de position régulière**, **pas de surtrading** (5 trades max par jour), **pas de revenge trading** (pas de trade moins de 10 min après une perte) et, si ton risque par trade est réglé, **pertes limitées à 1 R**. Clique sur le bouton **i** pour voir le détail de chaque règle.' },
   { q: 'Les graphiques TradingView', k: 'tradingview graphique chart symbole bougie analyse nombre graphiques compte tv',
     a: 'Dans le bloc **Graphiques TradingView**, choisis **1 à 4 graphiques** et, pour chacun, le symbole et l\'unité de temps. Le bouton pour ouvrir ton compte TradingView ouvre ta session avec tes indicateurs.' },
-  { q: 'Le tableau des marchés', k: 'marches indices cours dow jones nasdaq dax or petrole bitcoin cotation choisir ordre',
-    a: 'À droite de l\'évolution du capital : les cours de ton broker toutes les 2 secondes. **⚙ Marchés** pour choisir lesquels suivre (ou ajouter un symbole), et **glisse les lignes** pour changer l\'ordre.' },
+  { q: 'Le tableau des marchés', k: 'marches indices cours dow jones nasdaq dax or petrole bitcoin cotation choisir ordre onglet onglets obligations actions etf devises crypto horloge ouvert ferme',
+    a: 'À droite des graphiques TradingView : les cours de ton broker toutes les 2 secondes, classés par **onglets** (Indices, Matières premières, Actions…). Le bouton **⋮** choisit les onglets affichés (4 maximum), **⚙** les marchés de l\'onglet. **Clique sur une ligne** pour voir son graphique (1J à Max), **glisse-la** pour changer l\'ordre. L\'horloge est **verte** si le marché est ouvert, **rouge** s\'il est fermé.' },
   { q: 'Le calendrier économique', k: 'calendrier economique annonce annonces nfp cpi fed bce etoile importance zone pays fuseau horaire',
     a: 'Page **Calendrier économique** : choisis le jour ou la semaine, l\'**importance** (toutes, 2 étoiles et plus, 3 étoiles), les **zones** (menu Zones) et le **fuseau horaire**. Tes choix sont gardés.', act: [['Ouvrir le calendrier', 'eco']] },
   { q: 'Les actualités économiques', k: 'actualite actualites article news presse theme crypto europe asie recherche',
@@ -3576,6 +3619,7 @@ function applySplit(id) {
     if (id && id !== hid) continue;
     document.getElementById(hid).parentElement.style.setProperty('--split', (state[key] * 100).toFixed(2) + '%');
   }
+  if ((!id || id === 'tvSplit') && typeof mkHist !== 'undefined' && mkHist) { clearTimeout(applySplit.t2); applySplit.t2 = setTimeout(() => drawMkChart(), 60); }
   if ((!id || id === 'chartSplit') && typeof renderChart === 'function' && state.data) { clearTimeout(applySplit.t); applySplit.t = setTimeout(() => { renderChart(); renderDiscipline(); }, 60); }
 }
 for (const [hid, key] of Object.entries(SPLITS)) {
@@ -3697,42 +3741,142 @@ function renderDiscipline() {
 }
 $('#discInfo').onclick = () => { const d = $('#discDetail'); d.hidden = !d.hidden; $('#discInfo').classList.toggle('on', !d.hidden); };
 
-// ---------- cotations des marchés (MT5), marchés choisis par l'utilisateur ----------
+// ---------- marchés (MT5) : onglets par catégorie, graphique et cotations ----------
 let quotesTimer = null, quotesCatalog = null; const quotesPrev = {};
-state.quotes = ['us30', 'us500', 'us100', 'vix', 'ger40', 'jp225'];
-const QUOTES_DEFAULT = state.quotes.slice();
+const MK_CATS = ['Devises', 'Indices', 'Matières premières', 'Obligations', 'Actions', 'ETF', 'Crypto'];
+const MK_SHORT = { 'Matières premières': 'Matières' };
+const MK_RANGES = [['1D', '1J'], ['1W', '1S'], ['1M', '1M'], ['6M', '6M'], ['1Y', '1A'], ['5Y', '5A'], ['MAX', 'Max']];
+let MK_TAB_DEFAULT = {
+  'Devises': ['eurusd', 'gbpusd', 'usdjpy', 'usdchf', 'audusd', 'usdcad', 'dxy'], 'Indices': ['us30', 'us500', 'us100', 'us2000', 'vix', 'ger40', 'jp225'],
+  'Matières premières': ['xauusd', 'xagusd', 'oil', 'brent', 'natgas', 'copper'], 'Obligations': ['us10y', 'us30y', 'bund', 'gilt', 'jgb'],
+  'Actions': ['aapl', 'msft', 'nvda', 'tsla', 'amzn', 'meta', 'googl'], 'ETF': ['spy', 'qqq', 'iwm', 'gld'], 'Crypto': ['btcusd', 'ethusd', 'solusd', 'xrpusd', 'ltcusd'] };
+state.mk = { tabs: ['Indices', 'Matières premières', 'Obligations', 'Actions'], lists: {}, sel: {}, tab: 'Indices', range: '1D' };
+const mkList = cat => state.mk.lists[cat] || MK_TAB_DEFAULT[cat] || [];
+state.quotes = mkList(state.mk.tab);
 const fmtQ = (v, dg) => Number(v).toLocaleString('fr-BE', { minimumFractionDigits: dg, maximumFractionDigits: dg });
 function quoteLabel(k) {
   if (k.startsWith('x:')) return k.slice(2);
   const it = quotesCatalog && quotesCatalog.items.find(x => x.key === k);
   return it ? it.name : k;
 }
+function saveMk() { api('/api/prefs', { mk: state.mk }).catch(() => {}); }
+function mkSelKey() { const s0 = state.mk.sel[state.mk.tab]; return state.quotes.includes(s0) ? s0 : state.quotes[0]; }
+// onglets
+function renderMkTabs() {
+  const box = $('#mkTabs'); box.innerHTML = '';
+  for (const c of MK_CATS.filter(c => state.mk.tabs.includes(c))) {
+    const b = el('button', 'mk-tab' + (c === state.mk.tab ? ' on' : ''), MK_SHORT[c] || c); b.type = 'button'; b.title = c;
+    b.onclick = () => setMkTab(c); box.appendChild(b);
+  }
+  const rb = $('#mkRanges'); rb.innerHTML = '';
+  for (const [k, t] of MK_RANGES) {
+    const b = el('button', k === state.mk.range ? 'on' : null, t); b.type = 'button';
+    b.onclick = () => { state.mk.range = k; saveMk(); renderMkTabs(); loadMkChart(true); }; rb.appendChild(b);
+  }
+}
+function setMkTab(c) {
+  state.mk.tab = c; state.quotes = mkList(c); saveMk(); renderMkTabs(); $('#quotesPick').hidden = true;
+  if (lastQuotes) lastQuotes = null; $('#quotesBody').innerHTML = '<tr><td colspan="5" class="q-empty">Chargement des cours…</td></tr>';
+  quotesTick(); loadMkChart(true);
+}
+// menu ⋮ : choix des onglets (4 au maximum)
+let mkDraft = null;
+function renderMkMenu() {
+  const box = $('#mkMenuList'); box.innerHTML = '';
+  for (const c of MK_CATS) {
+    const on = mkDraft.includes(c), dis = !on && mkDraft.length >= 4;
+    const r = el('div', 'mk-opt' + (on ? ' on' : ' off') + (dis ? ' dis' : '')); r.append(el('span', 'ck', on ? '✓' : ''), c);
+    r.onclick = () => { if (dis) return; mkDraft = on ? mkDraft.filter(x => x !== c) : [...mkDraft, c]; renderMkMenu(); };
+    box.appendChild(r);
+  }
+  $('#mkMenuCount').textContent = mkDraft.length + '/4';
+  $('#mkApply').disabled = !mkDraft.length;
+}
+$('#mkMore').onclick = e => { e.stopPropagation(); const m = $('#mkMenu'); m.hidden = !m.hidden; if (!m.hidden) { mkDraft = state.mk.tabs.slice(); renderMkMenu(); } };
+$('#mkApply').onclick = () => {
+  state.mk.tabs = MK_CATS.filter(c => mkDraft.includes(c)); $('#mkMenu').hidden = true;
+  if (!state.mk.tabs.includes(state.mk.tab)) setMkTab(state.mk.tabs[0]); else { saveMk(); renderMkTabs(); }
+};
+// petit graphique du marché sélectionné
+let mkHist = null, mkHistKey = '', mkHistAt = 0;
+async function loadMkChart(force) {
+  const key = mkSelKey(), id = key + '|' + state.mk.range;
+  if (!key) { mkHist = null; drawMkChart(); return; }
+  if (!force && id === mkHistKey && Date.now() - mkHistAt < (state.mk.range === '1D' ? 60000 : 300000)) return;
+  if (id !== mkHistKey) { mkHist = null; drawMkChart('Chargement…'); }
+  mkHistKey = id; mkHistAt = Date.now();
+  let r; try { r = await api('/api/quotes/history?key=' + encodeURIComponent(key) + '&range=' + state.mk.range); } catch (e) { r = { status: 'error', error: e.message }; }
+  if (id !== mkHistKey) return;
+  if (r.status === 'busy' || r.status === 'starting') { mkHistAt = 0; if (!mkHist) drawMkChart('Connexion à MT5…'); return; }
+  mkHist = r.points && r.points.length > 1 ? r : null;
+  drawMkChart(mkHist ? null : r.status === 'missing' ? 'Pas proposé par ton broker' : (r.error || 'Pas d\'historique pour ce marché'));
+}
+function drawMkChart(msg) {
+  const host = $('#mkChart'); host.innerHTML = '';
+  if (!mkHist) { host.appendChild(el('div', 'mk-chart-msg', msg || '')); return; }
+  const live = lastQuotes && (lastQuotes.quotes || []).find(q => q.key === mkSelKey());
+  const pts = mkHist.points.map(p => p.slice());
+  if (live && state.mk.range === '1D') pts[pts.length - 1][1] = live.last;
+  const W = Math.max(host.clientWidth, 240), H = host.clientHeight || 170, m = { l: 18, r: 64, t: 10, b: 24 };
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const prev = state.mk.range === '1D' ? mkHist.prev : null;
+  let y0 = Math.min(...ys, prev ?? Infinity), y1 = Math.max(...ys, prev ?? -Infinity);
+  if (y1 === y0) { y1 += 1; y0 -= 1; }
+  const pad = (y1 - y0) * .08; y0 -= pad; y1 += pad;
+  const X = i => m.l + (W - m.l - m.r) * i / (pts.length - 1), Y = v => m.t + (H - m.t - m.b) * (1 - (v - y0) / (y1 - y0));
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const mk = (tag, at, txt) => { const e2 = document.createElementNS(ns, tag); for (const k in at) e2.setAttribute(k, at[k]); if (txt != null) e2.textContent = txt; svg.appendChild(e2); return e2; };
+  const up = prev != null ? ys[ys.length - 1] >= prev : ys[ys.length - 1] >= ys[0];
+  const col = up ? '#22c55e' : '#ef4444';
+  const gid = 'mkg' + Math.random().toString(36).slice(2, 7);
+  const defs = mk('defs', {}); defs.innerHTML = `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient>`;
+  // grille et prix à droite
+  const step = niceStep((y1 - y0) / 3); const dg = Math.max(0, Math.min(5, -Math.floor(Math.log10(step)) + (step / 10 ** Math.floor(Math.log10(step)) < 1.5 ? 1 : 0)));
+  for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
+    mk('line', { x1: m.l, x2: W - m.r + 6, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 });
+    mk('text', { x: W - m.r + 10, y: Y(v) + 4, fill: 'var(--muted)', 'font-size': 11 }, v.toLocaleString('fr-BE', { minimumFractionDigits: dg, maximumFractionDigits: dg }));
+  }
+  if (prev != null) mk('line', { x1: m.l, x2: W - m.r + 6, y1: Y(prev), y2: Y(prev), stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '4 4', opacity: .7 });
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
+  mk('path', { d: line + ` L${X(pts.length - 1)} ${H - m.b} L${X(0)} ${H - m.b} Z`, fill: `url(#${gid})` });
+  mk('path', { d: line, fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-linejoin': 'round' });
+  mk('circle', { cx: X(pts.length - 1), cy: Y(ys[ys.length - 1]), r: 3, fill: col });
+  // dates en bas
+  const span = xs[xs.length - 1] - xs[0], n = Math.max(2, Math.min(4, Math.floor((W - m.l - m.r) / 80)));
+  const fmtX = t => { const d = new Date(t * 1000);
+    if (span <= 2 * 86400) return d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+    if (span <= 120 * 86400) return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' });
+    if (span <= 800 * 86400) return d.toLocaleDateString('fr-BE', { month: 'short', year: '2-digit' });
+    return String(d.getFullYear()); };
+  for (let k = 0; k <= n; k++) { const i = Math.round((pts.length - 1) * k / n);
+    mk('text', { x: X(i), y: H - 6, fill: 'var(--muted)', 'font-size': 11, 'text-anchor': k === 0 ? 'start' : k === n ? 'end' : 'middle' }, fmtX(xs[i])); }
+  host.appendChild(svg);
+}
+function niceStep(raw) { const p = 10 ** Math.floor(Math.log10(raw || 1)), f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+const CLOCK = '<svg class="mk-clock" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 let quotesDragging = false;
 function renderQuotes(r) {
   if (quotesDragging) return; // ne pas redessiner pendant qu'on déplace une ligne
   const body = $('#quotesBody');
   const st = $('#quotesStatus'); st.innerHTML = '';
-  if (r.status === 'running' || r.status === 'demo') st.append(el('span', 'ok', '● En direct'), r.status === 'demo' ? ' · démo' : ' · MT5');
+  if (r.status === 'running' || r.status === 'demo') st.append(el('span', 'ok', '●'), r.status === 'demo' ? ' démo' : ' MT5');
   else if (r.status === 'busy') { st.textContent = 'MT5 occupé…'; return; }
   body.innerHTML = '';
   const rows = new Map((r.quotes || []).map(q => [q.key, q]));
-  if (!state.quotes.length) {
-    const tr = el('tr'); const td = el('td', 'q-empty', 'Aucun marché choisi : clique sur « ⚙ Marchés ».'); td.colSpan = 8; tr.appendChild(td); body.appendChild(tr); return;
-  }
-  if (!rows.size && r.status !== 'running' && r.status !== 'demo') {
-    const tr = el('tr'); const td = el('td', 'q-empty', r.error || 'Connexion à MT5…'); td.colSpan = 8; tr.appendChild(td); body.appendChild(tr); return;
-  }
+  const empty = txt => { const tr = el('tr'); const td = el('td', 'q-empty', txt); td.colSpan = 5; tr.appendChild(td); body.appendChild(tr); };
+  if (!state.quotes.length) return empty('Aucun marché dans cet onglet : clique sur « ⚙ ».');
+  if (!rows.size && r.status !== 'running' && r.status !== 'demo') return empty(r.error || 'Connexion à MT5…');
+  const selk = mkSelKey();
   for (const key of state.quotes) {
     const q = rows.get(key);
-    const tr = el('tr');
+    const tr = el('tr'); tr.dataset.key = key; if (key === selk) tr.classList.add('sel');
     if (!q) {
-      tr.className = 'q-miss'; tr.dataset.key = key;
-      const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), quoteLabel(key)); const td = el('td', 'r', 'non proposé par ton broker'); td.colSpan = 7;
+      tr.className += ' q-miss';
+      const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), quoteLabel(key)); const td = el('td', 'r', 'non proposé par ton broker'); td.colSpan = 4;
       tr.append(nm, td); body.appendChild(tr); continue;
     }
     const dg = Math.min(q.digits ?? 2, 5);
-    tr.dataset.key = key;
-    const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), el('span', 'fl', q.flag), q.name);
+    const nm = el('td', 'q-name'); nm.append(el('span', 'q-grip', '⠿'), q.name);
     const last = el('td', 'r q-last', fmtQ(q.last, dg));
     const prevLast = quotesPrev[q.key];
     if (prevLast !== undefined && prevLast !== q.last) {
@@ -3741,27 +3885,29 @@ function renderQuotes(r) {
     }
     quotesPrev[q.key] = q.last;
     const c = cls(q.chg), sign = q.chg > 0 ? '+' : q.chg < 0 ? '−' : '';
-    tr.append(nm, last, el('td', 'r q-hide', fmtQ(q.prev, dg)), el('td', 'r q-hide2', fmtQ(q.high, dg)), el('td', 'r q-hide2', fmtQ(q.low, dg)),
-      el('td', 'r ' + c, sign + fmtQ(Math.abs(q.chg), dg)), el('td', 'r ' + c, sign + Math.abs(q.pct).toFixed(2).replace('.', ',') + ' %'),
-      el('td', 'r q-hide q-time', q.at || ''));
+    const ck = el('td', 'ck'); ck.innerHTML = CLOCK; ck.style.color = q.open ? 'var(--win)' : 'var(--loss)';
+    ck.title = (q.open ? 'Marché ouvert' : 'Marché fermé') + (q.at ? ' · dernier prix reçu à ' + q.at : '');
+    tr.append(nm, last, el('td', 'r ' + c, sign + fmtQ(Math.abs(q.chg), dg)), el('td', 'r ' + c, sign + Math.abs(q.pct).toFixed(2).replace('.', ',') + ' %'), ck);
     tr.title = q.symbol;
     body.appendChild(tr);
   }
+  if (mkHist) drawMkChart();
 }
 let lastQuotes = null;
 async function quotesTick() {
   clearTimeout(quotesTimer);
   const visible = state.page === 'dash' && !document.hidden && state.accounts.length > 0;
   if (visible && state.quotes.length) {
-    try { lastQuotes = await api('/api/quotes?keys=' + encodeURIComponent(state.quotes.join(',')) + '&login=' + encodeURIComponent(state.sel || '')); }
-    catch (e) { lastQuotes = { status: 'error', error: 'Cours indisponibles : ' + e.message }; }
-    renderQuotes(lastQuotes);
-  } else if (visible) renderQuotes({ status: 'idle', quotes: [] });
+    const tab = state.mk.tab; let r;
+    try { r = await api('/api/quotes?keys=' + encodeURIComponent(state.quotes.join(',')) + '&login=' + encodeURIComponent(state.sel || '')); }
+    catch (e) { r = { status: 'error', error: 'Cours indisponibles : ' + e.message }; }
+    if (tab === state.mk.tab) { lastQuotes = r; renderQuotes(r); loadMkChart(); }
+  } else if (visible) { renderQuotes({ status: 'idle', quotes: [] }); drawMkChart(''); }
   quotesTimer = setTimeout(quotesTick, visible ? 2000 : 3000);
 }
 function saveQuotes() {
-  api('/api/prefs', { quotes: state.quotes }).catch(() => {});
-  buildQuotesPick(); if (lastQuotes) renderQuotes(lastQuotes); quotesTick();
+  state.mk.lists[state.mk.tab] = state.quotes; saveMk();
+  buildQuotesPick(); if (lastQuotes) renderQuotes(lastQuotes); quotesTick(); loadMkChart();
 }
 function toggleQuote(k) {
   state.quotes = state.quotes.includes(k) ? state.quotes.filter(x => x !== k) : [...state.quotes, k].slice(0, 30);
@@ -3769,31 +3915,28 @@ function toggleQuote(k) {
 }
 function buildQuotesPick() {
   const box = $('#quotesPickList'); box.innerHTML = '';
+  $('#quotesPickTitle').textContent = 'Marchés · ' + state.mk.tab;
   $('#quotesPickCount').textContent = state.quotes.length + ' suivi' + (state.quotes.length > 1 ? 's' : '');
   if (!quotesCatalog) { box.appendChild(el('div', 'muted', 'Chargement…')); return; }
-  const cats = [...new Set(quotesCatalog.items.map(x => x.cat))];
-  for (const cat of cats) {
-    box.appendChild(el('div', 'q-cat', cat));
-    const row = el('div', 'q-chips');
-    for (const it of quotesCatalog.items.filter(x => x.cat === cat)) {
-      const on = state.quotes.includes(it.key);
-      const c = el('button', 'chip theme-chip' + (on ? ' on' : '') + (it.available === false ? ' na' : '')); c.type = 'button';
-      c.append(el('span', 'ck', on ? '✓' : ''), it.flag + ' ' + it.name);
-      if (it.available === false) c.title = 'Pas proposé par ton broker';
-      c.onclick = () => toggleQuote(it.key);
-      row.appendChild(c);
-    }
-    box.appendChild(row);
+  const row = el('div', 'q-chips');
+  for (const it of quotesCatalog.items.filter(x => x.cat === state.mk.tab)) {
+    const on = state.quotes.includes(it.key);
+    const c = el('button', 'chip theme-chip' + (on ? ' on' : '') + (it.available === false ? ' na' : '')); c.type = 'button';
+    c.append(el('span', 'ck', on ? '✓' : ''), it.flag + ' ' + it.name);
+    if (it.available === false) c.title = 'Pas proposé par ton broker';
+    c.onclick = () => toggleQuote(it.key);
+    row.appendChild(c);
   }
+  box.appendChild(row);
   const extras = state.quotes.filter(k => k.startsWith('x:'));
   if (extras.length) {
     box.appendChild(el('div', 'q-cat', 'Mes symboles'));
-    const row = el('div', 'q-chips');
+    const row2 = el('div', 'q-chips');
     for (const k of extras) {
       const c = el('button', 'chip on'); c.type = 'button'; c.append('📈 ' + k.slice(2), el('span', 'x', '✕'));
-      c.title = 'Retirer'; c.onclick = () => toggleQuote(k); row.appendChild(c);
+      c.title = 'Retirer'; c.onclick = () => toggleQuote(k); row2.appendChild(c);
     }
-    box.appendChild(row);
+    box.appendChild(row2);
   }
 }
 async function openQuotesPick() {
@@ -3805,12 +3948,12 @@ async function openQuotesPick() {
 }
 $('#quotesPickBtn').onclick = e => { e.stopPropagation(); openQuotesPick(); };
 $('#quotesPickClose').onclick = () => { $('#quotesPick').hidden = true; };
-$('#quotesReset').onclick = () => { state.quotes = QUOTES_DEFAULT.slice(); saveQuotes(); };
+$('#quotesReset').onclick = () => { state.quotes = (MK_TAB_DEFAULT[state.mk.tab] || []).slice(); saveQuotes(); };
 function addExtraQuote() {
   const v = $('#quotesExtra').value.trim().replace(/[^\w.#/+\-]/g, '').slice(0, 30);
   if (!v) return;
   const k = 'x:' + v;
-  if (!state.quotes.includes(k)) { state.quotes.push(k); saveQuotes(); }
+  if (!state.quotes.includes(k)) { state.quotes = [...state.quotes, k]; saveQuotes(); }
   $('#quotesExtra').value = '';
 }
 $('#quotesExtraAdd').onclick = addExtraQuote;
@@ -3818,8 +3961,10 @@ $('#quotesExtra').onkeydown = e => { if (e.key === 'Enter') addExtraQuote(); };
 document.addEventListener('pointerdown', e => {
   const p = $('#quotesPick');
   if (!p.hidden && !p.contains(e.target) && e.target.id !== 'quotesPickBtn') p.hidden = true;
+  const mm = $('#mkMenu');
+  if (!mm.hidden && !mm.contains(e.target) && e.target.id !== 'mkMore') mm.hidden = true;
 });
-// déplacer une ligne pour changer l'ordre des marchés
+// clic sur une ligne = son graphique ; glisser = changer l'ordre
 $('#quotesBody').addEventListener('pointerdown', e => {
   const tr = e.target.closest('tr[data-key]'); if (!tr || e.button !== 0) return;
   const body = $('#quotesBody'), y0 = e.clientY; let started = false;
@@ -3836,15 +3981,29 @@ $('#quotesBody').addEventListener('pointerdown', e => {
   };
   const up = () => {
     window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
-    if (!started) return;
+    if (!started) { // simple clic : afficher ce marché sur le graphique
+      state.mk.sel[state.mk.tab] = tr.dataset.key; saveMk();
+      body.querySelectorAll('tr.sel').forEach(r => r.classList.remove('sel')); tr.classList.add('sel'); loadMkChart(true); return;
+    }
     tr.classList.remove('q-drag'); document.body.classList.remove('q-sorting'); quotesDragging = false;
     const order = [...body.querySelectorAll('tr[data-key]')].map(r => r.dataset.key);
-    if (order.join() !== state.quotes.join()) { state.quotes = order; api('/api/prefs', { quotes: state.quotes }).catch(() => {}); }
+    if (order.join() !== state.quotes.join()) { state.quotes = order; state.mk.lists[state.mk.tab] = order; saveMk(); }
   };
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) quotesTick(); });
-api('/api/prefs').then(p => { if (Array.isArray(p.quotes)) state.quotes = p.quotes; for (const k of ['split', 'split2']) if (typeof p[k] === 'number') state[k] = Math.min(0.8, Math.max(0.35, p[k])); applySplit(); }).catch(() => {}).finally(quotesTick);
+window.addEventListener('resize', () => { clearTimeout(drawMkChart.t); drawMkChart.t = setTimeout(() => { if (mkHist) drawMkChart(); }, 120); });
+renderMkTabs();
+Promise.all([api('/api/prefs').catch(() => ({})), api('/api/quotes/catalog').catch(() => null)]).then(([p, cat]) => {
+  if (cat) { quotesCatalog = cat; if (cat.tab_default) MK_TAB_DEFAULT = cat.tab_default; }
+  if (p.mk && Array.isArray(p.mk.tabs)) Object.assign(state.mk, { lists: {}, sel: {}, ...p.mk });
+  state.mk.tabs = MK_CATS.filter(c => state.mk.tabs.includes(c)).slice(0, 4);
+  if (!state.mk.tabs.length) state.mk.tabs = ['Indices'];
+  if (!state.mk.tabs.includes(state.mk.tab)) state.mk.tab = state.mk.tabs[0];
+  state.quotes = mkList(state.mk.tab);
+  for (const k of ['split', 'split2']) if (typeof p[k] === 'number') state[k] = Math.min(0.8, Math.max(0.35, p[k]));
+  applySplit(); renderMkTabs();
+}).finally(() => { quotesTick(); });
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
