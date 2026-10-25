@@ -1059,6 +1059,7 @@ def api_prefs_set():
                          "format": cd.get("format") if cd.get("format") in ("post", "story", "square") else "post",
                          "handle": str(cd.get("handle", ""))[:30], "hideAcc": bool(cd.get("hideAcc")),
                          "qr": cd.get("qr") is not False,
+                         "qrSrc": "link" if cd.get("qrSrc") == "link" else "details",
                          "links": {str(k)[:30]: str(v)[:300] for k, v in list((cd.get("links") or {}).items())[:60]
                                    if isinstance(v, str) and v.startswith(("http://", "https://"))}}
     if isinstance(body.get("quotes"), list):
