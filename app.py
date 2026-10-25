@@ -2910,7 +2910,7 @@ def free_port(preferred=8765):
 PREFERRED_PORT = 8765
 
 # ---------------------------------------------------------------- mise à jour automatique
-UPDATE_REPO = "collignonguillian-design/astra-dashboard"
+UPDATE_REPO = "astradashboard/astra-dashboard"
 UPDATE_BRANCH = "main"
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_FILE = os.path.join(APP_DIR, "version.json")
