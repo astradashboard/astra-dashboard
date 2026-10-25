@@ -520,8 +520,9 @@
   .disc-row small { color: var(--muted); font-size: 12px; }
   .tv-card .tv-grid.n4 .tv-box, .tv-card .tv-grid.n3 .tv-box { height: 360px; }
   .mk-top { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 18px; }
-  .mk-tabs { flex: 1; display: flex; align-items: center; min-width: 0; overflow: hidden; }
-  .mk-tab { background: none; border: none; color: var(--fg); font-weight: 650; font-size: 14px; padding: 6px 12px; white-space: nowrap; position: relative; opacity: .82; }
+  .mk-tabs { flex: 1; display: flex; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .mk-tabs::-webkit-scrollbar { display: none; }
+  .mk-tab { background: none; border: none; color: var(--fg); font-weight: 650; font-size: 13px; padding: 6px 8px; white-space: nowrap; position: relative; opacity: .82; flex: none; }
   .mk-tab:first-child { padding-left: 0; }
   .mk-tab + .mk-tab::before { content: ''; position: absolute; left: 0; top: 25%; bottom: 25%; width: 1px; background: var(--line); }
   .mk-tab.on { color: var(--gold); opacity: 1; }
@@ -540,12 +541,16 @@
   .mk-opt.dis { opacity: .45; cursor: not-allowed; }
   .mk-menu-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); }
   .mk-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 4px 18px; }
-  .mk-ranges { display: flex; gap: 2px; flex-wrap: wrap; }
-  .mk-ranges button { background: none; border: none; color: var(--muted); font-size: 13px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+  .mk-ranges { display: flex; gap: 0; flex-wrap: nowrap; min-width: 0; }
+  .mk-ranges button { background: none; border: none; color: var(--muted); font-size: 12.5px; padding: 4px 6px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
   .mk-ranges button:first-child { padding-left: 0; }
   .mk-ranges button.on { color: var(--fg); text-decoration: underline; text-underline-offset: 5px; text-decoration-color: var(--gold); text-decoration-thickness: 2px; }
   .mk-ranges button:hover { color: var(--fg); }
   .quotes-card { display: flex; flex-direction: column; }
+  @container (max-width: 420px) { .mk-tab { font-size: 12.5px; padding: 6px 6px; } .mk-top { padding-left: 14px; } .mk-bar { padding-left: 14px; } .mk-ranges button { padding: 4px 5px; } }
+  @container (max-width: 440px) { .mk-table td { padding: 9px 5px; font-size: 12.5px; } .mk-table td:first-child { padding-left: 14px; } .mk-table td:last-child { padding-right: 8px; } .mk-table td.ck { width: 24px; } }
+  @container (max-width: 345px) { .mk-table td.mk-chg { display: none; } }
+  @container (max-width: 360px) { .mk-tab { font-size: 12px; padding: 6px 5px; } .mk-ranges button { font-size: 12px; padding: 4px 4px; } }
   .mk-chart { position: relative; flex: 1 1 210px; min-height: 180px; max-height: 300px; margin: 4px 0 8px; }
   .mk-chart svg { display: block; width: 100%; height: 100%; }
   .mk-chart-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12.5px; text-align: center; padding: 0 20px; }
@@ -556,6 +561,8 @@
   .mk-table td.ck { width: 30px; text-align: center; padding-left: 4px; }
   .quotes-card { padding: 16px 0 6px; }
   .quotes-card .card-head { padding: 0 18px; }
+  .quotes-card .live-status { white-space: nowrap; font-size: 12px; }
+  .mk-bar .q-btn { padding: 5px 9px; }
   .q-arrow { color: var(--gold); }
   .q-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
   .q-table th { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 8px 8px;
@@ -3901,7 +3908,7 @@ function renderQuotes(r) {
     const c = cls(q.chg), sign = q.chg > 0 ? '+' : q.chg < 0 ? '−' : '';
     const ck = el('td', 'ck'); ck.innerHTML = CLOCK; ck.style.color = q.open ? 'var(--win)' : 'var(--loss)';
     ck.title = (q.open ? 'Marché ouvert' : 'Marché fermé') + (q.at ? ' · dernier prix reçu à ' + q.at : '');
-    tr.append(nm, last, el('td', 'r ' + c, sign + fmtQ(Math.abs(q.chg), dg)), el('td', 'r ' + c, sign + Math.abs(q.pct).toFixed(2).replace('.', ',') + ' %'), ck);
+    tr.append(nm, last, el('td', 'r mk-chg ' + c, sign + fmtQ(Math.abs(q.chg), dg)), el('td', 'r ' + c, sign + Math.abs(q.pct).toFixed(2).replace('.', ',') + ' %'), ck);
     tr.title = q.symbol;
     body.appendChild(tr);
   }
