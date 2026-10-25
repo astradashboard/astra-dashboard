@@ -1,0 +1,62 @@
+name: Installateur Windows
+
+on:
+  push:
+    branches: [main]
+    paths: [version.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python embarqué + dépendances
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $py = '3.12.10'
+          $root = "dist\app"
+          New-Item -ItemType Directory -Force "$root\python" | Out-Null
+          Invoke-WebRequest "https://www.python.org/ftp/python/$py/python-$py-embed-amd64.zip" -OutFile py.zip
+          Expand-Archive py.zip -DestinationPath "$root\python"
+          # active les paquets installés (site-packages) dans le Python embarqué
+          $pth = Get-ChildItem "$root\python\python*._pth" | Select-Object -First 1
+          $lines = @((Get-Content $pth) -replace '^#\s*import site', 'import site') + 'Lib\site-packages'
+          Set-Content $pth $lines
+          Get-Content $pth
+          python -m pip install --upgrade pip
+          python -m pip install --no-compile --target "$root\python\Lib\site-packages" -r requirements.txt pip
+          # fichiers de l'application
+          Copy-Item app.py, version.json, offres.json, icone.ico, requirements.txt, LISEZMOI.txt $root
+          Copy-Item static "$root\static" -Recurse
+          & "$root\python\python.exe" -c "import flask, MetaTrader5, keyring; print('dependances OK')"
+
+      - name: Installateur (Inno Setup)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = (Get-Content version.json | ConvertFrom-Json).version
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$v" installateur\astra.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup a échoué" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+
+      - name: Publication (release)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:VERSION"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) { gh release upload $tag dist\ASTRA-Dashboard-Setup.exe --clobber }
+          else { gh release create $tag dist\ASTRA-Dashboard-Setup.exe --title "ASTRA Dashboard $env:VERSION" --notes "Installateur Windows d'ASTRA Dashboard $env:VERSION." --latest }
