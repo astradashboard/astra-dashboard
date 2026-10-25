@@ -1375,6 +1375,171 @@ def _num(v):
         return str(v)
 
 
+# ---- traduction en français des intitulés du calendrier (le flux TradingView est en anglais)
+ECO_PHRASES = [  # (anglais, français) — du plus long au plus court au moment de l'emploi
+    ("non farm payrolls", "Emplois non agricoles (NFP)"), ("nonfarm payrolls", "Emplois non agricoles (NFP)"),
+    ("non farm payrolls private", "Emplois non agricoles privés"), ("nonfarm payrolls private", "Emplois non agricoles privés"),
+    ("manufacturing payrolls", "Emplois manufacturiers"), ("government payrolls", "Emplois publics"),
+    ("adp employment change", "Créations d'emplois ADP"), ("employment change", "Variation de l'emploi"),
+    ("unemployment rate", "Taux de chômage"), ("unemployment change", "Variation du chômage"),
+    ("unemployed persons", "Nombre de chômeurs"), ("claimant count change", "Demandeurs d'allocations chômage"),
+    ("initial jobless claims", "Inscriptions hebdomadaires au chômage"), ("continuing jobless claims", "Demandes continues d'allocations chômage"),
+    ("jobless claims 4-week average", "Inscriptions au chômage (moyenne 4 semaines)"),
+    ("jolts job openings", "Offres d'emploi JOLTS"), ("job openings", "Offres d'emploi"), ("challenger job cuts", "Suppressions d'emplois Challenger"),
+    ("average hourly earnings", "Salaire horaire moyen"), ("average weekly hours", "Durée hebdomadaire moyenne du travail"),
+    ("average earnings incl. bonus", "Salaires moyens (primes incluses)"), ("average earnings excl. bonus", "Salaires moyens (hors primes)"),
+    ("participation rate", "Taux de participation"), ("labor cost index", "Indice du coût du travail"), ("unit labour costs", "Coûts unitaires de la main-d'œuvre"),
+    ("unit labor costs", "Coûts unitaires de la main-d'œuvre"), ("nonfarm productivity", "Productivité non agricole"),
+    ("core inflation rate", "Inflation sous-jacente"), ("inflation rate", "Taux d'inflation"),
+    ("core pce price index", "Indice des prix PCE sous-jacent"), ("pce price index", "Indice des prix PCE"),
+    ("core consumer prices", "Prix à la consommation sous-jacents"), ("consumer price index", "Indice des prix à la consommation"),
+    ("harmonised inflation rate", "Inflation harmonisée"), ("harmonized inflation rate", "Inflation harmonisée"),
+    ("core cpi", "CPI sous-jacent"), ("cpi", "Indice des prix (CPI)"), ("core ppi", "PPI sous-jacent"), ("ppi", "Prix à la production (PPI)"),
+    ("producer price index", "Indice des prix à la production"), ("producer prices", "Prix à la production"),
+    ("import prices", "Prix à l'importation"), ("export prices", "Prix à l'exportation"),
+    ("gdp growth rate annualized", "Croissance du PIB (annualisée)"), ("gdp growth rate", "Croissance du PIB"), ("gdp price index", "Indice des prix du PIB"),
+    ("gdp", "PIB"), ("core pce prices", "Prix PCE sous-jacents"),
+    ("retail sales ex autos", "Ventes au détail hors automobiles"), ("retail sales ex gas/autos", "Ventes au détail hors carburant et automobiles"),
+    ("retail sales control group", "Ventes au détail (groupe de contrôle)"), ("retail sales", "Ventes au détail"),
+    ("personal income", "Revenus des ménages"), ("personal spending", "Dépenses des ménages"), ("household spending", "Dépenses des ménages"),
+    ("ism manufacturing pmi", "ISM manufacturier"), ("ism services pmi", "ISM des services"), ("ism non-manufacturing pmi", "ISM des services"),
+    ("ism manufacturing prices", "ISM manufacturier : prix"), ("ism services prices", "ISM des services : prix"),
+    ("s&p global manufacturing pmi", "PMI manufacturier S&P Global"), ("s&p global services pmi", "PMI des services S&P Global"),
+    ("s&p global composite pmi", "PMI composite S&P Global"), ("hcob manufacturing pmi", "PMI manufacturier HCOB"),
+    ("hcob services pmi", "PMI des services HCOB"), ("hcob composite pmi", "PMI composite HCOB"),
+    ("caixin manufacturing pmi", "PMI manufacturier Caixin"), ("caixin services pmi", "PMI des services Caixin"),
+    ("nbs manufacturing pmi", "PMI manufacturier NBS"), ("nbs non manufacturing pmi", "PMI non manufacturier NBS"),
+    ("manufacturing pmi", "PMI manufacturier"), ("services pmi", "PMI des services"), ("composite pmi", "PMI composite"),
+    ("construction pmi", "PMI de la construction"), ("chicago pmi", "PMI de Chicago"),
+    ("philadelphia fed manufacturing index", "Indice manufacturier de la Fed de Philadelphie"),
+    ("ny empire state manufacturing index", "Indice manufacturier Empire State (New York)"),
+    ("richmond fed manufacturing index", "Indice manufacturier de la Fed de Richmond"),
+    ("kansas fed manufacturing index", "Indice manufacturier de la Fed de Kansas City"),
+    ("dallas fed manufacturing index", "Indice manufacturier de la Fed de Dallas"),
+    ("industrial production", "Production industrielle"), ("manufacturing production", "Production manufacturière"),
+    ("capacity utilization", "Taux d'utilisation des capacités"), ("factory orders", "Commandes industrielles"),
+    ("durable goods orders ex transportation", "Commandes de biens durables hors transport"), ("durable goods orders ex defense", "Commandes de biens durables hors défense"),
+    ("durable goods orders", "Commandes de biens durables"), ("core durable goods orders", "Commandes de biens durables hors transport"),
+    ("wholesale inventories", "Stocks des grossistes"), ("business inventories", "Stocks des entreprises"), ("retail inventories ex autos", "Stocks des détaillants hors automobiles"),
+    ("building permits", "Permis de construire"), ("housing starts", "Mises en chantier"), ("existing home sales", "Ventes de logements existants"),
+    ("new home sales", "Ventes de logements neufs"), ("pending home sales", "Promesses de ventes de logements"),
+    ("s&p/case-shiller home price", "Prix des logements S&P/Case-Shiller"), ("house price index", "Indice des prix des logements"),
+    ("nahb housing market index", "Indice du marché immobilier NAHB"), ("mba mortgage applications", "Demandes de prêts immobiliers MBA"),
+    ("mba 30-year mortgage rate", "Taux hypothécaire à 30 ans MBA"), ("construction spending", "Dépenses de construction"),
+    ("michigan consumer sentiment", "Moral des consommateurs (Michigan)"), ("michigan consumer expectations", "Attentes des consommateurs (Michigan)"),
+    ("michigan current conditions", "Conditions actuelles (Michigan)"), ("michigan inflation expectations", "Anticipations d'inflation (Michigan)"),
+    ("michigan 5 year inflation expectations", "Anticipations d'inflation à 5 ans (Michigan)"),
+    ("cb consumer confidence", "Confiance des consommateurs (Conference Board)"), ("consumer confidence", "Confiance des consommateurs"),
+    ("consumer inflation expectations", "Anticipations d'inflation des consommateurs"),
+    ("business confidence", "Climat des affaires"), ("business climate", "Climat des affaires"), ("economic sentiment", "Sentiment économique"),
+    ("ifo business climate", "Climat des affaires Ifo"), ("ifo expectations", "Attentes Ifo"), ("ifo current conditions", "Situation actuelle Ifo"),
+    ("zew economic sentiment index", "Sentiment économique ZEW"), ("zew current conditions", "Situation actuelle ZEW"),
+    ("gfk consumer confidence", "Confiance des consommateurs GfK"), ("sentix investor confidence", "Confiance des investisseurs Sentix"),
+    ("tankan large manufacturers index", "Indice Tankan des grands industriels"), ("leading index", "Indicateur avancé"),
+    ("cb leading index", "Indicateur avancé (Conference Board)"), ("nfib business optimism index", "Optimisme des PME (NFIB)"),
+    ("balance of trade", "Balance commerciale"), ("trade balance", "Balance commerciale"), ("goods trade balance", "Balance commerciale des biens"),
+    ("current account", "Balance courante"), ("exports", "Exportations"), ("imports", "Importations"),
+    ("government budget", "Budget de l'État"), ("monthly budget statement", "Solde budgétaire mensuel"), ("budget balance", "Solde budgétaire"),
+    ("foreign exchange reserves", "Réserves de change"), ("money supply m2", "Masse monétaire M2"), ("money supply m3", "Masse monétaire M3"),
+    ("consumer credit", "Crédit à la consommation"), ("loan growth", "Croissance des crédits"), ("new yuan loans", "Nouveaux prêts en yuans"),
+    ("fed interest rate decision", "Décision de la Fed sur les taux"), ("ecb interest rate decision", "Décision de la BCE sur les taux"),
+    ("boe interest rate decision", "Décision de la BoE sur les taux"), ("boj interest rate decision", "Décision de la BoJ sur les taux"),
+    ("snb interest rate decision", "Décision de la BNS sur les taux"), ("boc interest rate decision", "Décision de la BoC sur les taux"),
+    ("rba interest rate decision", "Décision de la RBA sur les taux"), ("rbnz interest rate decision", "Décision de la RBNZ sur les taux"),
+    ("pboc loan prime rate", "Taux préférentiel de la PBoC"), ("loan prime rate 1y", "Taux préférentiel à 1 an"), ("loan prime rate 5y", "Taux préférentiel à 5 ans"),
+    ("interest rate decision", "Décision sur les taux"), ("deposit facility rate", "Taux de la facilité de dépôt"),
+    ("main refinancing rate", "Taux de refinancement"), ("marginal lending rate", "Taux de prêt marginal"),
+    ("fomc minutes", "Compte rendu du FOMC"), ("fomc economic projections", "Projections économiques du FOMC"),
+    ("fed press conference", "Conférence de presse de la Fed"), ("ecb press conference", "Conférence de presse de la BCE"),
+    ("ecb monetary policy meeting accounts", "Compte rendu de la réunion de la BCE"), ("boe minutes", "Compte rendu de la BoE"),
+    ("monetary policy statement", "Déclaration de politique monétaire"), ("monetary policy report", "Rapport de politique monétaire"),
+    ("fed beige book", "Livre beige de la Fed"), ("beige book", "Livre beige de la Fed"),
+    ("crude oil inventories", "Stocks de pétrole brut"), ("eia crude oil stocks change", "Variation des stocks de pétrole brut (EIA)"),
+    ("api crude oil stock change", "Variation des stocks de pétrole brut (API)"), ("eia gasoline stocks change", "Variation des stocks d'essence (EIA)"),
+    ("eia distillate stocks change", "Variation des stocks de distillats (EIA)"), ("eia natural gas stocks change", "Variation des stocks de gaz naturel (EIA)"),
+    ("eia cushing crude oil stocks change", "Variation des stocks de pétrole à Cushing (EIA)"), ("eia refinery crude runs change", "Variation du raffinage de brut (EIA)"),
+    ("baker hughes oil rig count", "Nombre de puits de pétrole (Baker Hughes)"), ("baker hughes total rig count", "Nombre total de puits (Baker Hughes)"),
+    ("total vehicle sales", "Ventes de véhicules"), ("new car registrations", "Immatriculations de voitures neuves"),
+    ("cftc s&p 500 speculative net positions", "Positions nettes spéculatives CFTC sur le S&P 500"),
+    ("cftc gold speculative net positions", "Positions nettes spéculatives CFTC sur l'or"),
+    ("cftc crude oil speculative net positions", "Positions nettes spéculatives CFTC sur le pétrole"),
+    ("cftc eur speculative net positions", "Positions nettes spéculatives CFTC sur l'euro"),
+    ("treasury bill auction", "Adjudication de bons du Trésor"), ("bank holiday", "Jour férié"), ("stress test results", "Résultats des tests de résistance"),
+    ("wage growth", "Croissance des salaires"), ("real earnings", "Salaires réels"), ("current account balance", "Solde de la balance courante"),
+]
+ECO_PHRASES.sort(key=lambda p: -len(p[0]))
+_ECO_EXACT = {a: b for a, b in ECO_PHRASES}
+ECO_QUALS = [(r"mom", "m/m"), (r"yoy", "a/a"), (r"qoq", "t/t"), (r"final", "définitif"), (r"flash", "flash"),
+             (r"prel(?:im(?:inary)?)?", "préliminaire"), (r"adv(?:ance)?", "préliminaire"), (r"2nd est(?:imate)?", "2e estimation"),
+             (r"3rd est(?:imate)?", "3e estimation"), (r"s\.a\.?", "cvs"), (r"n\.s\.a\.?", "non cvs"), (r"annualized", "annualisé")]
+ECO_BANKS = {"fed": "Fed", "fomc": "FOMC", "ecb": "BCE", "boe": "BoE", "boj": "BoJ", "snb": "BNS", "boc": "BoC", "rba": "RBA", "rbnz": "RBNZ", "pboc": "PBoC"}
+ECO_MONTHS = {"jan": "janv.", "feb": "févr.", "mar": "mars", "apr": "avr.", "may": "mai", "jun": "juin", "jul": "juil.",
+              "aug": "août", "sep": "sept.", "oct": "oct.", "nov": "nov.", "dec": "déc."}
+
+
+def eco_fr(title):
+    """Traduit un intitulé d'annonce économique (anglais → français). Ce qui n'est pas connu reste tel quel."""
+    import re
+
+    t = " ".join(str(title or "").split())
+    if not t:
+        return t
+    low = t.lower()
+    if low in _ECO_EXACT:
+        return _ECO_EXACT[low]
+    # discours : « Fed Chair Powell Speech », « ECB President Lagarde Speech », « Fed Waller Speech »
+    m = re.match(r"^(.*?)\s+speech$", t, re.I)
+    if m:
+        who = m.group(1).split()
+        bank = next((ECO_BANKS[w.lower()] for w in who if w.lower() in ECO_BANKS), None)
+        name = [w for w in who if w.lower() not in ECO_BANKS and w.lower() not in ("chair", "president", "governor", "member", "vice", "board")]
+        return "Discours de " + (" ".join(name) or "la banque centrale") + (f" ({bank})" if bank else "")
+    m = re.match(r"^(\d+)[- ](year|yr)\s+.*auction$", t, re.I)
+    if m:
+        return f"Adjudication d'obligations à {m.group(1)} ans"
+    m = re.match(r"^(\d+)[- ](week|month)\s+bill\s+auction$", t, re.I)
+    if m:
+        return f"Adjudication de bons à {m.group(1)} " + ("semaines" if m.group(2).lower() == "week" else "mois")
+    # qualificatifs en fin d'intitulé (MoM, YoY, Prel, Final…)
+    quals = []
+    while True:
+        for rx, fr in ECO_QUALS:
+            mm = re.search(r"\s+" + rx + r"$", t, re.I)
+            if mm:
+                quals.insert(0, fr)
+                t = t[:mm.start()]
+                break
+        else:
+            break
+    low = t.lower()
+    core = _ECO_EXACT.get(low)
+    if core is None:
+        for en, fr in ECO_PHRASES:  # expression connue au début ou dans l'intitulé
+            i = low.find(en)
+            if i >= 0 and (i == 0 or not low[i - 1].isalnum()) and (i + len(en) == len(low) or not low[i + len(en)].isalnum()):
+                rest = (t[:i] + t[i + len(en):]).strip(" -")
+                core = fr + (f" ({rest})" if rest else "")
+                break
+    core = core or t
+    if quals and core.endswith(")"):
+        return core[:-1] + ", " + ", ".join(quals) + ")"
+    return core + (f" ({', '.join(quals)})" if quals else "")
+
+
+def eco_period_fr(p):
+    import re
+
+    if not p:
+        return p
+    s = str(p)
+    s = re.sub(r"\bQ([1-4])\b", r"T\1", s)
+    s = re.sub(r"\bH([12])\b", r"S\1", s)
+    return re.sub(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", lambda m: ECO_MONTHS[m.group(1).lower()], s)
+
+
+ECO_SCALE = {"K": " k", "M": " M", "B": " Md", "T": " Bn"}
+
+
 @app.get("/api/eco")
 def api_eco():
     """Annonces du calendrier économique (flux public utilisé par le calendrier de TradingView)."""
@@ -1416,11 +1581,12 @@ def api_eco():
             continue
         imp = it.get("importance")
         events.append({
-            "id": it.get("id"), "date": it.get("date"), "title": it.get("title") or it.get("indicator"),
-            "country": it.get("country"), "currency": it.get("currency"), "period": it.get("period"),
+            "id": it.get("id"), "date": it.get("date"), "title": eco_fr(it.get("title") or it.get("indicator")),
+            "title_en": it.get("title") or it.get("indicator"),
+            "country": it.get("country"), "currency": it.get("currency"), "period": eco_period_fr(it.get("period")),
             "importance": imp if imp in (-1, 0, 1) else -1,
             "actual": _num(it.get("actual")), "forecast": _num(it.get("forecast")), "previous": _num(it.get("previous")),
-            "unit": it.get("unit") or "", "scale": it.get("scale") or "",
+            "unit": it.get("unit") or "", "scale": ECO_SCALE.get(it.get("scale") or "", it.get("scale") or ""),
         })
     data = {"events": events}
     _eco_cache[key] = {"at": time.time(), "data": data}

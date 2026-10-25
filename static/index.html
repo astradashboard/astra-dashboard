@@ -3260,10 +3260,11 @@ async function renderEco(force) {
     const bl = el('span', 'bulls b' + lvl); bl.appendChild(document.createElement('i')); tdI.appendChild(bl);
     tdI.title = ['Faible', 'Moyenne', 'Forte'][lvl - 1] + ' importance';
     const tdE = el('td'); tdE.appendChild(el('span', 'ev-t', ev.title || ev.indicator || '—'));
+    if (ev.title_en && ev.title_en !== ev.title) tdE.title = ev.title_en;
     if (ev.period) tdE.appendChild(el('span', 'ev-p', '(' + ev.period + ')'));
     const tdA = el('td', 'c-val', fmtEcoVal(ev.actual, ev));
     if (typeof ev.actual === 'number' && typeof ev.forecast === 'number' && ev.actual !== ev.forecast) {
-      const better = (ev.actual > ev.forecast) !== ECO_INVERSE.test(ev.title || '');
+      const better = (ev.actual > ev.forecast) !== ECO_INVERSE.test((ev.title || '') + ' ' + (ev.title_en || ''));
       tdA.classList.add(better ? 'val-up' : 'val-down');
     }
     tr.append(tdT, tdC, tdI, tdE, tdA, el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), el('td', 'c-val', fmtEcoVal(ev.previous, ev)));
