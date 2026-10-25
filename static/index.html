@@ -2499,18 +2499,36 @@ const HELP_KB = [
     a: 'Sous « + Ajouter un compte », clique sur **👁 Masquer les n° de compte** : les numéros sont cachés partout (pratique pour tes vidéos et captures).' },
   { q: 'Comment fonctionnent les mises à jour ?', k: 'mise jour version nouvelle telecharger automatique update bandeau',
     a: 'L\'app vérifie toute seule les nouvelles versions. Quand une mise à jour est prête, un **bandeau** apparaît : clique dessus, l\'app se met à jour et redémarre. Rien à retélécharger.' },
+  { q: 'Avec quelles prop firms et quels brokers ça marche ?', k: 'prop firm propfirm broker brokers courtier fonds propres compatible compatibilite marche fonctionne ftmo fundednext the5ers ic markets pepperstone reel demo mt4 ctrader tradelocker dxtrade plateforme',
+    alt: ['ça marche avec quelle prop firm', 'quels brokers sont compatibles', 'est-ce que ça marche avec mon broker', 'compatible avec fundednext', 'ça marche en fonds propres', 'ça marche avec mt4', 'ça marche avec ctrader'],
+    a: 'Avec **tous les comptes MetaTrader 5**, quel que soit le fournisseur : les **prop firms** (FTMO, FundedNext, The5ers…) comme les comptes en **fonds propres** chez un broker (IC Markets, Pepperstone…), en réel ou en démo. Il suffit du **numéro de compte**, du **nom exact du serveur** et du **mot de passe investisseur**.\nLes comptes sur d\'autres plateformes (**MetaTrader 4, cTrader, TradeLocker, DXtrade**…) ne sont pas encore pris en charge.', act: [['Ajouter un compte', 'add']] },
+  { q: 'L\'app peut-elle passer des ordres ?', k: 'ordre ordres passer trader acheter vendre fermer modifier position automatique robot bot copier copy trading toucher',
+    alt: ['est-ce que l\'app peut trader à ma place', 'l\'app peut fermer mes positions', 'est-ce que l\'application passe des trades', 'peut-elle toucher à mon compte'],
+    a: '**Non.** ASTRA Dashboard **lit seulement** ton capital et ton historique pour les analyser. Elle ne passe, ne modifie et ne ferme **jamais** aucune position. Avec le mot de passe investisseur, c\'est même impossible : il ne permet que la lecture.' },
+  { q: 'Ça fonctionne sur Mac ou sur téléphone ?', k: 'mac macbook apple macos iphone android telephone mobile smartphone tablette ipad linux parallels vps',
+    alt: ['est-ce que ça marche sur mac', 'y a-t-il une application mobile', 'je peux l\'utiliser sur mon téléphone', 'version iphone', 'ça marche sur linux'],
+    a: 'L\'application fonctionne sur **Windows 10 et 11**, avec MetaTrader 5 installé : la connexion de MetaTrader 5 aux applications n\'existe que sur Windows.\nSur **Mac**, tu peux l\'utiliser avec Windows installé via **Parallels Desktop**, ou sur un **VPS Windows** (celui où tourne souvent déjà ton MT5), en bureau à distance. Pas de version téléphone pour l\'instant.' },
+  { q: 'Comment se passe l\'essai gratuit ?', k: 'essai gratuit gratuitement tester 7 sept jours periode fin carte bancaire commencer trial',
+    alt: ['comment fonctionne l\'essai', 'l\'essai est gratuit', 'faut-il une carte bancaire pour l\'essai', 'que se passe-t-il à la fin de l\'essai', 'combien de temps dure l\'essai'],
+    a: 'Dans **Tarification**, clique sur **Commencer l\'essai gratuit** : **7 jours d\'accès**, avec les fonctions de l\'offre **Essentiel** (1 compte), **sans carte bancaire**. À la fin de l\'essai, choisis une offre pour continuer.', act: [['Voir les offres', 'offres']] },
+  { q: 'Quelle différence entre Essentiel et Pro ?', k: 'difference essentiel pro comparer comparaison offre plan choisir mieux inclus contient fonction',
+    alt: ['que contient l\'offre pro', 'pourquoi prendre pro', 'qu\'est-ce qu\'il y a dans essentiel', 'essentiel ou pro'],
+    a: '**Essentiel** (24,95 €/mois) : **1 compte**, statistiques, courbe, calendrier, journal et calendrier économique.\n**Pro** (34,95 €/mois) : jusqu\'à **50 comptes**, plus la vue **tous les comptes**, le **suivi en direct** des positions, le **rapport PDF mensuel** et les **cartes de résultats** à partager.\nEn **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
   { q: 'Les offres et l\'abonnement', k: 'offre offres abonnement prix tarif tarification payer paiement essentiel pro annuel mensuel',
     a: 'Page **Tarification** : **Essai gratuit** 7 jours, **Essentiel** (1 compte) et **Pro** (jusqu\'à 50 comptes, suivi en direct, PDF, cartes de résultats). En **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
   { q: 'Activer ma clé de licence', k: 'cle licence activer code debloquer achat email recu',
     a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
-  { q: 'Changer d\'offre ou résilier', k: 'changer offre resilier annuler arreter abonnement gerer facture remboursement',
-    a: 'Utilise le lien **gérer mon abonnement** de l\'e-mail de confirmation envoyé par Creem : tu peux y changer de carte ou résilier à tout moment, sans engagement. Pour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Rejoindre la communauté', 'discord']] },
+  { q: 'Comment annuler mon abonnement ?', k: 'changer offre resilier annuler annulation arreter stopper abonnement gerer facture remboursement desabonner engagement',
+    alt: ['changer d\'offre ou résilier', 'je veux résilier', 'comment me désabonner', 'y a-t-il un engagement', 'arrêter mon abonnement'],
+    a: 'Depuis le lien **gérer mon abonnement** de l\'e-mail de confirmation envoyé par **Creem**, ou en nous écrivant. **Sans engagement** : l\'accès reste ouvert jusqu\'à la fin de la période payée.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
     a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
-  { q: 'Utiliser l\'app sur un autre PC', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable',
-    a: 'Sur l\'ancien PC : Tarification → **Retirer de ce PC** pour libérer ta clé. Installe l\'app sur le nouveau PC et colle la même clé.' },
+  { q: 'Je peux l\'utiliser sur plusieurs PC ?', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable plusieurs deux 2 machine',
+    alt: ['utiliser l\'app sur un autre pc', 'changer d\'ordinateur', 'installer sur mon portable et mon fixe', 'ma clé marche sur combien de pc'],
+    a: 'Oui, ta clé fonctionne sur **2 PC**. Pour passer sur un autre ordinateur : sur l\'ancien PC, Tarification → **Retirer de ce PC** pour libérer ta clé, puis installe l\'app sur le nouveau PC et colle la même clé.', act: [['Se connecter', 'login']] },
   { q: 'Mes identifiants sont-ils en sécurité ?', k: 'securite securise donnees confidentialite stocke mot passe serveur prive',
-    a: 'Oui : tout reste **sur ton PC**. Les mots de passe mémorisés sont rangés dans le **Gestionnaire d\'identification Windows**, et l\'app ne les envoie à aucun serveur.' },
+    alt: ['mes mots de passe sont-ils protégés', 'est-ce que vous voyez mes identifiants', 'mes données sont envoyées où', 'est-ce sécurisé'],
+    a: 'Oui : tout reste **sur ton PC**. Les mots de passe mémorisés sont rangés dans le **Gestionnaire d\'identification de Windows** et ne sont envoyés à **aucun serveur**. Le **mot de passe investisseur** suffit, il ne permet que la lecture.' },
   { q: 'Faut-il installer MetaTrader 5 ?', k: 'metatrader mt5 installer installe terminal ouvre fenetre programme',
     a: 'L\'app utilise sa **propre copie cachée** de MT5 pour lire tes comptes : rien ne s\'ouvre à l\'écran et ton MT5 habituel n\'est pas touché. MetaTrader 5 doit simplement être installé sur le PC (Windows).' },
   { q: 'Le compte démo', k: 'demo demonstration essayer tester fictif exemple',
@@ -2519,14 +2537,18 @@ const HELP_KB = [
     a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans l\'offre **Pro**.' },
   { q: 'Contacter ASTRA / rejoindre la communauté', k: 'contact contacter support aide humain question communaute discord tiktok groupe serveur coach rejoindre suivre probleme',
     a: 'Rejoins la **communauté ASTRA sur Discord** pour poser tes questions, échanger avec les autres traders et obtenir de l\'aide. Tu peux aussi suivre **@astracapital1** sur TikTok.\nLes boutons sont aussi en bas de la colonne de gauche.', act: [['Rejoindre la communauté', 'discord'], ['Suis-moi sur TikTok', 'tiktok']] },
-  { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor drawdown definition signifie veut dire statistique moyenne',
-    a: '**Taux de réussite** : % de trades gagnants. **Profit factor** : gains ÷ pertes (au-dessus de 1 = rentable). **Drawdown max** : plus forte baisse du capital depuis un sommet. **Jours gagnants** : jours clôturés en positif.' },
+  { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor facteur drawdown definition signifie veut dire statistique moyenne sharpe rrr valeur attendue esperance lots equity solde perte moyenne ratio indicateur explication',
+    alt: ['c\'est quoi le ratio de sharpe', 'que veut dire rrr', 'c\'est quoi la valeur attendue', 'c\'est quoi le drawdown', 'que veut dire le facteur de profit', 'c\'est quoi l\'equity'],
+    a: '**Equity** : solde + positions ouvertes. **Solde** : capital sans les positions ouvertes. **Taux de réussite** : % de trades gagnants. **Profit / perte moyenne** : gain moyen d\'un trade gagnant / perte moyenne d\'un perdant. **RRR moyen** : profit moyen ÷ perte moyenne. **Valeur attendue** : ce que rapporte un trade en moyenne. **Facteur de profit** : total des gains ÷ total des pertes (au-dessus de 1 = rentable). **Ratio de Sharpe** : régularité des gains jour après jour. **Drawdown max** : plus forte baisse depuis un sommet.\nPasse la souris sur l\'icône **i** de chaque case pour le détail.' },
 ];
 const HELP_STOP = new Set('c j l d n qu a au aux avec ce ces comment dans de des du elle en est et faire fait il je la le les leur ma mais me mes mon ne nos notre on ou par pas peut peux pour quand que quel quelle qui sa se ses son sur ta te tes ton tu un une vos votre vous y est-ce quoi ca cela svp stp aide moi est'.split(' '));
 const hNorm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const hStem = w => { w = w.replace(/(s|x)$/, w.length > 3 ? '' : '$1'); if (w.length > 5) w = w.replace(/(er|ez|ee|e)$/, ''); return w; };
 const hTokens = s => hNorm(s).split(' ').filter(w => w && !HELP_STOP.has(w)).map(hStem);
-HELP_KB.forEach(e => { e._t = new Set(hTokens(e.k + ' ' + e.q)); });
+HELP_KB.forEach(e => {
+  e._t = new Set(hTokens(e.k + ' ' + e.q + ' ' + (e.alt || []).join(' ')));
+  e._qs = [e.q, ...(e.alt || [])].map(x => ({ n: hNorm(x), t: new Set(hTokens(x)) }));
+});
 function helpSearch(text) {
   const qt = hTokens(text); if (!qt.length) return [];
   return HELP_KB.map(e => {
@@ -2535,6 +2557,15 @@ function helpSearch(text) {
       if (e._t.has(w)) { sc += 2; continue; }
       if (w.length >= 4) for (const t of e._t) if (t.length >= 4 && (t.startsWith(w) || w.startsWith(t))) { sc += 1; break; }
     }
+    // question identique ou très proche d'une question connue (FAQ du site, formulations courantes)
+    const qn = hNorm(text), qs = new Set(qt);
+    let bonus = 0;
+    for (const v of e._qs) {
+      if (v.n === qn) { bonus = 100; break; }
+      const inter = [...qs].filter(w => v.t.has(w)).length, uni = new Set([...qs, ...v.t]).size;
+      if (uni && inter / uni >= 0.5) bonus = Math.max(bonus, Math.round(10 * inter / uni));
+    }
+    sc += bonus;
     return { e, sc };
   }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
 }
@@ -2581,7 +2612,7 @@ function toggleHelp(open) {
   const p = $('#helpPanel'), o = open === undefined ? p.hidden : open;
   p.hidden = !o; $('#helpFab').classList.toggle('open', o);
   if (o && !$('#helpMsgs').children.length) helpBubble('bot', 'Salut ! Je suis l\'assistant ASTRA. Pose-moi une question sur l\'app, ou choisis un sujet :', null,
-    [HELP_KB[0], HELP_KB[5], HELP_KB[14], HELP_KB[22]]);
+    ['Comment ajouter un compte MT5 ?', 'Avec quelles prop firms et quels brokers ça marche ?', 'Comment se passe l\'essai gratuit ?', 'Quelle différence entre Essentiel et Pro ?'].map(q => HELP_KB.find(e => e.q === q)).filter(Boolean));
   if (o) setTimeout(() => $('#helpInput').focus(), 50);
 }
 $('#helpFab').onclick = () => toggleHelp();
