@@ -477,6 +477,27 @@
   .split-handle:hover span, .split-handle.drag span { background: var(--gold); height: 90px; }
   body.splitting { cursor: col-resize; user-select: none; }
   .chart-row > .card { margin-bottom: 0; min-width: 0; }
+  .disc-card { position: relative; display: flex; flex-direction: column; }
+  .disc-info { width: 34px; height: 34px; padding: 0; border-radius: 10px; font-weight: 800; font-family: Georgia, serif; font-style: italic; }
+  .disc-info.on { border-color: var(--gold); color: var(--gold); }
+  .disc-legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; margin: -4px 0 4px; }
+  .disc-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .disc-gauge { flex: 1; display: grid; place-items: center; min-height: 250px; position: relative; }
+  .disc-gauge svg { width: 100%; max-width: 440px; height: auto; display: block; }
+  .disc-gauge::before { content: ''; position: absolute; left: 50%; bottom: 8%; width: 60%; height: 55%; transform: translateX(-50%); border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 100%, var(--disc-glow, rgba(34,197,94,.14)), transparent 70%); pointer-events: none; }
+  .disc-empty { color: var(--muted); text-align: center; font-size: 13px; padding: 30px 10px; }
+  .disc-detail[hidden] { display: none; }
+  .disc-detail { position: absolute; left: 14px; right: 14px; top: 58px; bottom: 14px; z-index: 5; overflow-y: auto; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.45); padding: 14px 16px; font-size: 13px; }
+  .disc-detail p { color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
+  .disc-row { margin-bottom: 12px; }
+  .disc-row .top { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
+  .disc-row .top span:last-child { font-variant-numeric: tabular-nums; }
+  .disc-row .bar { height: 6px; border-radius: 4px; background: var(--panel-2); margin: 6px 0 4px; overflow: hidden; }
+  .disc-row .bar b { display: block; height: 100%; border-radius: 4px; }
+  .disc-row small { color: var(--muted); font-size: 12px; }
+  .tv-card .tv-grid.n4 .tv-box, .tv-card .tv-grid.n3 .tv-box { height: 360px; }
   .quotes-card { padding: 16px 0 6px; }
   .quotes-card .card-head { padding: 0 18px; }
   .q-arrow { color: var(--gold); }
@@ -792,6 +813,36 @@
         <div class="chart-hint">Boutons − / + pour zoomer · cliquer-glisser pour se déplacer · double-clic pour tout voir</div>
       </section>
       <div class="split-handle" id="chartSplit" title="Glisser pour redimensionner · double-clic : 2/3 – 1/3"><span></span></div>
+      <section class="card disc-card" id="discCard">
+        <div class="card-head">
+          <h2>Score de discipline</h2>
+          <button class="btn disc-info" id="discInfo" type="button" title="Comment le score est calculé">i</button>
+        </div>
+        <div class="disc-legend"><span><i style="background:#ef4444"></i>0 - 30%</span><span><i style="background:#f97316"></i>30 - 80%</span><span><i style="background:#22c55e"></i>80 - 100%</span></div>
+        <div class="disc-gauge" id="discGauge"></div>
+        <div class="disc-detail" id="discDetail" hidden></div>
+      </section>
+      </div>
+      </div>
+      <div class="blk" data-block="tv" data-label="Graphiques TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="chart-row" id="tvRow">
+      <section class="card tv-card">
+        <div class="card-head">
+          <h2>Graphiques TradingView</h2>
+          <div class="tv-head-right">
+          <button type="button" class="btn" id="tvAccount" title="Ouvre tradingview.com dans sa propre fenêtre : tu t'y connectes une fois, la session reste enregistrée">👤 Mon compte TradingView ↗</button>
+          <div class="tv-count" id="tvCount" title="Nombre de graphiques">
+            <span>Graphiques</span>
+            <button type="button" class="btn" data-n="1">1</button>
+            <button type="button" class="btn" data-n="2">2</button>
+            <button type="button" class="btn" data-n="3">3</button>
+            <button type="button" class="btn" data-n="4">4</button>
+          </div>
+          </div>
+        </div>
+        <div class="tv-grid" id="tvGrid"></div>
+      </section>
+      <div class="split-handle" id="tvSplit" title="Glisser pour redimensionner · double-clic : 2/3 – 1/3"><span></span></div>
       <section class="card quotes-card">
         <div class="card-head">
           <h2>Marchés <span class="q-arrow">»</span></h2>
@@ -813,24 +864,6 @@
         </table>
       </section>
       </div>
-      </div>
-      <div class="blk" data-block="tv" data-label="Graphiques TradingView"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
-      <section class="card">
-        <div class="card-head">
-          <h2>Graphiques TradingView</h2>
-          <div class="tv-head-right">
-          <button type="button" class="btn" id="tvAccount" title="Ouvre tradingview.com dans sa propre fenêtre : tu t'y connectes une fois, la session reste enregistrée">👤 Mon compte TradingView ↗</button>
-          <div class="tv-count" id="tvCount" title="Nombre de graphiques">
-            <span>Graphiques</span>
-            <button type="button" class="btn" data-n="1">1</button>
-            <button type="button" class="btn" data-n="2">2</button>
-            <button type="button" class="btn" data-n="3">3</button>
-            <button type="button" class="btn" data-n="4">4</button>
-          </div>
-          </div>
-        </div>
-        <div class="tv-grid" id="tvGrid"></div>
-      </section>
       </div>
       <div class="blk" data-block="cal" data-label="Calendrier des profits et pertes"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <section class="card">
@@ -1385,7 +1418,7 @@ async function loadData() {
     const d = last ? new Date(last + 'T12:00:00') : new Date();
     state.month = [d.getFullYear(), d.getMonth()];
   }
-  renderHero(); renderPeriod(); renderKpis(); renderChart(); renderCal();
+  renderHero(); renderPeriod(); renderKpis(); renderChart(); renderDiscipline(); renderCal();
   showPage();
 }
 
@@ -1654,7 +1687,7 @@ function renderPeriod() {
   $('#perPrev').disabled = i === months.length - 1;
   $('#perNext').disabled = i === -1;
 }
-function setPeriod(p) { state.kpiPeriod = p; renderPeriod(); if (state.data) renderKpis(); }
+function setPeriod(p) { state.kpiPeriod = p; renderPeriod(); if (state.data) { renderKpis(); renderDiscipline(); } }
 $('#perSel').onchange = () => setPeriod($('#perSel').value);
 $('#perPrev').onclick = () => { const ms = periodMonths(); const i = state.kpiPeriod === 'all' ? -1 : ms.indexOf(state.kpiPeriod);
   if (i < ms.length - 1) setPeriod(ms[i + 1]); };
@@ -2321,6 +2354,8 @@ const HELP_KB = [
     a: 'Clique sur **Partager mes résultats** en haut du tableau de bord : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',
     a: 'Dans **Partager mes résultats**, coche « Afficher un QR code ». Avec **Détails des trades**, le QR ouvre une page qui montre le résumé et le détail de chaque position (date, symbole, sens, lots, entrée, sortie, résultat), dans la même unité que la carte. Avec **Mon lien**, il ouvre le lien de ton choix, par exemple ta page Myfxbook.' },
+  { q: 'Le score de discipline', k: 'score discipline jauge regle stop loss surtrading revenge perte journaliere lot taille note',
+    a: 'Le **Score de discipline** (à droite de l\'évolution du capital) note de 0 à 100 % le respect de tes règles sur la période choisie dans « Indicateurs » : **stop-loss placé**, **perte journalière sous 5 %**, **taille de position régulière**, **pas de surtrading** (5 trades max par jour), **pas de revenge trading** (pas de trade moins de 10 min après une perte) et, si ton risque par trade est réglé, **pertes limitées à 1 R**. Clique sur le bouton **i** pour voir le détail de chaque règle.' },
   { q: 'Les graphiques TradingView', k: 'tradingview graphique chart symbole bougie analyse nombre graphiques compte tv',
     a: 'Dans le bloc **Graphiques TradingView**, choisis **1 à 4 graphiques** et, pour chacun, le symbole et l\'unité de temps. Le bouton pour ouvrir ton compte TradingView ouvre ta session avec tes indicateurs.' },
   { q: 'Le tableau des marchés', k: 'marches indices cours dow jones nasdaq dax or petrole bitcoin cotation choisir ordre',
@@ -3461,28 +3496,134 @@ async function liveTick() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });
 liveTick();
 
-// ---------- largeur évolution du capital / marchés (poignée à glisser) ----------
-state.split = 2 / 3;
-function applySplit() {
-  const row = $('#chartSplit').parentElement;
-  row.style.setProperty('--split', (state.split * 100).toFixed(2) + '%');
-  if (typeof renderChart === 'function' && state.data) { clearTimeout(applySplit.t); applySplit.t = setTimeout(() => renderChart(), 60); }
+// ---------- largeurs : capital / discipline et TradingView / marchés (poignées à glisser) ----------
+state.split = 2 / 3; state.split2 = 2 / 3;
+const SPLITS = { chartSplit: 'split', tvSplit: 'split2' };
+function applySplit(id) {
+  for (const [hid, key] of Object.entries(SPLITS)) {
+    if (id && id !== hid) continue;
+    document.getElementById(hid).parentElement.style.setProperty('--split', (state[key] * 100).toFixed(2) + '%');
+  }
+  if ((!id || id === 'chartSplit') && typeof renderChart === 'function' && state.data) { clearTimeout(applySplit.t); applySplit.t = setTimeout(() => { renderChart(); renderDiscipline(); }, 60); }
 }
-(() => {
-  const h = $('#chartSplit');
+for (const [hid, key] of Object.entries(SPLITS)) {
+  const h = document.getElementById(hid);
+  const save = () => api('/api/prefs', { [key]: Math.round(state[key] * 1000) / 1000 }).catch(() => {});
   h.addEventListener('pointerdown', e => {
     e.preventDefault(); h.setPointerCapture(e.pointerId); h.classList.add('drag'); document.body.classList.add('splitting');
     const row = h.parentElement.getBoundingClientRect();
-    const move = ev => { state.split = Math.min(0.8, Math.max(0.35, (ev.clientX - row.left) / row.width)); applySplit(); };
+    // pendant le glissement, les iframes TradingView ne doivent pas « avaler » la souris
+    document.querySelectorAll('.tv-box iframe').forEach(f => f.style.pointerEvents = 'none');
+    const move = ev => { state[key] = Math.min(0.8, Math.max(0.35, (ev.clientX - row.left) / row.width)); applySplit(hid); };
     const up = () => {
       h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
       h.classList.remove('drag'); document.body.classList.remove('splitting');
-      api('/api/prefs', { split: Math.round(state.split * 1000) / 1000 }).catch(() => {});
+      document.querySelectorAll('.tv-box iframe').forEach(f => f.style.pointerEvents = '');
+      save();
     };
     h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   });
-  h.addEventListener('dblclick', () => { state.split = 2 / 3; applySplit(); api('/api/prefs', { split: 0.667 }).catch(() => {}); });
-})();
+  h.addEventListener('dblclick', () => { state[key] = 2 / 3; applySplit(hid); save(); });
+}
+
+// ---------- score de discipline ----------
+const DISC_STOPS = [[0, [239, 59, 74]], [.3, [245, 124, 43]], [.5, [245, 159, 11]], [.7, [156, 176, 74]], [.8, [52, 190, 130]], [1, [34, 197, 94]]];
+function discColor(x) {
+  for (let i = 0; i < DISC_STOPS.length - 1; i++) {
+    const [a, ca] = DISC_STOPS[i], [b, cb] = DISC_STOPS[i + 1];
+    if (x <= b) { const k = (x - a) / (b - a); return 'rgb(' + ca.map((v, j) => Math.round(v + (cb[j] - v) * k)).join(',') + ')'; }
+  }
+  return 'rgb(34,197,94)';
+}
+const DISC_DAILY_LIMIT = 0.05; // limite de perte journalière type FTMO : 5 % du capital de départ
+const DISC_MAX_TRADES = 5;     // au-delà, la journée compte comme du surtrading
+const DISC_REVENGE_MIN = 10;   // trade ouvert moins de 10 min après une perte = revenge trading
+function discipline(d) {
+  const per = state.kpiPeriod, inP = x => per === 'all' || x.startsWith(per);
+  const trades = (d.trades || []).filter(t => inP(t.d));
+  const days = d.daily.filter(x => inP(x.date) && (x.trades > 0 || x.pnl !== 0));
+  const pa = d.per_account || {}, crit = [];
+  const pct = (ok, n) => n ? ok / n * 100 : null;
+  // 1. stop-loss sur chaque position
+  const withDetail = trades.filter(t => t.s);
+  if (withDetail.length) {
+    const ok = withDetail.filter(t => t.sl).length;
+    crit.push({ name: 'Stop-loss placé', w: 25, v: pct(ok, withDetail.length), info: ok + ' trades sur ' + withDetail.length + ' avaient un stop-loss' });
+  }
+  // 2. limite de perte journalière respectée (par compte)
+  const byAccDay = {};
+  for (const t of trades) { const k = t.a + '|' + t.d; byAccDay[k] = (byAccDay[k] || 0) + t.n; }
+  let dOk = 0, dN = 0;
+  if (trades.length) {
+    for (const [k, v] of Object.entries(byAccDay)) { const sb = (pa[k.split('|')[0]] || {}).start_balance || 0; dN++; if (!sb || v > -DISC_DAILY_LIMIT * sb) dOk++; }
+  } else for (const x of days) { dN++; if (!d.start_balance || x.pnl > -DISC_DAILY_LIMIT * d.start_balance) dOk++; }
+  if (dN) crit.push({ name: 'Perte journalière sous 5 %', w: 25, v: pct(dOk, dN), info: dOk + ' journées sur ' + dN + ' sans dépasser la limite' });
+  // 3. taille de position régulière (≤ 1,5 × la taille habituelle sur ce compte et ce symbole)
+  if (withDetail.length >= 3) {
+    const groups = {};
+    for (const t of withDetail) (groups[t.a + '|' + t.s] = groups[t.a + '|' + t.s] || []).push(t.v);
+    const med = {}; for (const [k, a] of Object.entries(groups)) { const z = a.slice().sort((x, y) => x - y); med[k] = z[Math.floor(z.length / 2)]; }
+    const ok = withDetail.filter(t => t.v <= 1.5 * med[t.a + '|' + t.s] + 1e-9).length;
+    crit.push({ name: 'Taille de position régulière', w: 20, v: pct(ok, withDetail.length), info: ok + ' trades sur ' + withDetail.length + ' sans lot démesuré' });
+  }
+  // 4. pas de surtrading
+  const perDay = {};
+  if (trades.length) for (const t of trades) { const k = t.a + '|' + t.d; perDay[k] = (perDay[k] || 0) + 1; }
+  else for (const x of days) perDay[x.date] = x.trades;
+  const pd = Object.values(perDay);
+  if (pd.length) { const ok = pd.filter(n => n <= DISC_MAX_TRADES).length; crit.push({ name: 'Pas de surtrading', w: 15, v: pct(ok, pd.length), info: ok + ' journées sur ' + pd.length + ' avec ' + DISC_MAX_TRADES + ' trades ou moins' }); }
+  // 5. pas de revenge trading
+  const timed = withDetail.filter(t => t.ot && t.ct).sort((x, y) => x.ot < y.ot ? -1 : 1);
+  if (timed.length >= 2) {
+    let bad = 0;
+    for (const t of timed) {
+      const o = Date.parse(t.ot);
+      if (timed.some(p => p !== t && p.a === t.a && p.n < 0 && Date.parse(p.ct) <= o && o - Date.parse(p.ct) < DISC_REVENGE_MIN * 60000)) bad++;
+    }
+    crit.push({ name: 'Pas de revenge trading', w: 15, v: pct(timed.length - bad, timed.length), info: bad ? bad + ' trades ouverts moins de ' + DISC_REVENGE_MIN + ' min après une perte' : 'Aucun trade pris sous le coup d\'une perte' });
+  }
+  // 6. pertes contenues dans le risque prévu (si le risque par trade est réglé)
+  const rT = trades.filter(t => riskAmount(pa[t.a]) && t.n < 0);
+  if (rT.length) { const ok = rT.filter(t => -t.n <= 1.2 * riskAmount(pa[t.a])).length; crit.push({ name: 'Pertes limitées à 1 R', w: 20, v: pct(ok, rT.length), info: ok + ' pertes sur ' + rT.length + ' à 1,2 R ou moins' }); }
+  if (!crit.length) return null;
+  const W = crit.reduce((s, c) => s + c.w, 0);
+  return { score: Math.round(crit.reduce((s, c) => s + c.v * c.w, 0) / W), crit, n: trades.length || days.length };
+}
+function discLabel(v) { return v >= 80 ? 'Excellent' : v >= 60 ? 'Bon' : v >= 30 ? 'À améliorer' : 'Faible'; }
+function renderDiscipline() {
+  const host = $('#discGauge'), det = $('#discDetail');
+  if (!host || !state.data) return;
+  const r = discipline(state.data);
+  host.innerHTML = '';
+  if (!r) { host.appendChild(el('div', 'disc-empty', 'Pas encore assez de trades sur cette période pour calculer ton score.')); det.innerHTML = ''; return; }
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+  const Wd = 440, Hd = 270, cx = 220, cy = 228, R1 = 118, R2 = 160, N = 96;
+  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  const mk = (tag, at, txt) => { const e = document.createElementNS(ns, tag); for (const k in at) e.setAttribute(k, at[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; };
+  const lim = r.score / 100;
+  for (let i = 0; i < N; i++) {
+    const x = i / (N - 1), a = Math.PI * (1 - x), c = Math.cos(a), sn = Math.sin(a);
+    mk('line', { x1: cx + R1 * c, y1: cy - R1 * sn, x2: cx + R2 * c, y2: cy - R2 * sn, stroke: x <= lim + 1e-9 ? discColor(x) : 'rgba(143,152,171,.75)', 'stroke-width': 3.2, 'stroke-linecap': 'round' });
+  }
+  const lab = (p, dx, dy, anchor) => { const a = Math.PI * (1 - p / 100), rr = R2 + 22; mk('text', { x: cx + rr * Math.cos(a) + dx, y: cy - rr * Math.sin(a) + dy, 'text-anchor': anchor, fill: 'var(--muted)', 'font-size': 15, 'font-weight': 700 }, p + '%'); };
+  lab(0, 0, 22, 'middle'); lab(30, -6, 4, 'end'); lab(50, 0, -2, 'middle'); lab(80, 6, 4, 'start'); lab(100, 0, 22, 'middle');
+  const col = r.score >= 80 ? '#22c55e' : r.score >= 30 ? '#f97316' : '#ef4444';
+  mk('text', { x: cx, y: cy - 20, 'text-anchor': 'middle', fill: 'var(--fg)', 'font-size': 38, 'font-weight': 800 }, r.score + '%');
+  mk('text', { x: cx, y: cy + 10, 'text-anchor': 'middle', fill: col, 'font-size': 15, 'font-weight': 700 }, discLabel(r.score));
+  host.style.setProperty('--disc-glow', col === '#22c55e' ? 'rgba(34,197,94,.16)' : col === '#f97316' ? 'rgba(249,115,22,.14)' : 'rgba(239,68,68,.14)');
+  host.appendChild(svg);
+  // détail du calcul (bouton i)
+  det.innerHTML = '';
+  det.appendChild(el('p', null, 'Ton score mesure si tu respectes les règles d\'un trader discipliné sur la période choisie dans « Indicateurs » (' + (state.kpiPeriod === 'all' ? 'depuis le début du compte' : ($('#perSel').selectedOptions[0] || {}).textContent || state.kpiPeriod) + '). Chaque règle compte pour une part du score.'));
+  for (const c of r.crit) {
+    const row = el('div', 'disc-row'), top = el('div', 'top');
+    top.append(el('span', null, c.name + ' · ' + c.w + ' %'), el('span', null, Math.round(c.v) + '%'));
+    const bar = el('div', 'bar'), b = el('b'); b.style.width = c.v + '%'; b.style.background = discColor(c.v / 100); bar.appendChild(b);
+    row.append(top, bar, el('small', null, c.info)); det.appendChild(row);
+  }
+  if (!r.crit.some(c => c.name.startsWith('Pertes limitées'))) det.appendChild(el('p', null, 'Astuce : règle ton risque par trade (clic sur un indicateur en R) pour ajouter la règle « Pertes limitées à 1 R ».'));
+}
+$('#discInfo').onclick = () => { const d = $('#discDetail'); d.hidden = !d.hidden; $('#discInfo').classList.toggle('on', !d.hidden); };
 
 // ---------- cotations des marchés (MT5), marchés choisis par l'utilisateur ----------
 let quotesTimer = null, quotesCatalog = null; const quotesPrev = {};
@@ -3631,7 +3772,7 @@ $('#quotesBody').addEventListener('pointerdown', e => {
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) quotesTick(); });
-api('/api/prefs').then(p => { if (Array.isArray(p.quotes)) state.quotes = p.quotes; if (typeof p.split === 'number') { state.split = Math.min(0.8, Math.max(0.35, p.split)); applySplit(); } }).catch(() => {}).finally(quotesTick);
+api('/api/prefs').then(p => { if (Array.isArray(p.quotes)) state.quotes = p.quotes; for (const k of ['split', 'split2']) if (typeof p[k] === 'number') state[k] = Math.min(0.8, Math.max(0.35, p[k])); applySplit(); }).catch(() => {}).finally(quotesTick);
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {

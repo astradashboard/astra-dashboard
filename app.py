@@ -1051,8 +1051,9 @@ def api_prefs_set():
             tz = str(eco.get("tz", ""))[:40]
             if tz and all(c.isalnum() or c in "/_+-" for c in tz):
                 prefs["eco"]["tz"] = tz
-    if isinstance(body.get("split"), (int, float)):
-        prefs["split"] = min(0.8, max(0.35, float(body["split"])))
+    for sk in ("split", "split2"):
+        if isinstance(body.get(sk), (int, float)):
+            prefs[sk] = min(0.8, max(0.35, float(body[sk])))
     if isinstance(body.get("card"), dict):
         cd = body["card"]
         prefs["card"] = {"mode": cd.get("mode") if cd.get("mode") in ("both", "pct", "r") else "both",
