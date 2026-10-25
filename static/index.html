@@ -1541,7 +1541,7 @@ const METRICS = [
   { id: 'winDays', label: 'Jours gagnants', help: '% des jours tradés en profit',
     f: (d, s) => [s.tradeDays.length ? Math.round(s.winDays.length / s.tradeDays.length * 100) + ' %' : '—', s.winDays.length + ' / ' + s.tradeDays.length + ' jours', ''] },
   { id: 'winTrades', label: 'Taux de réussite', help: '% des trades clôturés en profit',
-    f: (d, s) => { const w = s.trades ? s.wins / s.trades * 100 : null; return [w == null ? '—' : w.toFixed(2).replace('.', ',') + ' %', nb(s.trades) + ' trades clôturés', w == null ? '' : w >= 50 ? 'pos' : 'neg']; } },
+    f: (d, s) => { const w = s.trades ? s.wins / s.trades * 100 : null; return [w == null ? '—' : w.toFixed(2).replace('.', ',') + ' %', nb(s.trades) + ' trades clôturés', '']; } },
   { id: 'best', label: 'Meilleur jour', help: 'Plus gros gain sur une journée',
     f: (d, s) => [s.best ? money(s.best.pnl, d.currency, true) : '—', fmtDay(s.best), s.best ? cls(s.best.pnl) : ''] },
   { id: 'worst', label: 'Pire jour', help: 'Plus grosse perte sur une journée',
