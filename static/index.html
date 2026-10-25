@@ -789,13 +789,13 @@
         <div id="liveBody"></div>
       </section>
       </div>
-      <div class="blk" data-block="kpis" data-label="Indicateurs"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <div class="blk" data-block="kpis" data-label="Statistiques"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <div class="kpis-head">
         <div class="left">
-          <h2>Indicateurs</h2>
+          <h2>Statistiques</h2>
           <div class="period">
             <button class="btn" id="perPrev" title="Mois précédent">‹</button>
-            <select id="perSel" title="Période des indicateurs"></select>
+            <select id="perSel" title="Période des statistiques"></select>
             <button class="btn" id="perNext" title="Mois suivant">›</button>
           </div>
         </div>
@@ -1090,7 +1090,7 @@
 
 <div class="modal-bg" id="customBg">
   <div class="modal">
-    <h2>Personnaliser les indicateurs</h2>
+    <h2>Personnaliser les statistiques</h2>
     <p class="sub">Coche ceux à afficher et range-les avec les flèches. Le choix est gardé sur ce PC.</p>
     <div class="pick-list" id="pickList"></div>
     <div class="modal-actions">
@@ -1584,7 +1584,7 @@ function renderKpis() {
     const a = document.createElement('div'); a.className = 'k'; a.textContent = typeof m.label === 'function' ? m.label() : m.label;
     const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
     const e = document.createElement('div'); e.className = 's'; e.textContent = sub;
-    const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cet indicateur';
+    const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cette statistique';
     x.draggable = false;
     x.onclick = ev => { ev.stopPropagation(); removeKpi(id); };
     if (m.risk) el.dataset.risk = '1';
@@ -1615,7 +1615,7 @@ function renderKpis() {
   }
   if (!box.children.length) {
     const el = document.createElement('div'); el.className = 'kpi empty-kpi';
-    el.textContent = 'Aucun indicateur : clique sur « Personnaliser » pour en ajouter.'; box.appendChild(el);
+    el.textContent = 'Aucune statistique : clique sur « Personnaliser » pour en ajouter.'; box.appendChild(el);
   }
 }
 
@@ -2344,9 +2344,9 @@ const HELP_KB = [
   { q: 'Renommer ou supprimer un compte', k: 'renommer nom supprimer retirer effacer compte clic droit changer nom',
     a: 'Fais un **clic droit** sur le compte dans la colonne de gauche : tu peux le **renommer**, régler son **risque par trade**, l\'**actualiser** ou le **supprimer**.' },
   { q: 'Comment sont calculés les R ?', k: 'r rr risque reward ratio risk calcul resultat definir trade',
-    a: '1 R = le **risque que tu prends par trade**, que tu définis toi-même pour chaque compte (en % du capital ou en montant).\nPour le régler : clic droit sur le compte → **Risque par trade…**. Un trade qui gagne 2 fois ce risque vaut +2 R.\nL\'indicateur « Résultat du mois en R » s\'affiche alors dans les indicateurs.' },
-  { q: 'Personnaliser les indicateurs', k: 'indicateur indicateurs kpi personnaliser ajouter retirer enlever statistiques choisir case',
-    a: 'Sous les indicateurs, clique sur **＋ Ajouter / ⚙ Personnaliser** pour en ajouter ou en retirer.\nTu peux aussi les **glisser** pour changer l\'ordre et les retirer directement avec la croix au survol.\nLe sélecteur de **période** (mois ou depuis le début) change les chiffres affichés.', act: [['Personnaliser', 'custom']] },
+    a: '1 R = le **risque que tu prends par trade**, que tu définis toi-même pour chaque compte (en % du capital ou en montant).\nPour le régler : clic droit sur le compte → **Risque par trade…**. Un trade qui gagne 2 fois ce risque vaut +2 R.\nLa statistique « Résultat du mois en R » s\'affiche alors dans les statistiques.' },
+  { q: 'Personnaliser les statistiques', k: 'indicateur indicateurs kpi personnaliser ajouter retirer enlever statistiques choisir case',
+    a: 'Sous les statistiques, clique sur **＋ Ajouter / ⚙ Personnaliser** pour en ajouter ou en retirer.\nTu peux aussi les **glisser** pour changer l\'ordre et les retirer directement avec la croix au survol.\nLe sélecteur de **période** (mois ou depuis le début) change les chiffres affichés.', act: [['Personnaliser', 'custom']] },
   { q: 'Déplacer les blocs du tableau de bord', k: 'deplacer bouger organiser ordre bloc blocs disposition glisser poignee ranger',
     a: 'Chaque bloc a une **poignée ⠿** en haut à gauche : maintiens-la et glisse le bloc plus haut ou plus bas. L\'ordre est gardé.\nEntre l\'évolution du capital et les marchés, la **poignée verticale** permet de régler leur largeur (double-clic : 2/3 – 1/3).' },
   { q: 'Zoomer sur l\'évolution du capital', k: 'zoom zoomer graphique courbe evolution capital periode agrandir',
@@ -2366,7 +2366,7 @@ const HELP_KB = [
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',
     a: 'Dans **Partager mes résultats**, coche « Afficher un QR code ». Avec **Détails des trades**, le QR ouvre une page qui montre le résumé et le détail de chaque position (date, symbole, sens, lots, entrée, sortie, résultat), dans la même unité que la carte. Avec **Mon lien**, il ouvre le lien de ton choix, par exemple ta page Myfxbook.' },
   { q: 'Le score de discipline', k: 'score discipline jauge regle stop loss surtrading revenge perte journaliere lot taille note',
-    a: 'Le **Score de discipline** (à droite de l\'évolution du capital) note de 0 à 100 % le respect de tes règles sur la période choisie dans « Indicateurs » : **stop-loss placé**, **perte journalière sous 5 %**, **taille de position régulière**, **pas de surtrading** (5 trades max par jour), **pas de revenge trading** (pas de trade moins de 10 min après une perte) et, si ton risque par trade est réglé, **pertes limitées à 1 R**. Clique sur le bouton **i** pour voir le détail de chaque règle.' },
+    a: 'Le **Score de discipline** (à droite de l\'évolution du capital) note de 0 à 100 % le respect de tes règles sur la période choisie dans « Statistiques » : **stop-loss placé**, **perte journalière sous 5 %**, **taille de position régulière**, **pas de surtrading** (5 trades max par jour), **pas de revenge trading** (pas de trade moins de 10 min après une perte) et, si ton risque par trade est réglé, **pertes limitées à 1 R**. Clique sur le bouton **i** pour voir le détail de chaque règle.' },
   { q: 'Les graphiques TradingView', k: 'tradingview graphique chart symbole bougie analyse nombre graphiques compte tv',
     a: 'Dans le bloc **Graphiques TradingView**, choisis **1 à 4 graphiques** et, pour chacun, le symbole et l\'unité de temps. Le bouton pour ouvrir ton compte TradingView ouvre ta session avec tes indicateurs.' },
   { q: 'Le tableau des marchés', k: 'marches indices cours dow jones nasdaq dax or petrole bitcoin cotation choisir ordre',
@@ -2449,7 +2449,7 @@ function helpAsk(text) {
   helpBubble('me', text);
   const n = hNorm(text);
   setTimeout(() => {
-    if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, indicateurs, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
+    if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, statistiques, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
     if (/^(merci|top|parfait|super|ok|d accord|nickel)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
     const res = helpSearch(text);
     if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, regarde ces sujets, ou pose ta question sur le **Discord** :', [['Rejoindre la communauté', 'discord']], (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
@@ -3629,14 +3629,14 @@ function renderDiscipline() {
   host.appendChild(svg);
   // détail du calcul (bouton i)
   det.innerHTML = '';
-  det.appendChild(el('p', null, 'Ton score mesure si tu respectes les règles d\'un trader discipliné sur la période choisie dans « Indicateurs » (' + (state.kpiPeriod === 'all' ? 'depuis le début du compte' : ($('#perSel').selectedOptions[0] || {}).textContent || state.kpiPeriod) + '). Chaque règle compte pour une part du score.'));
+  det.appendChild(el('p', null, 'Ton score mesure si tu respectes les règles d\'un trader discipliné sur la période choisie dans « Statistiques » (' + (state.kpiPeriod === 'all' ? 'depuis le début du compte' : ($('#perSel').selectedOptions[0] || {}).textContent || state.kpiPeriod) + '). Chaque règle compte pour une part du score.'));
   for (const c of r.crit) {
     const row = el('div', 'disc-row'), top = el('div', 'top');
     top.append(el('span', null, c.name + ' · ' + c.w + ' %'), el('span', null, Math.round(c.v) + '%'));
     const bar = el('div', 'bar'), b = el('b'); b.style.width = c.v + '%'; b.style.background = discColor(c.v / 100); bar.appendChild(b);
     row.append(top, bar, el('small', null, c.info)); det.appendChild(row);
   }
-  if (!r.crit.some(c => c.name.startsWith('Pertes limitées'))) det.appendChild(el('p', null, 'Astuce : règle ton risque par trade (clic sur un indicateur en R) pour ajouter la règle « Pertes limitées à 1 R ».'));
+  if (!r.crit.some(c => c.name.startsWith('Pertes limitées'))) det.appendChild(el('p', null, 'Astuce : règle ton risque par trade (clic sur une statistique en R) pour ajouter la règle « Pertes limitées à 1 R ».'));
 }
 $('#discInfo').onclick = () => { const d = $('#discDetail'); d.hidden = !d.hidden; $('#discInfo').classList.toggle('on', !d.hidden); };
 
