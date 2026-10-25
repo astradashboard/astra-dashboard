@@ -129,7 +129,9 @@
   .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
   .kpi { grid-column: span 2; background: var(--panel-2); border: 1px solid transparent; border-radius: var(--radius); padding: 16px 14px; text-align: center; }
   .kpi.big { grid-column: span 3; }
-  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi, .kpi.big { grid-column: span 1; } }
+  .kpi.big.pair1 { grid-column: 1 / span 3; }
+  .kpi.big.full { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi, .kpi.big { grid-column: span 1; } .kpi.big.pair1 { grid-column: 1 / span 1; } .kpi.big.full { grid-column: 1 / -1; } }
   .kpi { position: relative; cursor: grab; transition: opacity .15s, border-color .15s; }
   .kpi:hover { border-color: #34405a; }
   .kpi .k { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -1663,6 +1665,14 @@ function renderKpis() {
     const el = document.createElement('div'); el.className = 'kpi empty-kpi';
     el.textContent = 'Aucune statistique : clique sur « Personnaliser » pour en ajouter.'; box.appendChild(el);
   }
+  // grandes cases (Equity / Solde) : deux côte à côte = une moitié chacune ; seule = toute la largeur
+  const tiles = [...box.querySelectorAll('.kpi.big')];
+  tiles.forEach((t, i) => {
+    const prevBig = t.previousElementSibling && t.previousElementSibling.classList.contains('big') && !t.previousElementSibling.classList.contains('full') && !t.previousElementSibling.dataset.paired;
+    const nextBig = t.nextElementSibling && t.nextElementSibling.classList.contains('big');
+    if (prevBig) { t.dataset.paired = '1'; t.previousElementSibling.dataset.paired = '1'; t.previousElementSibling.classList.add('pair1'); }
+    else if (!nextBig) t.classList.add('full');
+  });
 }
 
 /* ---------- capital du compte ---------- */
