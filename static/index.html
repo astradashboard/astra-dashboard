@@ -124,10 +124,10 @@
   .pick input { width: 16px; height: 16px; accent-color: #c48a45; }
   .pick .mv { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 6px; width: 28px; height: 26px; padding: 0; }
   .pick .mv:disabled { opacity: .3; cursor: default; }
-  .stats-card .kpis-head { margin-bottom: 16px; }
+  .stats-card .kpis-head { margin-bottom: 12px; }
   .stats-card .kpis-head h2 { font-size: 17px; font-weight: 700; }
-  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-  .kpi { grid-column: span 2; background: var(--panel-2); border: 1px solid transparent; border-radius: var(--radius); padding: 16px 14px; text-align: center; }
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px; }
+  .kpi { grid-column: span 2; background: var(--panel-2); border: 1px solid transparent; border-radius: var(--radius); padding: 9px 12px; text-align: center; }
   .kpi.big { grid-column: span 3; }
   .kpi.big.pair1 { grid-column: 1 / span 3; }
   .kpi.big.full { grid-column: 1 / -1; }
@@ -567,9 +567,9 @@
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
-  .kpi .k { color: var(--muted); font-size: 13.5px; }
-  .kpi .v { font-size: 19px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
-  .kpi.big .v { font-size: 21px; }
+  .kpi .k { color: var(--muted); font-size: 13px; }
+  .kpi .v { font-size: 17px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi.big .v { font-size: 19px; }
   .kpi .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 18px; }
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
