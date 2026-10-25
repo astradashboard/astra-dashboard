@@ -20,16 +20,13 @@ Ce qu'il faut sur l'ordinateur
 Mac : non compatible (MetaTrader 5 ne donne pas accès à ses données sur Mac).
 
 
-ÉTAPE 1 - Lancer l'application sur ton PC
------------------------------------------
-1. Installe Python : https://www.python.org/downloads/
-   IMPORTANT : coche "Add python.exe to PATH" au début de l'installation.
-2. Décompresse ce dossier où tu veux (par exemple dans Documents).
-3. Double-clique sur "Lancer ASTRA Dashboard.bat".
-   La première fois, l'installation prend une minute, ensuite c'est instantané.
-
-Raccourci sur le bureau : clic droit sur "Lancer ASTRA Dashboard.bat" > Afficher plus d'options >
-Envoyer vers > Bureau (créer un raccourci).
+ÉTAPE 1 - Installer l'application
+---------------------------------
+1. Sur https://astracapital.app, clique sur « Télécharger pour Windows ».
+2. Lance le fichier ASTRA-Dashboard-Setup.exe.
+   Si Windows affiche « Windows a protégé votre ordinateur » : « Informations complémentaires » > « Exécuter quand même ».
+3. L'application s'ouvre toute seule. Ensuite, utilise le raccourci « ASTRA Dashboard » du bureau ou du menu Démarrer.
+   Rien d'autre à installer : tout est inclus. Les mises à jour s'installent ensuite toutes seules.
 
 
 ÉTAPE 2 - Connecter un compte
