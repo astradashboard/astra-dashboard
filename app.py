@@ -1033,6 +1033,8 @@ def api_prefs_set():
     prefs = _load(PREFS_FILE, {})
     if isinstance(body.get("kpis"), list):
         prefs["kpis"] = [str(x)[:40] for x in body["kpis"]][:50]
+    if isinstance(body.get("kpis_v"), int):
+        prefs["kpis_v"] = body["kpis_v"]
     if isinstance(body.get("news"), list):
         prefs["news"] = [str(x)[:20] for x in body["news"] if str(x) in NEWS_FEEDS][:12]
         prefs["newsV"] = 3

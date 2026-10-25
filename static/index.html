@@ -124,10 +124,16 @@
   .pick input { width: 16px; height: 16px; accent-color: #c48a45; }
   .pick .mv { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 6px; width: 28px; height: 26px; padding: 0; }
   .pick .mv:disabled { opacity: .3; cursor: default; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
-  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .stats-card .kpis-head { margin-bottom: 16px; }
+  .stats-card .kpis-head h2 { font-size: 17px; font-weight: 700; }
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .kpi { grid-column: span 2; background: var(--panel-2); border: 1px solid transparent; border-radius: var(--radius); padding: 16px 14px; text-align: center; }
+  .kpi.big { grid-column: span 3; }
+  @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi, .kpi.big { grid-column: span 1; } }
   .kpi { position: relative; cursor: grab; transition: opacity .15s, border-color .15s; }
   .kpi:hover { border-color: #34405a; }
+  .kpi .k { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .kpi-i { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font: italic 700 10px Georgia, serif; opacity: .8; cursor: help; flex: none; }
   .kpi.dragging { opacity: .35; cursor: grabbing; }
   .kpi.drop-before { box-shadow: -4px 0 0 -1px var(--gold); }
   .kpi.drop-after { box-shadow: 4px 0 0 -1px var(--gold); }
@@ -559,8 +565,9 @@
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1b2232; border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
   .toast button { background: none; border: none; color: var(--gold); font-weight: 600; padding: 0; }
-  .kpi .k { color: var(--muted); font-size: 12px; }
-  .kpi .v { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .k { color: var(--muted); font-size: 13.5px; }
+  .kpi .v { font-size: 19px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .kpi.big .v { font-size: 21px; }
   .kpi .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 18px; }
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
@@ -790,6 +797,7 @@
       </section>
       </div>
       <div class="blk" data-block="kpis" data-label="Statistiques"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
+      <section class="card stats-card">
       <div class="kpis-head">
         <div class="left">
           <h2>Statistiques</h2>
@@ -801,7 +809,8 @@
         </div>
         <button class="btn" id="customBtn">＋ Ajouter / ⚙ Personnaliser</button>
       </div>
-      <section class="kpis" id="kpis"></section>
+      <div class="kpis" id="kpis"></div>
+      </section>
       </div>
       <div class="blk" data-block="chart" data-label="Évolution du capital"><div class="blk-handle" title="Maintenir et glisser pour déplacer ce bloc" role="button" aria-label="Déplacer">⠿</div>
       <div class="chart-row">
@@ -1475,6 +1484,20 @@ function stats(d) {
     else if (r > 0) { st.rWon += r; st.rWins++; }
     else { st.rLost += -r; st.rLosses++; }
   }
+  // statistiques par trade
+  const pt = (d.trades || []).filter(inPeriod);
+  st.tHas = pt.length > 0;
+  st.tWins = pt.filter(t => t.n > 0); st.tLosses = pt.filter(t => t.n < 0);
+  st.tGain = st.tWins.reduce((a, t) => a + t.n, 0); st.tLoss = -st.tLosses.reduce((a, t) => a + t.n, 0);
+  st.tN = pt.length; st.tNet = pt.reduce((a, t) => a + t.n, 0);
+  st.lots = pt.reduce((a, t) => a + (t.v || 0), 0);
+  st.avgWin = st.tWins.length ? st.tGain / st.tWins.length : 0; st.avgLoss = st.tLosses.length ? st.tLoss / st.tLosses.length : 0;
+  // ratio de Sharpe journalier : moyenne ÷ écart-type des rendements quotidiens (sans annualisation)
+  { let b0 = st.periodStart; const rets = [];
+    for (const x of days) { if (b0 > 0 && (x.trades > 0 || x.pnl !== 0)) rets.push(x.pnl / b0); b0 += x.pnl; }
+    const m = rets.reduce((a, v) => a + v, 0) / (rets.length || 1);
+    const sd = Math.sqrt(rets.reduce((a, v) => a + (v - m) ** 2, 0) / Math.max(1, rets.length - 1));
+    st.sharpe = rets.length > 1 && sd > 0 ? m / sd : null; }
   st.rRiskSet = Object.values(pa).some(a => a.risk);
   st.rHasTrades = Object.values(pa).some(a => a.has_trades);
   st.gain = st.winDays.reduce((s, x) => s + x.pnl, 0);
@@ -1501,10 +1524,10 @@ const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString('fr-BE
 const nb = n => n.toLocaleString('fr-BE');
 
 const METRICS = [
-  { id: 'balance', label: 'Capital (balance)', help: 'Solde actuel du compte',
+  { id: 'balance', label: 'Solde', help: 'Solde actuel du compte (balance)',
     f: (d, s) => [money(d.balance, d.currency), 'Départ ' + money(d.start_balance, d.currency), ''] },
-  { id: 'equity', label: 'Équité', help: 'Solde + positions ouvertes',
-    f: (d, s) => { const fl = d.equity - d.balance; return [money(d.equity, d.currency), 'Flottant ' + money(fl, d.currency, true), cls(fl)]; } },
+  { id: 'equity', label: 'Equity', help: 'Solde + résultat des positions ouvertes',
+    f: (d, s) => { const fl = d.equity - d.balance; return [money(d.equity, d.currency), 'Flottant ' + money(fl, d.currency, true), '']; } },
   { id: 'total', label: () => state.kpiPeriod === 'all' ? 'Profit / perte total' : 'Résultat de ' + MONTHS[Number(state.kpiPeriod.slice(5)) - 1] + ' ' + state.kpiPeriod.slice(0, 4), help: 'Sur la période choisie',
     f: (d, s) => [money(s.pnl, d.currency, true), s.periodStart ? pct(s.pnl / s.periodStart * 100) : '', cls(s.pnl)] },
   { id: 'today', label: "Aujourd'hui", help: 'Résultat du jour',
@@ -1516,7 +1539,7 @@ const METRICS = [
   { id: 'winDays', label: 'Jours gagnants', help: '% des jours tradés en profit',
     f: (d, s) => [s.tradeDays.length ? Math.round(s.winDays.length / s.tradeDays.length * 100) + ' %' : '—', s.winDays.length + ' / ' + s.tradeDays.length + ' jours', ''] },
   { id: 'winTrades', label: 'Taux de réussite', help: '% des trades clôturés en profit',
-    f: (d, s) => [s.trades ? Math.round(s.wins / s.trades * 100) + ' %' : '—', nb(s.trades) + ' trades clôturés', ''] },
+    f: (d, s) => { const w = s.trades ? s.wins / s.trades * 100 : null; return [w == null ? '—' : w.toFixed(2).replace('.', ',') + ' %', nb(s.trades) + ' trades clôturés', w == null ? '' : w >= 50 ? 'pos' : 'neg']; } },
   { id: 'best', label: 'Meilleur jour', help: 'Plus gros gain sur une journée',
     f: (d, s) => [s.best ? money(s.best.pnl, d.currency, true) : '—', fmtDay(s.best), s.best ? cls(s.best.pnl) : ''] },
   { id: 'worst', label: 'Pire jour', help: 'Plus grosse perte sur une journée',
@@ -1530,7 +1553,7 @@ const METRICS = [
   { id: 'avgWinLoss', label: 'Jour gagnant / perdant moyen', help: 'Gain moyen et perte moyenne par jour',
     f: (d, s) => { const g = s.winDays.length ? s.gain / s.winDays.length : 0, l = s.lossDays.length ? s.loss / s.lossDays.length : 0;
       return [money(g, d.currency, true), 'Perte moyenne ' + money(-l, d.currency, true), 'pos']; } },
-  { id: 'pf', label: 'Profit factor', help: 'Total des gains ÷ total des pertes (par jour)',
+  { id: 'pf', label: 'Profit factor (par jour)', help: 'Total des gains ÷ total des pertes, journée par journée',
     f: (d, s) => [s.loss ? (s.gain / s.loss).toFixed(2).replace('.', ',') : (s.gain ? '∞' : '—'), 'Gains ' + money(s.gain, d.currency) + ' · Pertes ' + money(s.loss, d.currency), s.loss && s.gain / s.loss >= 1 ? 'pos' : (s.loss ? 'neg' : '')] },
   { id: 'streak', label: 'Série en cours', help: 'Jours gagnants ou perdants d\'affilée',
     f: (d, s) => [s.curRun > 0 ? s.curRun + ' gagnant' + (s.curRun > 1 ? 's' : '') : s.curRun < 0 ? (-s.curRun) + ' perdant' + (s.curRun < -1 ? 's' : '') : '—',
@@ -1551,11 +1574,33 @@ METRICS.push(
       return [fmtR(r, true), s.rCount + ' trade(s)' + (s.rNoRisk ? ' · ' + s.rNoRisk + ' sans risque défini' : ''), cls(r)];
     } },
 );
-const DEFAULT_KPIS = ['equity', 'total', 'today', 'week', 'winDays', 'winTrades', 'best', 'worst', 'maxDd', 'pf'];
+const dec2 = v => v.toFixed(2).replace('.', ',');
+const NO_T = ['—', 'Clique sur Actualiser pour charger le détail de tes trades', ''];
+METRICS.push(
+  { id: 'avgWin', label: 'Profit moyen', help: 'Gain moyen d\'un trade gagnant',
+    f: (d, s) => !s.tHas ? NO_T : [s.tWins.length ? money(s.avgWin, d.currency) : '—', s.tWins.length + ' trades gagnants', 'pos'] },
+  { id: 'avgLoss', label: 'Perte moyenne', help: 'Perte moyenne d\'un trade perdant',
+    f: (d, s) => !s.tHas ? NO_T : [s.tLosses.length ? money(-s.avgLoss, d.currency) : '—', s.tLosses.length + ' trades perdants', 'neg'] },
+  { id: 'nTrades', label: 'Nombre de trades', help: 'Trades clôturés sur la période',
+    f: (d, s) => [nb(s.tHas ? s.tN : s.trades), s.tradeDays.length + ' jours tradés', ''] },
+  { id: 'lots', label: 'Lots', help: 'Volume total tradé (en lots)',
+    f: (d, s) => !s.tHas ? NO_T : [s.lots.toLocaleString('fr-BE', { maximumFractionDigits: 2 }), 'Moyenne ' + (s.tN ? (s.lots / s.tN).toLocaleString('fr-BE', { maximumFractionDigits: 2 }) : '0') + ' lot par trade', ''] },
+  { id: 'sharpe', label: 'Ratio de Sharpe', help: 'Rendement moyen d\'une journée tradée ÷ sa volatilité (non annualisé). Plus il est haut, plus tes gains sont réguliers',
+    f: (d, s) => [s.sharpe == null ? '—' : dec2(s.sharpe), 'Calculé sur ' + s.tradeDays.length + ' jours tradés', ''] },
+  { id: 'rrr', label: 'RRR moyen', help: 'Ratio gain / risque : profit moyen ÷ perte moyenne',
+    f: (d, s) => !s.tHas ? NO_T : [s.avgLoss ? dec2(s.avgWin / s.avgLoss) : '—', 'Profit moyen ÷ perte moyenne', ''] },
+  { id: 'expect', label: 'Valeur attendue', help: 'Ce que rapporte un trade en moyenne (espérance de gain)',
+    f: (d, s) => !s.tHas ? NO_T : [s.tN ? money(s.tNet / s.tN, d.currency, true) : '—', 'Par trade, frais compris', cls(s.tNet)] },
+  { id: 'pfT', label: 'Facteur de profit', help: 'Total des gains ÷ total des pertes, trade par trade. Au-dessus de 1, tu gagnes de l\'argent',
+    f: (d, s) => !s.tHas ? NO_T : [s.tLoss ? dec2(s.tGain / s.tLoss) : (s.tGain ? '∞' : '—'), 'Gains ' + money(s.tGain, d.currency) + ' · Pertes ' + money(s.tLoss, d.currency), ''] },
+);
+const BIG_KPIS = new Set(['equity', 'balance']);
+const DEFAULT_KPIS = ['equity', 'balance', 'winTrades', 'avgWin', 'avgLoss', 'nTrades', 'lots', 'sharpe', 'rrr', 'expect', 'pfT'];
+const KPIS_V = 2; // version de la mise en page par défaut des statistiques
 state.kpis = DEFAULT_KPIS.slice();
 
 function savePrefs() {
-  return api('/api/prefs', { kpis: state.kpis }).catch(e => notice('Choix non enregistré : ' + e.message, true));
+  return api('/api/prefs', { kpis: state.kpis, kpis_v: KPIS_V }).catch(e => notice('Choix non enregistré : ' + e.message, true));
 }
 let toastTimer;
 function toast(msg, undo) {
@@ -1579,11 +1624,12 @@ function renderKpis() {
   for (const id of state.kpis) {
     const m = METRICS.find(x => x.id === id); if (!m) continue;
     const [v, sub, c] = m.f(d, s);
-    const el = document.createElement('div'); el.className = 'kpi'; el.title = m.help + ' — glisser pour déplacer';
+    const el = document.createElement('div'); el.className = 'kpi' + (BIG_KPIS.has(id) ? ' big' : ''); el.title = 'Glisser pour déplacer';
     el.draggable = true; el.dataset.id = id;
     const a = document.createElement('div'); a.className = 'k'; a.textContent = typeof m.label === 'function' ? m.label() : m.label;
+    const ic = document.createElement('span'); ic.className = 'kpi-i'; ic.textContent = 'i'; ic.title = m.help + (sub ? '\n' + sub : ''); a.appendChild(ic);
     const b = document.createElement('div'); b.className = 'v ' + c; b.textContent = v;
-    const e = document.createElement('div'); e.className = 's'; e.textContent = sub;
+    const e = document.createDocumentFragment();
     const x = document.createElement('button'); x.className = 'kpi-x'; x.textContent = '×'; x.title = 'Retirer cette statistique';
     x.draggable = false;
     x.onclick = ev => { ev.stopPropagation(); removeKpi(id); };
@@ -1741,7 +1787,8 @@ $('#customSave').onclick = async () => {
   savePrefs();
 };
 api('/api/prefs').then(p => {
-  if (Array.isArray(p.kpis)) { state.kpis = p.kpis; if (state.data) renderKpis(); }
+  if (Array.isArray(p.kpis) && p.kpis_v === KPIS_V) { state.kpis = p.kpis; if (state.data) renderKpis(); }
+  else if (Array.isArray(p.kpis)) api('/api/prefs', { kpis: state.kpis, kpis_v: KPIS_V }).catch(() => {}); // nouvelle mise en page par défaut
   if (p.heroCur) { state.heroCur = p.heroCur; if (state.data) renderHero(); }
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
   if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
