@@ -266,10 +266,11 @@
   #ecoRange .eco-days button { border: none; margin: 0; padding: 0 13px; border-radius: 7px; font-size: 13px; color: var(--muted); white-space: nowrap; }
   #ecoRange .eco-days button:hover { color: var(--fg); }
   #ecoRange .eco-days button.on { background: var(--gold-soft); color: var(--gold); font-weight: 600; border: none; }
-  .eco-alert-btn { height: 36px; width: 36px; display: inline-grid; place-items: center; padding: 0; }
+  .eco-alert-btn { height: 36px; width: 36px; display: inline-grid; place-items: center; padding: 0; color: var(--gold); border-color: rgba(196,138,69,.6); background: var(--gold-soft); }
+  .eco-alert-btn:hover { border-color: var(--gold); }
+  .eco-alert-btn.on { background: var(--gold); color: #0a0d14; }
   .al-sub { color: var(--muted); margin: 6px 0 0; line-height: 1.5; font-size: 14px; } .al-sub b { color: var(--fg); }
   .alert-modal .key-acts { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
-  .eco-alert-btn.on { color: var(--gold); border-color: var(--gold); }
   .alert-modal { width: min(520px, calc(100vw - 32px)); }
   .alert-modal input[type=email] { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 10px 12px; font: inherit; }
   .alert-modal input[type=email]:focus { outline: none; border-color: var(--gold); }
