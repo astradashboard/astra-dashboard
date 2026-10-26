@@ -2541,6 +2541,32 @@ def api_open_url():
     return jsonify({"ok": True})
 
 
+@app.post("/api/licence/portal")
+def api_licence_portal():
+    """Ouvre l'espace client Creem (changer de carte, résilier) pour la clé de ce PC."""
+    import urllib.error
+    import urllib.request
+
+    lic = _load(LICENCE_FILE, {})
+    if not lic.get("key") or lic.get("owner"):
+        return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    email = lic.get("email") or (_load(PREFS_FILE, {}).get("alerts") or {}).get("email") or ""
+    body = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": email}
+    req = urllib.request.Request(f"{api}/portal", data=json.dumps(body).encode(), method="POST", headers={
+        "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            url = json.loads(r.read().decode("utf-8") or "{}").get("url")
+    except Exception:
+        url = None
+    if not url or not url.startswith("https://"):
+        return jsonify({"error": "Impossible d'ouvrir ton espace client pour le moment. Utilise le lien « gérer mon abonnement » "
+                                 "de l'e-mail de paiement envoyé par Creem, ou écris-nous à astracapital369@gmail.com."}), 502
+    webbrowser.open(url)
+    return jsonify({"ok": True})
+
+
 @app.get("/api/state")
 def api_state():
     accounts, cache = load_accounts(), load_cache()

@@ -17,6 +17,7 @@ export default {
         longueur_cle: apiKey.length, mode: test ? 'TEST' : 'REEL', serveur_creem: base }, { headers: cors });
     }
     if (action === 'notify' && request.method === 'POST') return notify(request, env, base, apiKey, cors);
+    if (action === 'portal' && request.method === 'POST') return portal(request, base, apiKey, cors);
     if (request.method !== 'POST' || !['activate', 'validate', 'deactivate'].includes(action)) {
       return Response.json({ error: 'not found' }, { status: 404, headers: cors });
     }
@@ -93,4 +94,29 @@ async function notify(request, env, base, apiKey, cors) {
       text: `Annonce(s) économique(s) dans 5 minutes :\n${text}\n\nASTRA Dashboard — alertes du calendrier économique.` }) });
   if (!r.ok) return fail('envoi refusé par le service e-mail (' + r.status + ')', 502);
   return Response.json({ ok: true }, { headers: cors });
+}
+
+// ---------- lien vers l'espace client Creem (gérer / annuler l'abonnement) ----------
+async function portal(request, base, apiKey, cors) {
+  const fail = (error, status = 400) => Response.json({ error }, { status, headers: cors });
+  let body; try { body = await request.json(); } catch { return fail('bad request'); }
+  const key = String(body.key || '').trim().slice(0, 200);
+  if (!key) return fail('clé de licence manquante', 401);
+  const H = { 'x-api-key': apiKey, 'Content-Type': 'application/json', accept: 'application/json' };
+  const r = await fetch(`${base}/v1/licenses/validate`, { method: 'POST', headers: H,
+    body: JSON.stringify({ key, instance_id: String(body.instance_id || '').slice(0, 100) }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.status) return fail('clé de licence inconnue', 404);
+  let cid = (d.customer && (d.customer.id || (typeof d.customer === 'string' ? d.customer : null))) || d.customer_id || null;
+  const email = String(body.email || '').trim().slice(0, 200);
+  if (!cid && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    const c = await fetch(`${base}/v1/customers?email=${encodeURIComponent(email)}`, { headers: H });
+    const cj = await c.json().catch(() => ({}));
+    cid = cj.id || (cj.customer && cj.customer.id) || null;
+  }
+  if (!cid) return fail('client introuvable', 404);
+  const b = await fetch(`${base}/v1/customers/billing`, { method: 'POST', headers: H, body: JSON.stringify({ customer_id: cid }) });
+  const bj = await b.json().catch(() => ({}));
+  if (!b.ok || !bj.customer_portal_link) return fail('lien indisponible', 502);
+  return Response.json({ url: bj.customer_portal_link }, { headers: cors });
 }

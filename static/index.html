@@ -2562,7 +2562,7 @@ const HELP_KB = [
     a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
   { q: 'Comment annuler mon abonnement ?', k: 'changer offre resilier annuler annulation arreter stopper abonnement gerer facture remboursement desabonner engagement',
     alt: ['changer d\'offre ou résilier', 'je veux résilier', 'comment me désabonner', 'y a-t-il un engagement', 'arrêter mon abonnement'],
-    a: 'Depuis le lien **gérer mon abonnement** de l\'e-mail de confirmation envoyé par **Creem**, ou en nous écrivant. **Sans engagement** : l\'accès reste ouvert jusqu\'à la fin de la période payée.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Rejoindre la communauté', 'discord']] },
+    a: 'Dans **Tarification**, clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Voir les offres', 'offres'], ['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
     a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
   { q: 'Je peux l\'utiliser sur plusieurs PC ?', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable plusieurs deux 2 machine',
@@ -2732,8 +2732,15 @@ async function renderOffres() {
     tx.appendChild(el('div', null, parts.join(' · ')));
     if (lic.error) tx.appendChild(el('div', null, lic.error));
     const acts = el('div', 'acts');
-    if (!lic.owner && !lic.trial && offresData.portal_url) {
-      const g = el('button', 'btn', 'Gérer mon abonnement'); g.type = 'button'; g.onclick = () => openPay(offresData.portal_url); acts.appendChild(g);
+    if (!lic.owner && !lic.trial) {
+      const g = el('button', 'btn', 'Gérer / annuler mon abonnement'); g.type = 'button';
+      g.onclick = async () => {
+        g.disabled = true; const t0 = g.textContent; g.textContent = 'Ouverture…';
+        try { await api('/api/licence/portal', {}); toast('Ton espace client Creem s\'ouvre dans ton navigateur.'); }
+        catch (e) { notice(e.message, true); }
+        g.disabled = false; g.textContent = t0;
+      };
+      acts.appendChild(g);
     }
     const v = el('button', 'btn', 'Vérifier'); v.type = 'button';
     v.onclick = async () => { v.disabled = true; await refreshLicence(true); v.disabled = false; toast(licOk() ? 'Abonnement vérifié.' : 'Abonnement inactif.'); };
