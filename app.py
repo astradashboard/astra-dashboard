@@ -2578,7 +2578,10 @@ def api_licence_change():
             msg = json.loads(e.read().decode("utf-8") or "{}").get("error")
         except Exception:
             msg = None
-        return jsonify({"error": f"Changement impossible : {msg or 'erreur ' + str(e.code)}."}), 502
+        if msg and "discount" in msg.lower():
+            return jsonify({"error": "Changement impossible : ton abonnement a une réduction (code promo) en cours. Creem n'autorise pas le changement "
+                                     "d'offre tant qu'elle est active. Écris-nous à astracapital369@gmail.com et on le fait pour toi."}), 409
+        return jsonify({"error": f"Changement impossible : {(msg or 'erreur ' + str(e.code)).rstrip('.')}."}), 502
     except Exception:
         return jsonify({"error": "Changement impossible pour le moment (pas de connexion ?)."}), 502
     with _lic_lock:
