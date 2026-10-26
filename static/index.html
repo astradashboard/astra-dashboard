@@ -731,6 +731,10 @@
     display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .of-active[hidden] { display: none; }
   #abo { max-width: 980px; margin: 0 auto; }
+  #share { max-width: 1120px; margin: 0 auto; } .share-head img { display: none; }
+  #shareHost .modal.card-modal { max-width: none; max-height: none; overflow: visible; margin: 0; }
+  #shareHost #cardClose, #shareHost .card-side > h2, #shareHost .card-side > .sub { display: none; }
+  .share-empty { text-align: center; color: var(--muted); padding: 60px 20px; }
   .abo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 22px; }
   .abo-grid .it { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
   .abo-grid .it small { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 4px; }
@@ -832,6 +836,7 @@
       </div>
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
+      <button data-page="share"><span class="ic">⇪</span><span class="nav-t">Partager mes résultats</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
       <button data-page="abo" class="nav-abo" id="navAbo" hidden><span class="ic">⚙</span><span class="nav-t">Gérer mon abonnement</span></button>
     </nav>
@@ -850,7 +855,6 @@
         <p id="subtitle"></p>
       </div>
       <div class="actions">
-        <button class="btn" id="shareBtn" title="Créer une image de tes résultats à poster (TikTok, Instagram…)">Partager mes résultats</button>
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
@@ -1083,6 +1087,15 @@
         <span><b>Accès immédiat</b> : ta clé arrive par e-mail</span>
       </div>
       <div class="of-community" id="ofCommunity"><span>Une question avant de t'abonner ? Rejoins la communauté :</span></div>
+    </div>
+
+    <div id="share" hidden>
+      <div class="of-head share-head">
+        <h1>Partager mes résultats</h1>
+        <p>Crée une image de tes résultats, prête à poster sur TikTok, Instagram ou dans ton groupe.</p>
+      </div>
+      <div class="share-empty" id="shareEmpty" hidden>Ajoute d'abord un compte pour créer une carte de résultats.</div>
+      <div id="shareHost"></div>
     </div>
 
     <div id="abo" hidden>
@@ -2432,13 +2445,21 @@ function cardOptions() {
 }
 function openCard() {
   if (!hasPerk('cards')) return perkUpsell('Les cartes de résultats');
+  if (state.page !== 'share') { state.page = 'share'; showPage(); window.scrollTo(0, 0); return; }
   if (!state.data) return;
   state.card.hideAcc = state.mask || state.card.hideAcc;
   state.card.calView = null;
   $('#cardHandle').value = state.card.handle; $('#cardHideAcc').checked = state.card.hideAcc;
-  $('#cardBg').classList.add('open');
   const go = () => cardOptions();
   if (cardLogo.complete) go(); else cardLogo.onload = go;
+}
+function renderShare() {
+  const host = $('#shareHost'), m = document.querySelector('.modal.card-modal');
+  if (m && m.parentElement !== host) host.appendChild(m);
+  if (!hasPerk('cards')) { perkUpsell('Les cartes de résultats'); return; }
+  const ok = state.accounts.length > 0 && !!state.data;
+  $('#shareEmpty').hidden = ok; host.hidden = !ok;
+  if (ok) openCard();
 }
 function saveCardPrefs() { api('/api/prefs', { card: { mode: state.card.mode, format: state.card.format, handle: state.card.handle, hideAcc: state.card.hideAcc, qr: state.card.qr, qrSrc: state.card.qrSrc, links: state.card.links } }).catch(() => {}); }
 $('#cardLink').oninput = e => {
@@ -2553,7 +2574,6 @@ $('#cardCopy').onclick = () => $('#cardCanvas').toBlob(async b => {
   try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('Image copiée : colle-la où tu veux (Ctrl+V).'); }
   catch (e) { toast('Copie impossible ici : utilise « Enregistrer l\'image ».'); }
 }, 'image/png');
-$('#shareBtn').onclick = openCard;
 api('/api/prefs').then(p => { if (p.card && typeof p.card === 'object') Object.assign(state.card, {
   mode: ['both', 'pct', 'r'].includes(p.card.mode) ? p.card.mode : 'both', format: CARD_FORMATS[p.card.format] ? p.card.format : 'post',
   handle: String(p.card.handle || '').slice(0, 30), hideAcc: !!p.card.hideAcc, qr: p.card.qr !== false, qrSrc: p.card.qrSrc === 'link' ? 'link' : 'details',
@@ -2590,7 +2610,7 @@ const HELP_KB = [
   { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document',
     a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois, regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Partager mes résultats sur TikTok / Instagram', k: 'partager carte image tiktok instagram reseaux post story publier resultats photo',
-    a: 'Clique sur **Partager mes résultats** en haut du tableau de bord : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
+    a: 'Ouvre **Partager mes résultats** dans le menu de gauche : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',
     a: 'Dans **Partager mes résultats**, coche « Afficher un QR code ». Avec **Détails des trades**, le QR ouvre une page qui montre le résumé et le détail de chaque position (date, symbole, sens, lots, entrée, sortie, résultat), dans la même unité que la carte. Avec **Mon lien**, il ouvre le lien de ton choix, par exemple ta page Myfxbook.' },
   { q: 'Le score de discipline', k: 'score discipline jauge regle stop loss surtrading revenge perte journaliere lot taille note',
@@ -2683,7 +2703,7 @@ function helpSearch(text) {
 const HELP_ACTS = {
   add: () => openLogin(), custom: () => { state.page = 'dash'; showPage(); setTimeout(() => $('#customBtn').click(), 50); },
   offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
-  eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'dash'; showPage(); openCard(); },
+  eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'share'; showPage(); window.scrollTo(0, 0); },
   abo: () => { state.page = licOk() && state.lic && state.lic.key_hint && !state.lic.trial ? 'abo' : 'offres'; showPage(); window.scrollTo(0, 0); },
   discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'), login: () => openKey(),
 };
@@ -3008,9 +3028,11 @@ function showPage() {
   $('#eco').hidden = state.page !== 'eco';
   $('#offres').hidden = state.page !== 'offres';
   $('#abo').hidden = state.page !== 'abo';
-  if (state.page === 'offres' || state.page === 'abo') { $('#content').hidden = true; $('#journal').hidden = true; }
-  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo'].includes(state.page) ? 'none' : '';
-  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo'].includes(state.page);
+  $('#share').hidden = state.page !== 'share';
+  if (['offres', 'abo', 'share'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
+  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share'].includes(state.page) ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo', 'share'].includes(state.page);
+  if (state.page === 'share') renderShare();
   if (state.page === 'offres' || state.page === 'abo') renderOffres();
   if (state.page === 'journal' && hasAcc) renderJournal();
   if (state.page === 'eco') { renderEco(true); loadNews(); }
