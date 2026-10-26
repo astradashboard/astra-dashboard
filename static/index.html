@@ -720,6 +720,14 @@
   .of-active { background: var(--panel); border: 1px solid rgba(34,197,94,.45); border-radius: 16px; padding: 18px 22px; margin-bottom: 26px;
     display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .of-active[hidden] { display: none; }
+  #abo { max-width: 980px; margin: 0 auto; }
+  .abo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .abo-grid .it { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .abo-grid .it small { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 4px; }
+  .abo-grid .it b { font-size: 16px; }
+  .abo-help { padding: 18px 22px; } .abo-help h3 { margin: 0 0 8px; } .abo-help p { color: var(--muted); margin: 6px 0; line-height: 1.55; } .abo-help b { color: var(--fg); }
+  .abo-help a { color: var(--gold); }
+  #ofKeyBox { margin: 0 0 26px; } #ofKeyBox[hidden], #navAbo[hidden] { display: none; }
   .of-active .st { width: 40px; height: 40px; border-radius: 50%; background: rgba(34,197,94,.14); color: var(--win); display: grid; place-items: center; font-weight: 800; font-size: 18px; flex: none; }
   .of-active .tx { flex: 1; min-width: 220px; }
   .of-active .tx b { font-size: 15.5px; }
@@ -806,6 +814,7 @@
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
+      <button data-page="abo" class="nav-abo" id="navAbo" hidden><span class="ic">⚙</span><span class="nav-t">Gérer mon abonnement</span></button>
     </nav>
     <div class="spacer"></div>
     <div class="social" id="socialBox">
@@ -1033,18 +1042,6 @@
         <h1>Tarification</h1>
         <p>Ton dashboard de trading complet : capital, résultats, journal, suivi en direct et calendrier économique.</p>
       </div>
-      <div class="of-active" id="ofActive" hidden></div>
-      <div class="of-billing"><div class="seg" id="ofBilling">
-        <button type="button" data-v="month">Mensuel</button>
-        <button type="button" data-v="year">Annuel <span class="of-save" id="ofSave">−20 %</span></button>
-      </div></div>
-      <div class="of-plans" id="ofPlans"></div>
-      <div class="of-trust">
-        <span><b>Sans engagement</b> · résiliable à tout moment</span>
-        <span><b>Paiement sécurisé</b> par carte, Apple Pay ou PayPal</span>
-        <span><b>Essai gratuit 7 jours</b> sans carte bancaire</span>
-        <span><b>Accès immédiat</b> : ta clé arrive par e-mail</span>
-      </div>
       <div class="card of-key" id="ofKeyBox">
         <div>
           <h3>Déjà abonné ?</h3>
@@ -1056,7 +1053,33 @@
         </form>
         <div class="of-key-err" id="ofKeyErr"></div>
       </div>
+      <div class="of-billing"><div class="seg" id="ofBilling">
+        <button type="button" data-v="month">Mensuel</button>
+        <button type="button" data-v="year">Annuel <span class="of-save" id="ofSave">−20 %</span></button>
+      </div></div>
+      <div class="of-plans" id="ofPlans"></div>
+      <div class="of-trust">
+        <span><b>Sans engagement</b> · résiliable à tout moment</span>
+        <span><b>Paiement sécurisé</b> par carte, Apple Pay ou PayPal</span>
+        <span><b>Essai gratuit 7 jours</b> sans carte bancaire</span>
+        <span><b>Accès immédiat</b> : ta clé arrive par e-mail</span>
+      </div>
       <div class="of-community" id="ofCommunity"><span>Une question avant de t'abonner ? Rejoins la communauté :</span></div>
+    </div>
+
+    <div id="abo" hidden>
+      <div class="of-head">
+        <img class="of-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
+        <h1>Gérer mon abonnement</h1>
+        <p>Ton offre, ta clé de licence et la gestion de ton abonnement.</p>
+      </div>
+      <div class="of-active" id="ofActive" hidden></div>
+      <div class="abo-grid" id="aboInfo"></div>
+      <div class="card abo-help">
+        <h3>Résilier ou changer de carte</h3>
+        <p>Clique sur <b>Gérer / annuler mon abonnement</b> : ton espace client Creem s'ouvre dans ton navigateur, sans mot de passe. Choisis ton abonnement puis <b>Manage Subscription</b> pour changer de carte ou <b>Cancel Subscription</b> pour résilier. Sans engagement.</p>
+        <p>Pour changer d'offre (Essentiel ↔ Pro), passe par la page <a href="#" id="aboToOffres">Tarification</a> ou écris-nous.</p>
+      </div>
     </div>
 
     <div class="empty-state" id="emptyState" hidden>
@@ -2562,7 +2585,7 @@ const HELP_KB = [
     a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
   { q: 'Comment annuler mon abonnement ?', k: 'changer offre resilier annuler annulation arreter stopper abonnement gerer facture remboursement desabonner engagement',
     alt: ['changer d\'offre ou résilier', 'je veux résilier', 'comment me désabonner', 'y a-t-il un engagement', 'arrêter mon abonnement'],
-    a: 'Dans **Tarification**, clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Voir les offres', 'offres'], ['Rejoindre la communauté', 'discord']] },
+    a: 'Dans le menu de gauche, ouvre **Gérer mon abonnement** puis clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Gérer mon abonnement', 'abo'], ['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
     a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
   { q: 'Je peux l\'utiliser sur plusieurs PC ?', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable plusieurs deux 2 machine',
@@ -2615,6 +2638,7 @@ const HELP_ACTS = {
   add: () => openLogin(), custom: () => { state.page = 'dash'; showPage(); setTimeout(() => $('#customBtn').click(), 50); },
   offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
   eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'dash'; showPage(); openCard(); },
+  abo: () => { state.page = licOk() && state.lic && state.lic.key_hint && !state.lic.trial ? 'abo' : 'offres'; showPage(); window.scrollTo(0, 0); },
   discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'), login: () => openKey(),
 };
 function helpBubble(who, text, acts, sugg) {
@@ -2704,7 +2728,8 @@ state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
 function perkUpsell(what) { toast(what + ' est inclus dans l\'offre Pro.'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
-function applyLock() { document.body.classList.toggle('locked', !licOk()); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
+function syncAboNav() { const l = state.lic || {}, show = !!(l.key_hint && !l.trial); $('#navAbo').hidden = !show; if (!show && state.page === 'abo') { state.page = 'offres'; showPage(); } }
+function applyLock() { document.body.classList.toggle('locked', !licOk()); syncAboNav(); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
 function licenceLost() {
   if (state.lic && !state.lic.active) return;
   state.lic = Object.assign({}, state.lic || {}, { active: false });
@@ -2753,6 +2778,17 @@ async function renderOffres() {
     box.append(el('div', 'st', lic.active ? '✓' : '!'), tx, acts);
   } else box.hidden = true;
   $('#ofKeyBox').hidden = !!lic.active && !lic.trial;
+  // page « Gérer mon abonnement » : détails
+  const info = $('#aboInfo'); info.innerHTML = '';
+  if (lic.key_hint && !lic.trial) {
+    const it = (k, v) => { const d = el('div', 'it'); d.append(el('small', null, k), el('b', null, v)); info.appendChild(d); };
+    it('Offre', lic.owner ? 'Propriétaire' : (lic.plan_name || '—'));
+    it('Statut', lic.active ? 'Actif' : 'Inactif');
+    it('Comptes', lic.owner ? 'Illimités' : (lic.real_accounts || 0) + ' / ' + (lic.max_accounts || 1));
+    if (lic.renews_at && !lic.owner) it(lic.active ? 'Prochain renouvellement' : 'Expiré le', fmtLicDay(lic.renews_at));
+    if (lic.email) it('E-mail', lic.email);
+    it('Clé de licence', lic.key_hint);
+  }
   // mensuel / annuel
   document.querySelectorAll('#ofBilling button').forEach(b => {
     b.classList.toggle('on', b.dataset.v === state.ofBilling);
@@ -2841,6 +2877,7 @@ async function activateKey(key) {
   await api('/api/licence', { key });
   await refreshLicence(); toast('Application débloquée, bienvenue !');
 }
+$('#aboToOffres').onclick = e => { e.preventDefault(); state.page = 'offres'; showPage(); window.scrollTo(0, 0); };
 function syncLoginBtn() {
   const b = $('#loginKeyBtn'), lic = state.lic || {};
   b.classList.toggle('on', licOk());
@@ -2897,16 +2934,17 @@ function showPage() {
   $('#journal').hidden = !hasAcc || state.page !== 'journal';
   $('#eco').hidden = state.page !== 'eco';
   $('#offres').hidden = state.page !== 'offres';
-  if (state.page === 'offres') { $('#content').hidden = true; $('#journal').hidden = true; }
-  document.querySelector('header.top').style.display = state.page === 'eco' || state.page === 'offres' ? 'none' : '';
-  $('#emptyState').hidden = hasAcc || state.page === 'eco' || state.page === 'offres';
-  if (state.page === 'offres') renderOffres();
+  $('#abo').hidden = state.page !== 'abo';
+  if (state.page === 'offres' || state.page === 'abo') { $('#content').hidden = true; $('#journal').hidden = true; }
+  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo'].includes(state.page) ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo'].includes(state.page);
+  if (state.page === 'offres' || state.page === 'abo') renderOffres();
   if (state.page === 'journal' && hasAcc) renderJournal();
   if (state.page === 'eco') { renderEco(true); loadNews(); }
 }
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
-  if (!licOk() && b.dataset.page !== 'offres') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
+  if (!licOk() && b.dataset.page !== 'offres' && b.dataset.page !== 'abo') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
   state.page = b.dataset.page; state.jTrade = null;
   if (state.page === 'journal' && state.sel === 'all' && state.accounts.length) {
     state.sel = state.accounts[0].login; state.month = null; state.view = null; renderAccounts(); loadData();
