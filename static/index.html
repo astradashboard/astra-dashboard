@@ -727,6 +727,9 @@
   .abo-grid .it b { font-size: 16px; }
   .abo-help { padding: 18px 22px; } .abo-help h3 { margin: 0 0 8px; } .abo-help p { color: var(--muted); margin: 6px 0; line-height: 1.55; } .abo-help b { color: var(--fg); }
   .abo-help a { color: var(--gold); }
+  .abo-mail { margin: 0 0 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; } .abo-mail label { color: var(--muted); font-size: 13px; }
+  .abo-mail input { flex: 1; min-width: 220px; max-width: 360px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 9px 12px; font: inherit; }
+  .abo-mail input:focus { outline: none; border-color: var(--gold); }
   .abo-change { padding: 18px 22px; margin-bottom: 22px; } .abo-change h3 { margin: 0 0 6px; }
   .abo-ch-sub { color: var(--muted); margin: 0 0 14px; line-height: 1.5; font-size: 13.5px; }
   .abo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
@@ -1084,6 +1087,7 @@
       <div class="card abo-change" id="aboChange">
         <h3>Changer d'offre</h3>
         <p class="abo-ch-sub">Passe à l'offre ou à la formule qui te convient. Le changement est immédiat : la différence est calculée au prorata du temps restant (facturée si l'offre est plus chère, remboursée si elle l'est moins).</p>
+        <div class="abo-mail" id="aboMailRow" hidden><label for="aboMail">E-mail utilisé pour ton achat</label><input id="aboMail" type="email" placeholder="toi@exemple.com" autocomplete="email"></div>
         <div class="abo-opts" id="aboOpts"></div>
         <div class="al-err" id="aboErr"></div>
       </div>
@@ -2773,7 +2777,9 @@ async function renderOffres() {
       const g = el('button', 'btn', 'Gérer / annuler mon abonnement'); g.type = 'button';
       g.onclick = async () => {
         g.disabled = true; const t0 = g.textContent; g.textContent = 'Ouverture…';
-        try { await api('/api/licence/portal', {}); toast('Ton espace client Creem s\'ouvre dans ton navigateur.'); }
+        let mail = lic.email || ($('#aboMail') && $('#aboMail').value.trim());
+        if (!mail) { state.page = 'abo'; showPage(); $('#aboMail').focus(); notice('Indique l\'e-mail utilisé pour ton achat (bloc « Changer d\'offre »), puis reclique sur le bouton.', true); g.disabled = false; g.textContent = t0; return; }
+        try { await api('/api/licence/portal', { email: mail }); toast('Ton espace client Creem s\'ouvre dans ton navigateur.'); refreshLicence(); }
         catch (e) { notice(e.message, true); }
         g.disabled = false; g.textContent = t0;
       };
@@ -2801,6 +2807,7 @@ async function renderOffres() {
     if (lic.email) it('E-mail', lic.email);
     it('Clé de licence', lic.key_hint);
   }
+  $('#aboMailRow').hidden = !!lic.email || !(lic.key_hint && !lic.trial && !lic.owner);
   const opts = $('#aboOpts'); opts.innerHTML = ''; $('#aboChange').hidden = !(lic.key_hint && !lic.trial && !lic.owner && lic.active);
   if (!$('#aboChange').hidden) {
     for (const p of (offresData.plans || []).filter(p => !p.trial)) {
@@ -2817,7 +2824,8 @@ async function renderOffres() {
         b.onclick = async () => {
           if (!armed) { armed = true; b.textContent = 'Confirmer le changement ?'; setTimeout(() => { if (armed) { armed = false; b.textContent = 'Passer à cette offre'; } }, 4000); return; }
           armed = false; b.disabled = true; b.textContent = 'Changement en cours…'; $('#aboErr').textContent = '';
-          try { const r = await api('/api/licence/change', { plan: p.id, period: per }); if (r.licence) state.lic = r.licence; applyLock(); renderOffres(); toast('Offre changée : ' + p.name + (per === 'year' ? ' annuel' : ' mensuel') + '.'); }
+          const mail = $('#aboMail').value.trim(); if (!lic.email && !mail) { $('#aboErr').textContent = 'Indique d\'abord l\'e-mail utilisé pour ton achat.'; $('#aboMail').focus(); b.disabled = false; b.textContent = 'Passer à cette offre'; return; }
+          try { const r = await api('/api/licence/change', { plan: p.id, period: per, email: mail }); if (r.licence) state.lic = r.licence; applyLock(); renderOffres(); toast('Offre changée : ' + p.name + (per === 'year' ? ' annuel' : ' mensuel') + '.'); }
           catch (e) { $('#aboErr').textContent = e.message; b.disabled = false; b.textContent = 'Passer à cette offre'; }
         };
         o.appendChild(b); opts.appendChild(o);

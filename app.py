@@ -2563,7 +2563,11 @@ def api_licence_change():
     if not product:
         return jsonify({"error": "Cette offre n'est pas encore disponible."}), 400
     api = (load_offers().get("licence_api") or "").rstrip("/")
-    payload = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": lic.get("email") or "", "product_id": product}
+    email = str(body.get("email") or lic.get("email") or "").strip()[:200]
+    if not email:
+        return jsonify({"error": "Indique l'e-mail utilisé pour ton achat.", "need_email": True}), 400
+    payload = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": email, "product_id": product,
+               "current_product": lic.get("sub_product") or ""}
     req = urllib.request.Request(f"{api}/change", data=json.dumps(payload).encode(), method="POST", headers={
         "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
     try:
@@ -2580,6 +2584,7 @@ def api_licence_change():
     with _lic_lock:
         lic = _load(LICENCE_FILE, {})
         lic["sub_product"] = res.get("product_id") or product
+        lic["email"] = email
         lic.update(plan=plan.get("id"), plan_name=plan.get("name"), max_accounts=int(plan.get("accounts", 1)), period=period)
         _save(LICENCE_FILE, lic)
     return jsonify({"ok": True, "licence": _lic_public(licence(force=True))})
@@ -2595,15 +2600,31 @@ def api_licence_portal():
     if not lic.get("key") or lic.get("owner"):
         return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
     api = (load_offers().get("licence_api") or "").rstrip("/")
-    email = lic.get("email") or (_load(PREFS_FILE, {}).get("alerts") or {}).get("email") or ""
-    body = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": email}
+    email = str((request.get_json(silent=True) or {}).get("email") or lic.get("email") or "").strip()[:200]
+    if not email:
+        return jsonify({"error": "Indique l'e-mail utilisé pour ton achat.", "need_email": True}), 400
+    body = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": email, "current_product": lic.get("sub_product") or ""}
     req = urllib.request.Request(f"{api}/portal", data=json.dumps(body).encode(), method="POST", headers={
         "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    msg = None
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=60) as r:
             url = json.loads(r.read().decode("utf-8") or "{}").get("url")
+    except urllib.error.HTTPError as e:
+        url = None
+        try:
+            msg = json.loads(e.read().decode("utf-8") or "{}").get("error")
+        except Exception:
+            pass
     except Exception:
         url = None
+    if url and url.startswith("https://"):
+        with _lic_lock:
+            lic = _load(LICENCE_FILE, {})
+            lic["email"] = email
+            _save(LICENCE_FILE, lic)
+    if msg and not url:
+        return jsonify({"error": f"Impossible d'ouvrir ton espace client : {msg}."}), 502
     if not url or not url.startswith("https://"):
         return jsonify({"error": "Impossible d'ouvrir ton espace client pour le moment. Utilise le lien « gérer mon abonnement » "
                                  "de l'e-mail de paiement envoyé par Creem, ou écris-nous à astracapital369@gmail.com."}), 502
