@@ -266,6 +266,22 @@
   #ecoRange .eco-days button { border: none; margin: 0; padding: 0 13px; border-radius: 7px; font-size: 13px; color: var(--muted); white-space: nowrap; }
   #ecoRange .eco-days button:hover { color: var(--fg); }
   #ecoRange .eco-days button.on { background: var(--gold-soft); color: var(--gold); font-weight: 600; border: none; }
+  .eco-alert-btn { height: 36px; width: 36px; display: inline-grid; place-items: center; padding: 0; }
+  .al-sub { color: var(--muted); margin: 6px 0 0; line-height: 1.5; font-size: 14px; } .al-sub b { color: var(--fg); }
+  .alert-modal .key-acts { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
+  .eco-alert-btn.on { color: var(--gold); border-color: var(--gold); }
+  .alert-modal { width: min(520px, calc(100vw - 32px)); }
+  .alert-modal input[type=email] { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .alert-modal input[type=email]:focus { outline: none; border-color: var(--gold); }
+  .al-lab { display: block; color: var(--muted); font-size: 12.5px; margin: 16px 0 6px; }
+  .al-imp { display: inline-flex; height: 36px; } .al-imp button { padding: 0 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; } .al-imp button.on { color: var(--gold); }
+  .al-note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; line-height: 1.5; }
+  .al-err { color: var(--loss); font-size: 13px; margin-top: 10px; min-height: 0; } .al-ok { color: var(--win); font-size: 13px; margin-top: 6px; }
+  .al-switch { display: flex; align-items: center; gap: 12px; margin-top: 16px; cursor: pointer; font-weight: 600; }
+  .al-switch input { display: none; }
+  .al-switch .sw { width: 40px; height: 22px; border-radius: 12px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+  .al-switch .sw::after { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .al-switch input:checked + .sw { background: var(--gold); } .al-switch input:checked + .sw::after { transform: translateX(18px); }
   .eco-line-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .eco-line-tools .seg { height: 36px; box-sizing: border-box; align-items: stretch; }
   .eco-line-tools .seg button { display: inline-flex; align-items: center; gap: 6px; }
@@ -982,6 +998,7 @@
             <button type="button" data-imp="1" title="3 étoiles seulement"><span class="bulls b3"><i></i></span></button>
           </div>
           <label class="eco-tz" title="Fuseau horaire des heures affichées"><select id="ecoTz"></select></label>
+          <button type="button" class="btn eco-alert-btn" id="ecoAlertBtn" title="Recevoir un e-mail 5 minutes avant les annonces"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
         </div>
       </div>
       <div class="card eco-card">
@@ -1097,6 +1114,27 @@
       <div class="key-acts"><button class="btn ghost" type="button" id="keyClose">Annuler</button><button class="btn primary" type="submit" id="keyGo">Se connecter</button></div>
     </form>
     <div class="key-foot">Pas encore de clé ? <a href="#" id="keyOffers">Voir les offres et l'essai gratuit</a></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="alertBg">
+  <div class="modal alert-modal">
+    <h2>Alertes des annonces économiques</h2>
+    <p class="al-sub">Reçois un <b>e-mail 5 minutes avant</b> chaque annonce importante, pour ne jamais te faire surprendre en position.</p>
+    <label class="al-switch"><input type="checkbox" id="alertOn"><span class="sw"></span><span>Activer les alertes par e-mail</span></label>
+    <label class="al-lab" for="alertEmail">Adresse e-mail</label>
+    <input id="alertEmail" type="email" placeholder="toi@exemple.com" autocomplete="email">
+    <div class="al-lab">Annonces concernées</div>
+    <div class="seg al-imp" id="alertImp">
+      <button type="button" data-imp="1"><span class="bulls b3"><i></i></span> Fort impact</button>
+      <button type="button" data-imp="0,1"><span class="bulls b2"><i></i></span> Moyen et fort</button>
+      <button type="button" data-imp="-1,0,1">Toutes</button>
+    </div>
+    <p class="al-note">Zones suivies : celles choisies dans le calendrier (<span id="alertZones"></span>). L'app doit être ouverte sur ton PC pour envoyer les alertes.</p>
+    <div class="al-err" id="alertErr"></div>
+    <div class="al-ok" id="alertOk"></div>
+    <div class="key-acts"><button class="btn ghost" type="button" id="alertTest">Tester</button><span style="flex:1"></span>
+      <button class="btn ghost" type="button" id="alertClose">Fermer</button><button class="btn primary" type="button" id="alertSave">Enregistrer</button></div>
   </div>
 </div>
 
@@ -2493,6 +2531,9 @@ const HELP_KB = [
     a: 'À droite des graphiques TradingView : les cours de ton broker toutes les 2 secondes, classés par **onglets** (Indices, Matières premières, Actions…). Le bouton **⋮** choisit les onglets affichés (4 maximum), **⚙** les marchés de l\'onglet. **Clique sur une ligne** pour voir son graphique (1J à Max), **glisse-la** pour changer l\'ordre. L\'horloge est **verte** si le marché est ouvert, **rouge** s\'il est fermé.' },
   { q: 'Le calendrier économique', k: 'calendrier economique annonce annonces nfp cpi fed bce etoile importance zone pays fuseau horaire',
     a: 'Page **Calendrier économique** : choisis le jour ou la semaine, l\'**importance** (toutes, 2 étoiles et plus, 3 étoiles), les **zones** (menu Zones) et le **fuseau horaire**. Tes choix sont gardés.', act: [['Ouvrir le calendrier', 'eco']] },
+  { q: 'Recevoir une alerte avant une annonce', k: 'alerte alertes notification notifications mail email e-mail prevenir rappel avant annonce 5 minutes cloche',
+    alt: ['comment activer les notifications', 'être prévenu avant une annonce', 'recevoir un mail avant le nfp'],
+    a: 'Dans le **Calendrier économique**, clique sur **Alertes** (la cloche). Active les alertes, indique ton **e-mail** et choisis les annonces concernées (fort impact, moyen et fort, ou toutes). Tu reçois un e-mail **5 minutes avant** chaque annonce des zones choisies dans le calendrier. L\'app doit être ouverte sur ton PC. Inclus dans les abonnements **Essentiel** et **Pro**.', act: [['Ouvrir le calendrier', 'eco']] },
   { q: 'Les actualités économiques', k: 'actualite actualites article news presse theme crypto europe asie recherche',
     a: 'Sous le calendrier économique : coche les **thèmes** (US, Europe, Asie, Australie, Crypto) et utilise la **recherche** (ex. « BCE », « pétrole »). Clique sur un article pour l\'ouvrir.', act: [['Voir les actualités', 'eco']] },
   { q: 'Masquer mes numéros de compte', k: 'masquer cacher numero compte confidentiel video capture anonyme',
@@ -2619,6 +2660,43 @@ $('#helpFab').onclick = () => toggleHelp();
 $('#helpClose').onclick = () => toggleHelp(false);
 $('#helpForm').onsubmit = e => { e.preventDefault(); const v = $('#helpInput').value; $('#helpInput').value = ''; helpAsk(v); };
 function syncHelpFab() { $('#helpFab').hidden = !licOk(); if (!licOk()) $('#helpPanel').hidden = true; }
+
+// ---------- alertes e-mail des annonces économiques ----------
+state.alerts = { on: false, email: '', imp: [1] };
+function syncAlertBtn() { $('#ecoAlertBtn').classList.toggle('on', !!state.alerts.on); $('#ecoAlertBtn').title = state.alerts.on ? 'Alertes e-mail activées (' + state.alerts.email + ')' : 'Recevoir un e-mail 5 minutes avant les annonces'; }
+let alertImp = '1';
+function renderAlertImp() { document.querySelectorAll('#alertImp button').forEach(b => b.classList.toggle('on', b.dataset.imp === alertImp)); }
+async function openAlerts() {
+  $('#alertErr').textContent = ''; $('#alertOk').textContent = '';
+  try { state.alerts = await api('/api/alerts'); } catch (e) {}
+  $('#alertOn').checked = !!state.alerts.on; $('#alertEmail').value = state.alerts.email || (state.lic && state.lic.email) || '';
+  alertImp = (state.alerts.imp || [1]).slice().sort().join(',') || '1'; renderAlertImp();
+  $('#alertZones').textContent = ECO_COUNTRIES.filter(c => state.eco.countries.includes(c[0])).map(c => c[1] + ' ' + c[2]).join(', ') || 'États-Unis';
+  if (state.alerts.allowed === false) $('#alertErr').textContent = 'Les alertes e-mail sont incluses dans les abonnements Essentiel et Pro.';
+  else if (state.alerts.last_error) $('#alertErr').textContent = 'Dernière erreur : ' + state.alerts.last_error;
+  if (state.alerts.last_sent) $('#alertOk').textContent = 'Dernière alerte envoyée le ' + state.alerts.last_sent + '.';
+  $('#alertBg').classList.add('open');
+}
+$('#ecoAlertBtn').onclick = openAlerts;
+$('#alertClose').onclick = () => $('#alertBg').classList.remove('open');
+document.querySelectorAll('#alertImp button').forEach(b => b.onclick = () => { alertImp = b.dataset.imp; renderAlertImp(); });
+$('#alertSave').onclick = async () => {
+  $('#alertErr').textContent = ''; $('#alertOk').textContent = '';
+  const email = $('#alertEmail').value.trim(), on = $('#alertOn').checked;
+  if (on && !email) { $('#alertErr').textContent = 'Indique ton adresse e-mail.'; return; }
+  try {
+    state.alerts = await api('/api/alerts', { on, email, imp: alertImp.split(',').map(Number) });
+    syncAlertBtn(); $('#alertBg').classList.remove('open');
+    toast(state.alerts.on ? 'Alertes activées : un e-mail 5 minutes avant chaque annonce.' : 'Alertes e-mail désactivées.');
+  } catch (e) { $('#alertErr').textContent = e.message; }
+};
+$('#alertTest').title = 'Envoyer un e-mail de test';
+$('#alertTest').onclick = async () => {
+  $('#alertErr').textContent = ''; $('#alertOk').textContent = 'Envoi en cours…';
+  try { await api('/api/alerts/test', { email: $('#alertEmail').value.trim() }); $('#alertOk').textContent = 'E-mail de test envoyé : vérifie ta boîte (et les spams).'; }
+  catch (e) { $('#alertOk').textContent = ''; $('#alertErr').textContent = e.message; }
+};
+api('/api/alerts').then(a => { state.alerts = a; syncAlertBtn(); }).catch(() => {});
 
 // ---------- abonnement : page « Tarification » et verrouillage ----------
 state.lic = null; let offresData = null;

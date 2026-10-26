@@ -1540,24 +1540,15 @@ def eco_period_fr(p):
 ECO_SCALE = {"K": " k", "M": " M", "B": " Md", "T": " Bn"}
 
 
-@app.get("/api/eco")
-def api_eco():
-    """Annonces du calendrier économique (flux public utilisé par le calendrier de TradingView)."""
+def _eco_fetch(d0, d1, countries):
+    """Annonces du flux public du calendrier TradingView (cache 2 min). Lève une exception hors ligne."""
     import time
     import urllib.request
 
-    frm, to = str(request.args.get("from", "")), str(request.args.get("to", ""))
-    try:
-        d0, d1 = dt.date.fromisoformat(frm), dt.date.fromisoformat(to)
-    except ValueError:
-        return jsonify({"error": "Dates invalides."}), 400
-    if d1 < d0 or (d1 - d0).days > 31:
-        return jsonify({"error": "Période invalide."}), 400
-    countries = sorted({c.strip().upper() for c in str(request.args.get("countries", "US")).split(",")} & ECO_ALLOWED) or ["US"]
-    key = (frm, to, ",".join(countries))
+    key = (d0.isoformat(), d1.isoformat(), ",".join(countries))
     hit = _eco_cache.get(key)
     if hit and time.time() - hit["at"] < 120:
-        return jsonify(hit["data"])
+        return hit["data"]
     # marge d'un jour de chaque côté : l'app filtre ensuite sur les jours de Bruxelles
     start = (d0 - dt.timedelta(days=1)).isoformat() + "T00:00:00.000Z"
     end = (d1 + dt.timedelta(days=1)).isoformat() + "T23:59:59.000Z"
@@ -1570,10 +1561,10 @@ def api_eco():
     try:
         with urllib.request.urlopen(req, timeout=12) as r:
             raw = json.loads(r.read().decode("utf-8"))
-    except Exception as ex:
+    except Exception:
         if hit:
-            return jsonify({**hit["data"], "stale": True})
-        return jsonify({"error": f"service indisponible ({type(ex).__name__})"}), 502
+            return {**hit["data"], "stale": True}
+        raise
     items = raw.get("result") if isinstance(raw, dict) else raw
     events = []
     for it in items or []:
@@ -1590,7 +1581,155 @@ def api_eco():
         })
     data = {"events": events}
     _eco_cache[key] = {"at": time.time(), "data": data}
-    return jsonify(data)
+    return data
+
+
+@app.get("/api/eco")
+def api_eco():
+    """Annonces du calendrier économique (flux public utilisé par le calendrier de TradingView)."""
+    frm, to = str(request.args.get("from", "")), str(request.args.get("to", ""))
+    try:
+        d0, d1 = dt.date.fromisoformat(frm), dt.date.fromisoformat(to)
+    except ValueError:
+        return jsonify({"error": "Dates invalides."}), 400
+    if d1 < d0 or (d1 - d0).days > 31:
+        return jsonify({"error": "Période invalide."}), 400
+    countries = sorted({c.strip().upper() for c in str(request.args.get("countries", "US")).split(",")} & ECO_ALLOWED) or ["US"]
+    try:
+        return jsonify(_eco_fetch(d0, d1, countries))
+    except Exception as ex:
+        return jsonify({"error": f"service indisponible ({type(ex).__name__})"}), 502
+
+
+# ---------------------------------------------------------------- alertes e-mail des annonces
+ALERT_SENT_FILE = os.path.join(DATA_DIR, "alertes-envoyees.json")
+ALERT_LEAD = 5 * 60  # e-mail envoyé 5 minutes avant l'annonce
+ALERT_STATE = {"last_error": None, "last_sent": None, "last_check": None}
+
+
+def _alert_settings():
+    prefs = _load(PREFS_FILE, {})
+    al = prefs.get("alerts") or {}
+    eco = prefs.get("eco") or {}
+    countries = [c for c in (eco.get("countries") or ["US"]) if c in ECO_ALLOWED] or ["US"]
+    return {"on": bool(al.get("on")), "email": al.get("email") or "", "imp": al.get("imp") or [1],
+            "countries": countries, "tz": eco.get("tz") or "Europe/Brussels"}
+
+
+def _alert_allowed():
+    """Alertes réservées aux abonnés (clé de licence vérifiable par le relais) et au propriétaire."""
+    lic = _load(LICENCE_FILE, {})
+    return bool(licence_active() and lic.get("key"))
+
+
+def _alert_post(events, cfg, test=False):
+    import urllib.error
+    import urllib.request
+
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    if not api:
+        raise ConnectionError("service d'alertes pas encore configuré")
+    lic = _load(LICENCE_FILE, {})
+    body = {"key": lic.get("key", ""), "instance_id": lic.get("instance_id") or "", "to": cfg["email"],
+            "tz": cfg["tz"], "test": bool(test), "events": events[:10]}
+    req = urllib.request.Request(f"{api}/notify", data=json.dumps(body).encode(), method="POST", headers={
+        "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read().decode("utf-8") or "{}").get("error")
+        except Exception:
+            msg = None
+        raise ConnectionError(msg or f"HTTP {e.code}")
+
+
+def _alert_event(e):
+    return {k: e.get(k) for k in ("date", "title", "country", "currency", "importance", "forecast", "previous", "unit", "scale", "period")}
+
+
+def _alert_loop():
+    """Toutes les 30 s : prévient par e-mail des annonces qui tombent dans ~5 minutes."""
+    import time
+
+    while True:
+        time.sleep(30)
+        try:
+            cfg = _alert_settings()
+            if not cfg["on"] or not cfg["email"] or not _alert_allowed():
+                continue
+            now = dt.datetime.now(dt.timezone.utc)
+            data = _eco_fetch(now.date(), (now + dt.timedelta(days=1)).date(), sorted(cfg["countries"]))
+            ALERT_STATE["last_check"] = time.time()
+            sent = _load(ALERT_SENT_FILE, {})
+            due = {}
+            for e in data.get("events", []):
+                if e.get("importance") not in cfg["imp"]:
+                    continue
+                try:
+                    t = dt.datetime.fromisoformat(str(e["date"]).replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                left = (t - now).total_seconds()
+                key = f"{e.get('id')}|{e['date']}"
+                if 0 < left <= ALERT_LEAD + 45 and key not in sent:
+                    due.setdefault(e["date"], []).append((key, e))
+            for when, lst in sorted(due.items()):
+                _alert_post([_alert_event(e) for _k, e in lst], cfg)
+                for k, _e in lst:
+                    sent[k] = time.time()
+                ALERT_STATE.update(last_sent=dt.datetime.now().strftime("%d/%m %H:%M"), last_error=None)
+            if due:
+                cutoff = time.time() - 3 * 86400
+                _save(ALERT_SENT_FILE, {k: v for k, v in sent.items() if v > cutoff})
+        except Exception as ex:
+            ALERT_STATE["last_error"] = str(ex)[:200]
+
+
+@app.get("/api/alerts")
+def api_alerts_get():
+    cfg = _alert_settings()
+    return jsonify({**{k: cfg[k] for k in ("on", "email", "imp")}, "allowed": _alert_allowed(),
+                    "last_error": ALERT_STATE["last_error"], "last_sent": ALERT_STATE["last_sent"]})
+
+
+@app.post("/api/alerts")
+def api_alerts_set():
+    import re
+
+    body = request.get_json(silent=True) or {}
+    email = str(body.get("email", "")).strip()[:200]
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return jsonify({"error": "Adresse e-mail invalide."}), 400
+    imp = [i for i in (body.get("imp") or [1]) if i in (-1, 0, 1)] or [1]
+    on = bool(body.get("on")) and bool(email)
+    if on and not _alert_allowed():
+        return jsonify({"error": "Les alertes e-mail sont incluses dans les abonnements Essentiel et Pro."}), 402
+    prefs = _load(PREFS_FILE, {})
+    prefs["alerts"] = {"on": on, "email": email, "imp": imp}
+    _save(PREFS_FILE, prefs)
+    return api_alerts_get()
+
+
+@app.post("/api/alerts/test")
+def api_alerts_test():
+    cfg = _alert_settings()
+    body = request.get_json(silent=True) or {}
+    if body.get("email"):
+        cfg["email"] = str(body["email"]).strip()[:200]
+    if not cfg["email"]:
+        return jsonify({"error": "Indique d'abord ton adresse e-mail."}), 400
+    if not _alert_allowed():
+        return jsonify({"error": "Les alertes e-mail sont incluses dans les abonnements Essentiel et Pro."}), 402
+    now = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=5)
+    sample = {"date": now.isoformat().replace("+00:00", "Z"), "title": "Emplois non agricoles (NFP) — exemple", "country": "US",
+              "currency": "USD", "importance": 1, "forecast": 150, "previous": 142, "unit": "", "scale": " k", "period": "sept."}
+    try:
+        _alert_post([sample], cfg, test=True)
+    except Exception as ex:
+        return jsonify({"error": f"Envoi impossible : {ex}"}), 502
+    return jsonify({"ok": True})
 
 
 def _gnews(query):
@@ -3193,6 +3332,7 @@ def serve_only(port):
                 time.sleep(0.3)
     SERVER["port"] = port
     threading.Thread(target=lifetime_watchdog, daemon=True).start()
+    threading.Thread(target=_alert_loop, daemon=True).start()
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
@@ -3228,6 +3368,7 @@ def main():
     )
     server.start()
     threading.Thread(target=lifetime_watchdog, daemon=True).start()
+    threading.Thread(target=_alert_loop, daemon=True).start()
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
 
     # 1) Fenêtre d'application Edge/Chrome. L'app s'arrête quand la fenêtre se ferme
