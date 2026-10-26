@@ -727,6 +727,12 @@
   .abo-grid .it b { font-size: 16px; }
   .abo-help { padding: 18px 22px; } .abo-help h3 { margin: 0 0 8px; } .abo-help p { color: var(--muted); margin: 6px 0; line-height: 1.55; } .abo-help b { color: var(--fg); }
   .abo-help a { color: var(--gold); }
+  .abo-change { padding: 18px 22px; margin-bottom: 22px; } .abo-change h3 { margin: 0 0 6px; }
+  .abo-ch-sub { color: var(--muted); margin: 0 0 14px; line-height: 1.5; font-size: 13.5px; }
+  .abo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .abo-opt { background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .abo-opt b { font-size: 16px; } .abo-opt .pr { color: var(--gold); font-weight: 700; } .abo-opt small { color: var(--muted); font-size: 12.5px; }
+  .abo-opt .btn { margin-top: 10px; } .abo-opt.cur { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
   #ofKeyBox { margin: 0 0 26px; } #ofKeyBox[hidden], #navAbo[hidden] { display: none; }
   .of-active .st { width: 40px; height: 40px; border-radius: 50%; background: rgba(34,197,94,.14); color: var(--win); display: grid; place-items: center; font-weight: 800; font-size: 18px; flex: none; }
   .of-active .tx { flex: 1; min-width: 220px; }
@@ -1075,10 +1081,16 @@
       </div>
       <div class="of-active" id="ofActive" hidden></div>
       <div class="abo-grid" id="aboInfo"></div>
+      <div class="card abo-change" id="aboChange">
+        <h3>Changer d'offre</h3>
+        <p class="abo-ch-sub">Passe à l'offre ou à la formule qui te convient. Le changement est immédiat : la différence est calculée au prorata du temps restant (facturée si l'offre est plus chère, remboursée si elle l'est moins).</p>
+        <div class="abo-opts" id="aboOpts"></div>
+        <div class="al-err" id="aboErr"></div>
+      </div>
       <div class="card abo-help">
-        <h3>Résilier ou changer de carte</h3>
+        <h3>Mettre à jour le paiement ou résilier</h3>
         <p>Clique sur <b>Gérer / annuler mon abonnement</b> : ton espace client Creem s'ouvre dans ton navigateur, sans mot de passe. Choisis ton abonnement puis <b>Manage Subscription</b> pour changer de carte ou <b>Cancel Subscription</b> pour résilier. Sans engagement.</p>
-        <p>Pour changer d'offre (Essentiel ↔ Pro), passe par la page <a href="#" id="aboToOffres">Tarification</a> ou écris-nous.</p>
+        <p>Les offres sont détaillées sur la page <a href="#" id="aboToOffres">Tarification</a>. Une question ? Écris-nous à astracapital369@gmail.com.</p>
       </div>
     </div>
 
@@ -2585,7 +2597,7 @@ const HELP_KB = [
     a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
   { q: 'Comment annuler mon abonnement ?', k: 'changer offre resilier annuler annulation arreter stopper abonnement gerer facture remboursement desabonner engagement',
     alt: ['changer d\'offre ou résilier', 'je veux résilier', 'comment me désabonner', 'y a-t-il un engagement', 'arrêter mon abonnement'],
-    a: 'Dans le menu de gauche, ouvre **Gérer mon abonnement** puis clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, écris-nous ou passe par le Discord.', act: [['Gérer mon abonnement', 'abo'], ['Rejoindre la communauté', 'discord']] },
+    a: 'Dans le menu de gauche, ouvre **Gérer mon abonnement** puis clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, utilise **Changer d\'offre** sur la même page.', act: [['Gérer mon abonnement', 'abo'], ['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
     a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
   { q: 'Je peux l\'utiliser sur plusieurs PC ?', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable plusieurs deux 2 machine',
@@ -2788,6 +2800,29 @@ async function renderOffres() {
     if (lic.renews_at && !lic.owner) it(lic.active ? 'Prochain renouvellement' : 'Expiré le', fmtLicDay(lic.renews_at));
     if (lic.email) it('E-mail', lic.email);
     it('Clé de licence', lic.key_hint);
+  }
+  const opts = $('#aboOpts'); opts.innerHTML = ''; $('#aboChange').hidden = !(lic.key_hint && !lic.trial && !lic.owner && lic.active);
+  if (!$('#aboChange').hidden) {
+    for (const p of (offresData.plans || []).filter(p => !p.trial)) {
+      for (const per of ['month', 'year']) {
+        if (per === 'year' && !(p.annual && p.annual.checkout_url)) continue;
+        if (per === 'month' && !p.checkout_url) continue;
+        const cur = lic.plan === p.id && (lic.period || 'month') === per;
+        const o = el('div', 'abo-opt' + (cur ? ' cur' : ''));
+        o.append(el('b', null, p.name + (per === 'year' ? ' · annuel' : ' · mensuel')),
+          el('span', 'pr', per === 'year' ? (p.annual.total || p.annual.price) + (p.annual.total ? ' par an' : ' par mois') : p.price + ' par mois'),
+          el('small', null, (p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes' : '1 compte') + (per === 'year' ? ' · −' + (offresData.annual_discount || 20) + ' %' : '')));
+        const b = el('button', 'btn' + (cur ? '' : ' primary'), cur ? 'Ton offre actuelle' : 'Passer à cette offre'); b.type = 'button'; b.disabled = cur;
+        let armed = false;
+        b.onclick = async () => {
+          if (!armed) { armed = true; b.textContent = 'Confirmer le changement ?'; setTimeout(() => { if (armed) { armed = false; b.textContent = 'Passer à cette offre'; } }, 4000); return; }
+          armed = false; b.disabled = true; b.textContent = 'Changement en cours…'; $('#aboErr').textContent = '';
+          try { const r = await api('/api/licence/change', { plan: p.id, period: per }); if (r.licence) state.lic = r.licence; applyLock(); renderOffres(); toast('Offre changée : ' + p.name + (per === 'year' ? ' annuel' : ' mensuel') + '.'); }
+          catch (e) { $('#aboErr').textContent = e.message; b.disabled = false; b.textContent = 'Passer à cette offre'; }
+        };
+        o.appendChild(b); opts.appendChild(o);
+      }
+    }
   }
   // mensuel / annuel
   document.querySelectorAll('#ofBilling button').forEach(b => {

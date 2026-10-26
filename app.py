@@ -2330,7 +2330,7 @@ def _lic_public(lic):
             "plan": lic.get("plan"), "plan_name": lic.get("plan_name"), "max_accounts": lic.get("max_accounts"),
             "email": lic.get("email"), "renews_at": lic.get("expires_at"), "key_hint": hint,
             "checked_at": lic.get("checked_at"), "offline": bool(lic.get("offline")), "error": lic.get("error"),
-            "trial_used": bool(_trial_marks())}
+            "trial_used": bool(_trial_marks()), "period": lic.get("period") or "month"}
 
 
 def licence(force=False):
@@ -2368,9 +2368,13 @@ def licence(force=False):
         ok = bool(r.get("valid")) and status == "active" and _store_ok(meta)
         lic.update(offline=False, status=status, checked_at=dt.datetime.now().isoformat(timespec="seconds"),
                    expires_at=lk.get("expires_at"), email=meta.get("customer_email") or lic.get("email"))
+        if lic.get("sub_product"):  # offre changée depuis l'app : la clé garde son produit d'origine chez Creem
+            meta = {**meta, "variant_id": lic["sub_product"]}
         if meta:
             plan = _plan_from_meta(meta)
-            lic.update(plan=plan.get("id"), plan_name=plan.get("name"), max_accounts=int(plan.get("accounts", 1)))
+            yearly = str((plan.get("annual") or {}).get("variant_id") or "") == str(meta.get("variant_id"))
+            lic.update(plan=plan.get("id"), plan_name=plan.get("name"), max_accounts=int(plan.get("accounts", 1)),
+                       period="year" if yearly else "month")
         lic["active"] = ok
         lic["error"] = None if ok else {"expired": "Ton abonnement a expiré.", "disabled": "Cette clé a été désactivée.",
                                         "inactive": "Cette clé n'est plus active sur ce PC."}.get(status, r.get("error") or "Clé invalide.")
@@ -2539,6 +2543,46 @@ def api_open_url():
         return jsonify({"error": "Adresse non autorisée."}), 400
     webbrowser.open(url)
     return jsonify({"ok": True})
+
+
+@app.post("/api/licence/change")
+def api_licence_change():
+    """Change d'offre (Essentiel / Pro, mensuel / annuel) sur l'abonnement Creem en cours."""
+    import urllib.error
+    import urllib.request
+
+    body = request.get_json(silent=True) or {}
+    plan_id, period = str(body.get("plan", "")), "year" if body.get("period") == "year" else "month"
+    plan = next((p for p in load_offers().get("plans", []) if p.get("id") == plan_id and not p.get("trial")), None)
+    if not plan:
+        return jsonify({"error": "Offre inconnue."}), 400
+    product = (plan.get("annual") or {}).get("variant_id") if period == "year" else plan.get("variant_id")
+    lic = _load(LICENCE_FILE, {})
+    if not lic.get("key") or lic.get("owner") or lic.get("trial"):
+        return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
+    if not product:
+        return jsonify({"error": "Cette offre n'est pas encore disponible."}), 400
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    payload = {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": lic.get("email") or "", "product_id": product}
+    req = urllib.request.Request(f"{api}/change", data=json.dumps(payload).encode(), method="POST", headers={
+        "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            res = json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read().decode("utf-8") or "{}").get("error")
+        except Exception:
+            msg = None
+        return jsonify({"error": f"Changement impossible : {msg or 'erreur ' + str(e.code)}."}), 502
+    except Exception:
+        return jsonify({"error": "Changement impossible pour le moment (pas de connexion ?)."}), 502
+    with _lic_lock:
+        lic = _load(LICENCE_FILE, {})
+        lic["sub_product"] = res.get("product_id") or product
+        lic.update(plan=plan.get("id"), plan_name=plan.get("name"), max_accounts=int(plan.get("accounts", 1)), period=period)
+        _save(LICENCE_FILE, lic)
+    return jsonify({"ok": True, "licence": _lic_public(licence(force=True))})
 
 
 @app.post("/api/licence/portal")
