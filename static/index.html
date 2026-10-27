@@ -54,6 +54,7 @@
   .ctx .ic { width: 16px; text-align: center; opacity: .8; }
   .acc .bal { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .acc { position: relative; }
+  .acc.acc-drag { border-color: var(--gold) !important; background: var(--gold-soft) !important; box-shadow: 0 8px 24px rgba(0,0,0,.4); opacity: .95; }
   .acc-x { position: absolute; top: 3px; right: 4px; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; font-size: 14px; line-height: 1;
     color: var(--muted); opacity: 0; transition: opacity .15s, color .15s, background .15s; cursor: pointer; }
   .acc:hover .acc-x { opacity: 1; } .acc-x:hover { color: var(--loss); background: rgba(239,68,68,.14); }
@@ -1385,7 +1386,7 @@ $('#maskBtn').onclick = () => {
 /* ---------- comptes ---------- */
 async function loadState() {
   const s = await api('/api/state');
-  state.accounts = s.accounts; state.mt5 = s.mt5_available; state.keyring = s.keyring_available;
+  state.accounts = sortAccounts(s.accounts); state.mt5 = s.mt5_available; state.keyring = s.keyring_available;
   if (!state.keyring) { $('#fRemember').disabled = true; $('#fRemember').parentElement.style.opacity = .5; }
   if (state.sel !== 'all' && !state.accounts.find(a => a.login === state.sel)) state.sel = 'all';
   renderAccounts();
@@ -1400,6 +1401,12 @@ async function loadState() {
   await loadData();
 }
 
+state.accOrder = [];
+function sortAccounts(list) {
+  const o = state.accOrder || [], pos = l => { const i = o.indexOf(String(l)); return i < 0 ? 1e6 : i; };
+  return (list || []).map((a, i) => [a, i]).sort((x, y) => pos(x[0].login) - pos(y[0].login) || x[1] - y[1]).map(x => x[0]);
+}
+let accDragging = false;
 function renderAccounts() {
   const list = $('#accList'); list.innerHTML = '';
   const items = state.accounts.length > 1 ? [{ login: 'all', name: 'Tous les comptes', server: state.accounts.length + ' comptes' }, ...state.accounts] : state.accounts;
@@ -1419,14 +1426,43 @@ function renderAccounts() {
       x.onclick = ev => { ev.stopPropagation(); deleteAccount(a); };
       b.appendChild(x);
     }
-    b.onclick = () => { if (b.dataset.editing) return; state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = ''; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing || accDragging) return; state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = ''; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     if (a.login !== 'all') {
-      b.title = 'Clic droit : renommer, actualiser ou supprimer';
+      b.dataset.login = a.login;
+      b.title = 'Glisser pour changer l\'ordre · clic droit : renommer, actualiser ou supprimer';
       b.addEventListener('contextmenu', ev => { ev.preventDefault(); openAccountMenu(a, ev.clientX, ev.clientY, b); });
     }
     list.appendChild(b);
   }
 }
+
+// déplacer un compte dans la colonne de gauche pour changer l'ordre
+$('#accList').addEventListener('pointerdown', e => {
+  const btn = e.target.closest('.acc[data-login]'); if (!btn || e.button !== 0 || e.target.closest('.acc-x') || btn.dataset.editing) return;
+  const list = $('#accList'), y0 = e.clientY; let started = false;
+  const move = ev => {
+    if (!started) {
+      if (Math.abs(ev.clientY - y0) < 6) return;
+      started = true; accDragging = true; btn.classList.add('acc-drag'); document.body.classList.add('q-sorting');
+    }
+    ev.preventDefault();
+    const rows = [...list.querySelectorAll('.acc[data-login]')].filter(r => r !== btn);
+    const after = rows.find(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    if (after) { if (btn.nextSibling !== after) list.insertBefore(btn, after); }
+    else if (rows.length && rows[rows.length - 1].nextSibling !== btn) list.insertBefore(btn, rows[rows.length - 1].nextSibling);
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+    if (!started) return;
+    btn.classList.remove('acc-drag'); document.body.classList.remove('q-sorting');
+    setTimeout(() => { accDragging = false; }, 0);
+    const order = [...list.querySelectorAll('.acc[data-login]')].map(r => r.dataset.login);
+    state.accOrder = order; state.accounts = sortAccounts(state.accounts);
+    api('/api/prefs', { accOrder: order }).catch(() => {});
+    renderAccounts();
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+});
 
 /* ---------- risque par trade ---------- */
 let riskAcc = null;
@@ -1995,6 +2031,7 @@ api('/api/prefs').then(p => {
   if (Array.isArray(p.layout)) { state.layout = p.layout; applyLayout(); }
   if (Array.isArray(p.tv)) p.tv.slice(0, 4).forEach((x, i) => { if (x && x.symbol) state.tv[i] = { symbol: x.symbol, interval: x.interval || '15' }; });
   else if (p.tv && p.tv.symbol) state.tv[0] = { symbol: p.tv.symbol, interval: p.tv.interval || '15' }; // ancien réglage à un graphique
+  if (Array.isArray(p.accOrder)) { state.accOrder = p.accOrder; state.accounts = sortAccounts(state.accounts); renderAccounts(); }
   if (typeof p.mask === 'boolean') { state.mask = p.mask; renderMaskBtn(); renderAccounts(); if (state.data) loadData(); }
   if ([1, 2, 3, 4].includes(p.tvCount)) state.tvCount = p.tvCount;
   if (p.eco && p.eco.imp && Array.isArray(p.eco.countries) && p.eco.countries.length) {
@@ -2596,6 +2633,8 @@ const HELP_KB = [
     a: 'Vérifie trois choses :\n1. Le **serveur** doit être écrit exactement comme dans MT5 (dans MT5 : Fichier → Se connecter à un compte de trading).\n2. Le **numéro de compte** et le **mot de passe** (attention aux majuscules).\n3. Que le compte est toujours actif chez ta prop firm.\nSi plusieurs MT5 sont installés sur ton PC, indique le chemin du terminal dans « Options avancées ».' },
   { q: 'Mes données ne sont pas à jour', k: 'actualiser rafraichir mise jour donnees anciennes historique manquant trades manquants charger recharger',
     a: 'Clique sur **↻ Actualiser** en haut à droite du tableau de bord. Pour un seul compte : clic droit sur le compte → **Actualiser ce compte**.\nLa toute première lecture peut prendre jusqu\'à une minute, le temps de récupérer tout l\'historique.' },
+  { q: 'Changer l\'ordre des comptes', k: 'ordre comptes deplacer glisser classer trier ranger liste colonne gauche',
+    a: 'Dans la colonne de gauche, **maintiens le clic sur un compte et fais-le glisser** vers le haut ou le bas. L\'ordre est enregistré.' },
   { q: 'Renommer ou supprimer un compte', k: 'renommer nom supprimer retirer effacer compte clic droit changer nom',
     a: 'Fais un **clic droit** sur le compte dans la colonne de gauche : tu peux le **renommer**, régler son **risque par trade**, l\'**actualiser** ou le **supprimer**.' },
   { q: 'Comment sont calculés les R ?', k: 'r rr risque reward ratio risk calcul resultat definir trade',

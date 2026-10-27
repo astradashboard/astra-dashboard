@@ -1228,6 +1228,8 @@ def api_prefs_set():
                        "range": str(mk.get("range", "1D")).upper() if str(mk.get("range", "1D")).upper() in QUOTE_RANGES else "1D"}
     if isinstance(body.get("mask"), bool):
         prefs["mask"] = body["mask"]
+    if isinstance(body.get("accOrder"), list):
+        prefs["accOrder"] = [str(x)[:40] for x in body["accOrder"]][:200]
     if body.get("tvCount") in (1, 2, 3, 4):
         prefs["tvCount"] = body["tvCount"]
     if isinstance(body.get("tv"), list):
