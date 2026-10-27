@@ -483,6 +483,11 @@
   .h-form input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 9px 11px; font: inherit; font-size: 13.5px; }
   .h-form input:focus { outline: none; border-color: var(--gold); }
   /* cartes de résultats */
+  .pdf-accs { display: flex; flex-wrap: wrap; gap: 6px; max-height: 128px; overflow-y: auto; }
+  .pdf-accs .chip { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 12.5px; padding: 5px 10px; }
+  .pdf-accs .chip.on { border-color: var(--gold); color: var(--gold); }
+  #pdfAccField[hidden] { display: none; }
+  .pdf-acc-hint { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
   .modal.card-modal { max-width: 1040px; display: grid; grid-template-columns: 330px 1fr; gap: 26px; padding: 24px; }
   .card-side { display: flex; flex-direction: column; }
   .card-side .sub { margin-bottom: 8px; }
@@ -1255,6 +1260,10 @@
       <label for="pdfMonth">Mois</label>
       <select id="pdfMonth" class="field-select"></select>
     </div>
+    <div class="field" id="pdfAccField">
+      <label>Comptes inclus <span class="pdf-acc-hint" id="pdfAccHint"></span></label>
+      <div class="pdf-accs" id="pdfAccs"></div>
+    </div>
     <div class="pdf-thumb" id="pdfThumb" title="Cliquer pour agrandir l'aperçu">
       <div class="pdf-sheet" id="pdfSheet"></div>
     </div>
@@ -1500,14 +1509,42 @@ $('#riskClear').onclick = () => saveRisk({ mode: null });
 $('#riskForm').addEventListener('submit', e => { e.preventDefault(); saveRisk({ mode: $('#riskMode').value, value: $('#riskValue').value }); });
 
 /* ---------- rapport PDF ---------- */
-const pdfQuery = () => 'login=' + encodeURIComponent(state.sel) + '&month=' + encodeURIComponent($('#pdfMonth').value) + (state.mask ? '&masque=1' : '');
+state.pdfAccs = [];
+const pdfQuery = () => 'login=' + encodeURIComponent((state.pdfAccs.length ? state.pdfAccs : [state.sel]).join(',')) + '&month=' + encodeURIComponent($('#pdfMonth').value) + (state.mask ? '&masque=1' : '');
+function renderPdfAccs() {
+  const box = $('#pdfAccs'); box.innerHTML = '';
+  for (const a of state.accounts) {
+    const on = state.pdfAccs.includes(a.login);
+    const c = el('button', 'chip theme-chip' + (on ? ' on' : '')); c.type = 'button';
+    c.append(el('span', 'ck', on ? '✓' : ''), shownName(a.name));
+    c.onclick = () => {
+      if (on && state.pdfAccs.length === 1) return; // au moins un compte
+      state.pdfAccs = on ? state.pdfAccs.filter(x => x !== a.login) : state.accounts.map(x => x.login).filter(l => l === a.login || state.pdfAccs.includes(l));
+      renderPdfAccs(); fillPdfSheet();
+    };
+    box.appendChild(c);
+  }
+  const n = state.pdfAccs.length;
+  $('#pdfAccHint').textContent = n > 1 ? '· ' + n + ' comptes additionnés' : '';
+  $('#pdfSub').textContent = n > 1 ? n + ' comptes cumulés : résultats, positions et statistiques additionnés' : shownName((state.accounts.find(a => a.login === state.pdfAccs[0]) || {}).name || '');
+  $('#pdfAccField').hidden = state.accounts.length < 2;
+}
 function openPdf(months) {
   const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
+  state.pdfAccs = [acc.login];
+  // mois disponibles sur l'ensemble des comptes
+  api('/api/data?login=all').then(d => {
+    const all = [...new Set([...(months || []), ...(d.daily || []).filter(x => x.trades || x.pnl).map(x => x.date.slice(0, 7))])].sort().reverse();
+    const sel = $('#pdfMonth'), cur = sel.value; if (all.length <= sel.options.length) return;
+    sel.innerHTML = '';
+    for (const k of all) { const mn = MONTHS[Number(k.slice(5)) - 1]; sel.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
+    sel.value = all.includes(cur) ? cur : all[0];
+  }).catch(() => {});
   const sel = $('#pdfMonth'); sel.innerHTML = '';
   const list = months.length ? months : [new Date().getFullYear() + '-' + pad(new Date().getMonth() + 1)];
   for (const k of list) { const mn = MONTHS[Number(k.slice(5)) - 1]; sel.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
   sel.value = state.jMonth !== 'all' && list.includes(state.jMonth) ? state.jMonth : list[0];
-  $('#pdfSub').textContent = shownName(acc.name); $('#pdfErr').style.display = 'none';
+  renderPdfAccs(); $('#pdfErr').style.display = 'none';
   $('#pdfGo').disabled = false; $('#pdfGo').textContent = 'Enregistrer en PDF';
   setPdfBig(false);
   $('#pdfBg').classList.add('open');
@@ -2653,8 +2690,8 @@ const HELP_KB = [
     a: 'Le bloc **Trades en cours** apparaît automatiquement dès qu\'une position est ouverte (et disparaît quand tout est clôturé). Il affiche tes positions et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans l\'offre **Pro**.', act: [['Voir les offres', 'offres']] },
   { q: 'Utiliser le journal de trading', k: 'journal trading historique liste trades detail position filtre gagnant perdant',
     a: 'Ouvre **Journal de trading** dans la colonne de gauche : tous les trades du compte (date, symbole, PnL). Clique sur un trade pour voir son détail : ouverture, volume, sens, frais, profit en % et en R.\nFiltre par mois ou par gagnants / perdants.', act: [['Ouvrir le journal', 'journal']] },
-  { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document',
-    a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois, regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
+  { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document plusieurs comptes cumul additionner',
+    a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois et coche les **comptes inclus** : avec plusieurs comptes, résultats, positions et statistiques sont **additionnés** dans un seul rapport. Regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Partager mes résultats sur TikTok / Instagram', k: 'partager carte image tiktok instagram reseaux post story publier resultats photo',
     a: 'Ouvre **Partager mes résultats** dans le menu de gauche : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',

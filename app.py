@@ -2816,16 +2816,39 @@ def _cls(v):
     return "pos" if v > 0 else "neg" if v < 0 else ""
 
 
-def month_report(login, month):
+def _month_report_one(login, month):
     """Chiffres d'un mois pour un compte (même logique que le tableau de bord)."""
     accounts, cache = load_accounts(), load_cache()
     if login not in accounts or login not in cache:
         raise KeyError("Compte introuvable.")
     acc, c = accounts[login], cache[login]
-    cur = c.get("currency") or "USD"
     daily = c.get("daily", {})
-    start_cap = (c.get("start_balance") or 0.0) + sum(v["pnl"] for d, v in daily.items() if d < month + "-01")
-    days = [(d, v) for d, v in sorted(daily.items()) if d.startswith(month)]
+    risk_cfg = acc.get("risk")
+    risk = None
+    if risk_cfg:
+        risk = risk_cfg["value"] if risk_cfg["mode"] == "amount" else risk_cfg["value"] / 100 * (c.get("start_balance") or 0)
+    trades = [dict(t, acc=acc.get("name") or login, rr=(t["n"] / risk if risk else None))
+              for t in (c.get("trades") or []) if t.get("d", "").startswith(month)]
+    return {"acc": acc, "cur": c.get("currency") or "USD", "daily": daily, "trades": trades, "risk": risk,
+            "start_cap": (c.get("start_balance") or 0.0) + sum(v["pnl"] for d, v in daily.items() if d < month + "-01")}
+
+
+def month_report(login, month):
+    """Rapport d'un mois pour un ou plusieurs comptes (liste « 123,456 ») : tout est additionné."""
+    logins = [l for l in dict.fromkeys(str(login).split(",")) if l][:50]
+    if not logins:
+        raise KeyError("Compte introuvable.")
+    parts = [_month_report_one(l, month) for l in logins]
+    daily = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0, "losses": 0})
+    for p in parts:
+        for d, v in p["daily"].items():
+            if d.startswith(month):
+                for k in ("pnl", "trades", "wins", "losses"):
+                    daily[d][k] += v.get(k, 0) or 0
+    curs = sorted({p["cur"] for p in parts})
+    cur = curs[0]
+    start_cap = sum(p["start_cap"] for p in parts)
+    days = sorted(daily.items())
     traded = [(d, v) for d, v in days if v.get("trades") or v.get("pnl")]
     pnl = sum(v["pnl"] for _, v in days)
     trades_n = sum(v.get("trades", 0) for _, v in days)
@@ -2840,21 +2863,21 @@ def month_report(login, month):
         peak = max(peak, bal)
         max_dd = max(max_dd, peak - bal)
         curve.append((d, bal))
-    risk_cfg = acc.get("risk")
-    risk = None
-    if risk_cfg:
-        risk = risk_cfg["value"] if risk_cfg["mode"] == "amount" else risk_cfg["value"] / 100 * (c.get("start_balance") or 0)
-    trades = [t for t in (c.get("trades") or []) if t.get("d", "").startswith(month)]
+    trades = [t for p in parts for t in p["trades"]]
     trades.sort(key=lambda t: t.get("ct") or t["d"])
     if trades:  # compteurs alignés sur la liste des positions du rapport
         trades_n = len(trades)
         wins = sum(1 for t in trades if t["n"] > 0)
         losses = sum(1 for t in trades if t["n"] < 0)
+    all_risk = all(p["risk"] for p in parts)
+    r_total = sum(t["rr"] for t in trades) if all_risk and trades else (pnl / parts[0]["risk"] if len(parts) == 1 and parts[0]["risk"] else None)
     best = max(traded, key=lambda x: x[1]["pnl"]) if traded else None
     worst = min(traded, key=lambda x: x[1]["pnl"]) if traded else None
     return {
-        "acc": acc, "cur": cur, "month": month, "start_cap": start_cap, "end_cap": start_cap + pnl, "pnl": pnl,
-        "pct": pnl / start_cap * 100 if start_cap else 0.0, "r": pnl / risk if risk else None, "risk": risk,
+        "acc": parts[0]["acc"], "accs": [p["acc"] for p in parts], "multi": len(parts) > 1, "mixed_cur": len(curs) > 1,
+        "cur": cur, "month": month, "start_cap": start_cap, "end_cap": start_cap + pnl, "pnl": pnl,
+        "pct": pnl / start_cap * 100 if start_cap else 0.0, "r": r_total, "risk": parts[0]["risk"] if len(parts) == 1 else None,
+        "all_risk": all_risk,
         "trades_n": trades_n, "wins": wins, "losses": losses, "win_days": sum(1 for _, v in traded if v["pnl"] > 0),
         "traded_days": len(traded), "pf": (gain / loss) if loss else None, "gain": gain, "loss": loss,
         "max_dd": max_dd, "max_dd_pct": max_dd / peak * 100 if peak else 0.0, "best": best, "worst": worst,
@@ -2915,7 +2938,8 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
         card("Résultat du mois", _fmt_money(rep["pnl"], cur, True), "", _cls(rep["pnl"])),
         card("Résultat en %", _fmt_pct(rep["pct"]), "du capital en début de mois", _cls(rep["pnl"])),
         card("Résultat en R", _fmt_r(rep["r"]) if rep["r"] is not None else "—",
-             f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else "Risque par trade non défini",
+             f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else ("Risque propre à chaque compte" if rep.get("multi") and rep["r"] is not None
+                                                                         else "Risque par trade non défini"),
              _cls(rep["r"] or 0)),
         card("Trades gagnants", str(rep["wins"]), "", "pos" if rep["wins"] else ""),
         card("Trades perdants", str(rep["losses"]), "", "neg" if rep["losses"] else ""),
@@ -2930,13 +2954,14 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
         ct = t.get("ct") or t["d"]
         when = f"{ct[8:10]}/{ct[5:7]}" + (f" {ct[11:16]}" if len(ct) > 10 else "")
         side = {"buy": '<span class="badge buy">Long</span>', "sell": '<span class="badge sell">Short</span>'}.get(t.get("side"), "—")
-        r_txt = _fmt_r(t["n"] / rep["risk"]) if rep["risk"] else "—"
+        r_txt = _fmt_r(t["rr"]) if t.get("rr") is not None else "—"
+        acc_td = f"<td>{e(_mask_name(t.get('acc', '')) if masked else t.get('acc', ''))}</td>" if rep.get("multi") else ""
         px = lambda v: _fmt_num(v, 2) if isinstance(v, (int, float)) else "—"
-        rows.append(f"<tr><td>{e(when)}</td><td><b>{e(t.get('s') or '—')}</b></td><td>{side}</td>"
+        rows.append(f"<tr><td>{e(when)}</td>{acc_td}<td><b>{e(t.get('s') or '—')}</b></td><td>{side}</td>"
                     f"<td class='r'>{px(t.get('v'))}</td><td class='r'>{px(t.get('op'))}</td><td class='r'>{px(t.get('cp'))}</td>"
                     f"<td class='r {_cls(t['n'])}'><b>{e(_fmt_money(t['n'], cur, True))}</b></td>"
-                    f"<td class='r {_cls(t['n']) if rep['risk'] else ''}'>{e(r_txt)}</td></tr>")
-    table = ("<table><thead><tr><th>Clôture</th><th>Symbole</th><th>Sens</th><th class='r'>Lots</th><th class='r'>Entrée</th>"
+                    f"<td class='r {_cls(t['n']) if t.get('rr') is not None else ''}'>{e(r_txt)}</td></tr>")
+    table = ("<table><thead><tr><th>Clôture</th>" + ("<th>Compte</th>" if rep.get("multi") else "") + "<th>Symbole</th><th>Sens</th><th class='r'>Lots</th><th class='r'>Entrée</th>"
              "<th class='r'>Sortie</th><th class='r'>PnL</th><th class='r'>R</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
              ) if rows else '<p class="muted">Aucun trade détaillé pour ce mois. Actualise le compte dans l\'app pour charger les trades.</p>'
 
@@ -2946,10 +2971,15 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
     if masked:
         name_, login_ = _mask_name(name_), MASK
     acc_line = e(name_) + (f" · {e(login_)} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
+    if rep.get("multi"):
+        names = [(_mask_name(a.get("name") or a["login"]) if masked else (a.get("name") or a["login"])) for a in rep["accs"]]
+        acc_line = f"{len(names)} comptes cumulés · " + e(", ".join(names))
+        if rep.get("mixed_cur"):
+            acc_line += " · devises différentes additionnées sans conversion"
     script = "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script>" if auto_print else ""
     preview_css = ("<style>html{background:#3a3f4b}body{width:210mm;max-width:calc(100% - 24px);margin:14px auto;"
                    "padding:12mm;background:#fff;border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.35)}</style>") if preview else ""
-    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '')} - {title}</title>
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '') if not rep.get('multi') else str(len(rep['accs'])) + ' comptes'} - {title}</title>
 <style>
 @page {{ size: A4; margin: 12mm 12mm 14mm; }}
 * {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
@@ -2992,7 +3022,7 @@ tr {{ break-inside: avoid; }}
 <h2>Synthèse du mois</h2><div class="kpis">{kpis}</div>
 <h2>Évolution du capital</h2><div class="chart">{chart}</div>
 <div class="page2"><h2>Trades du mois ({len(rep['trades'])})</h2>{table}</div>
-<div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else ''}</div>
+<div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else (' · R calculé avec le risque de chaque compte' if rep.get('multi') and rep['r'] is not None else '')}</div>
 </div>{script}{preview_css}</body></html>"""
 
 
@@ -3039,7 +3069,8 @@ def api_report_pdf():
     if not _valid_month(month):
         return jsonify({"error": "Mois invalide."}), 400
     accounts = load_accounts()
-    if login not in accounts:
+    logins = [l for l in dict.fromkeys(login.split(",")) if l]
+    if not logins or any(l not in accounts for l in logins):
         return jsonify({"error": "Compte introuvable."}), 404
     exe = find_pdf_browser()
     if not exe:
@@ -3079,7 +3110,7 @@ def api_report_pdf():
         return jsonify({"error": "La création du PDF a échoué" + (f" ({detail})" if detail else "") + ".",
                         "fallback": True, "browser": os.path.basename(exe)}), 500
     y, m = int(month[:4]), int(month[5:])
-    nm = accounts[login].get("name") or login
+    nm = (accounts[logins[0]].get("name") or logins[0]) if len(logins) == 1 else f"{len(logins)} comptes"
     if masked:
         nm = _mask_name(nm).replace(MASK, "xxxxxx")
     safe = "".join(ch for ch in nm if ch not in '\\/:*?"<>|').strip() or "compte"
