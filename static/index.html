@@ -71,6 +71,11 @@
   .btn.danger:hover { border-color: var(--loss); color: var(--loss); }
   aside .spacer { flex: 1; }
   .social { display: grid; gap: 6px; }
+  .lang-row { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
+  .lang-row:hover { border-color: rgba(196,138,69,.55); }
+  .lang-ic { font-size: 14px; filter: grayscale(1) brightness(1.3); }
+  #langSel { flex: 1; background: transparent; border: 0; color: var(--fg); font: inherit; padding: 8px 0; cursor: pointer; outline: none; }
+  #langSel option { background: var(--panel); color: var(--fg); }
   .login-btn { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--gold-soft); border: 1px solid rgba(196,138,69,.55); color: var(--fg);
     border-radius: 10px; padding: 10px 12px; font-size: 13.5px; font-weight: 650; text-align: left; }
   .login-btn svg { color: var(--gold); flex: none; }
@@ -855,6 +860,8 @@
       <button type="button" class="soc" data-soc="discord" title="Rejoindre la communauté ASTRA sur Discord"><img class="soc-ic" src="/static/discord.png" alt="" width="18" height="18"><span>Rejoindre la communauté</span></button>
       <button type="button" class="soc" data-soc="tiktok" title="Suivre ASTRA CAPITAL sur TikTok"><svg class="soc-ic" width="18" height="18" viewBox="0 0 24 24" fill="#c48a45" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg><span>Suis-moi sur TikTok</span></button>
     </div>
+    <div class="lang-row"><span class="lang-ic" aria-hidden="true">🌐</span><select id="langSel" title="Langue" aria-label="Langue" data-noi18n>
+      <option value="fr">Français</option><option value="en">English</option><option value="de">Deutsch</option><option value="es">Español</option></select></div>
     <div class="label" id="appVersion" style="text-align:center"></div>
   </aside>
 
@@ -1333,11 +1340,14 @@
   </form>
 </div>
 
+<script src="/static/i18n.js"></script>
 <script src="/static/qrcode.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const state = { accounts: [], sel: 'all', data: null, month: null, mt5: true, keyring: true };
-const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+if (!window.tr) { window.tr = s => s; window.trAll = s => s; }
+const LOCALE = window.LOC || 'fr-BE', LANG = window.LANG || 'fr';
+const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 15).toLocaleDateString(LOCALE, { month: 'long' }));
 
 async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -1351,7 +1361,7 @@ async function api(path, body) {
 function money(v, cur, sign) {
   if (v === null || v === undefined || isNaN(v)) return '—';
   let s;
-  try { s = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: cur || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cur === 'JPY' ? 0 : 2 }).format(Math.abs(v)); }
+  try { s = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: cur || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: cur === 'JPY' ? 0 : 2 }).format(Math.abs(v)); }
   catch (e) { s = Math.abs(v).toFixed(2) + ' ' + (cur || ''); }
   if (sign) return (v > 0 ? '+' : v < 0 ? '−' : '') + s;
   return (v < 0 ? '−' : '') + s;
@@ -1385,6 +1395,12 @@ function renderMaskBtn() {
   const t = state.mask ? 'Afficher les numéros de compte' : 'Masquer les numéros de compte';
   b.dataset.tip = t; b.setAttribute('aria-label', t);
 }
+$('#langSel').value = LANG;
+$('#langSel').onchange = async e => {
+  const lg = e.target.value;
+  try { await api('/api/prefs', { lang: lg }); } catch (err) {}
+  location.reload();
+};
 $('#maskBtn').onclick = () => {
   state.mask = !state.mask; renderMaskBtn();
   api('/api/prefs', { mask: state.mask }).catch(() => {});
@@ -1424,7 +1440,7 @@ function renderAccounts() {
     const b = document.createElement('button');
     b.className = 'acc' + (a.login === state.sel ? ' active' + (state.page === 'journal' ? ' dimmed' : '') : '');
     const left = document.createElement('div');
-    const nm = document.createElement('div'); nm.textContent = shownName(a.name);
+    const nm = document.createElement('div'); nm.textContent = shownName(a.name); if (a.login !== 'all') nm.dataset.noi18n = '';
     const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : shownLogin(a.login) + ' · ' + a.server);
     left.append(nm, sm);
     const bal = document.createElement('span'); bal.className = 'bal';
@@ -1687,7 +1703,7 @@ async function loadData() {
   $('#title').textContent = acc ? shownName(acc.name) : 'Tous les comptes';
   const fetched = acc ? acc.fetched_at : state.accounts.map(a => a.fetched_at).filter(Boolean).sort()[0];
   $('#subtitle').textContent = (acc ? (acc.demo ? 'Données fictives' : shownLogin(acc.login) + ' · ' + acc.server) : state.data.accounts + ' comptes')
-    + (fetched ? ' · mis à jour le ' + new Date(fetched).toLocaleString('fr-BE', { dateStyle: 'short', timeStyle: 'short' }) : '');
+    + (fetched ? ' · mis à jour le ' + new Date(fetched).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short' }) : '');
   if (state.data.mixed_currencies) notice('Les comptes ont des devises différentes : les totaux additionnent les montants sans conversion.', true);
   if (!state.month) {
     const last = state.data.daily.length ? state.data.daily[state.data.daily.length - 1].date : null;
@@ -1776,8 +1792,8 @@ function stats(d) {
   return st;
 }
 
-const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) : '';
-const nb = n => n.toLocaleString('fr-BE');
+const fmtDay = x => x ? new Date(x.date + 'T12:00:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }) : '';
+const nb = n => n.toLocaleString(LOCALE);
 
 const METRICS = [
   { id: 'balance', label: 'Solde', help: 'Solde actuel du compte (balance)',
@@ -1840,7 +1856,7 @@ METRICS.push(
   { id: 'nTrades', label: 'Nombre de trades', help: 'Trades clôturés sur la période',
     f: (d, s) => [nb(s.tHas ? s.tN : s.trades), s.tradeDays.length + ' jours tradés', ''] },
   { id: 'lots', label: 'Lots', help: 'Volume total tradé (en lots)',
-    f: (d, s) => !s.tHas ? NO_T : [s.lots.toLocaleString('fr-BE', { maximumFractionDigits: 2 }), 'Moyenne ' + (s.tN ? (s.lots / s.tN).toLocaleString('fr-BE', { maximumFractionDigits: 2 }) : '0') + ' lot par trade', ''] },
+    f: (d, s) => !s.tHas ? NO_T : [s.lots.toLocaleString(LOCALE, { maximumFractionDigits: 2 }), 'Moyenne ' + (s.tN ? (s.lots / s.tN).toLocaleString(LOCALE, { maximumFractionDigits: 2 }) : '0') + ' lot par trade', ''] },
   { id: 'sharpe', label: 'Ratio de Sharpe', help: 'Rendement moyen d\'une journée tradée ÷ sa volatilité (non annualisé). Plus il est haut, plus tes gains sont réguliers',
     f: (d, s) => [s.sharpe == null ? '—' : dec2(s.sharpe), 'Calculé sur ' + s.tradeDays.length + ' jours tradés', ''] },
   { id: 'rrr', label: 'RRR moyen', help: 'Ratio gain / risque : profit moyen ÷ perte moyenne',
@@ -1963,7 +1979,7 @@ async function renderHero() {
     try {
       const r = await getRate(cur, state.heroCur); rate = r.rate;
       const d0 = r.date ? ' · taux du ' + String(r.date).slice(0, 10).split('-').reverse().join('/') : '';
-      fxNote = '1 ' + cur + ' = ' + rate.toLocaleString('fr-BE', { maximumFractionDigits: 4 }) + ' ' + state.heroCur + d0 + (r.stale ? ' (hors ligne)' : '');
+      fxNote = '1 ' + cur + ' = ' + rate.toLocaleString(LOCALE, { maximumFractionDigits: 4 }) + ' ' + state.heroCur + d0 + (r.stale ? ' (hors ligne)' : '');
     } catch (e) { target = cur; rate = 1; fxNote = 'Conversion impossible : ' + e.message + '. Montants affichés en ' + cur + '.'; }
   }
   if (state.data !== d) return; // un autre compte a été choisi entre-temps
@@ -2130,8 +2146,8 @@ function renderChart() {
   }
   const v0 = state.view ? clampView(n, state.view.i0, state.view.i1) : { i0: 0, i1: n - 1 };
   const pts = all.slice(v0.i0, v0.i1 + 1);
-  const fmtD = p => p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE') : 'départ';
-  $('#chartRange').textContent = 'Du ' + fmtD(pts[0].date ? pts[0] : all[1]) + ' au ' + fmtD(pts[pts.length - 1]);
+  const fmtD = p => p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString(LOCALE) : 'départ';
+  $('#chartRange').textContent = tr('Du ') + fmtD(pts[0].date ? pts[0] : all[1]) + tr(' au ') + fmtD(pts[pts.length - 1]);
 
   const vals = pts.map(p => p.v);
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -2141,7 +2157,7 @@ function renderChart() {
   const last = pts.length - 1;
   const x = i => m.l + (W - m.l - m.r) * i / Math.max(1, last);
   const y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
-  const fmtAxis = new Intl.NumberFormat('fr-BE', { style: 'currency', currency: d.currency || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 });
+  const fmtAxis = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: d.currency || 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 });
   for (let i = 0; i <= 4; i++) {
     const v = lo + (hi - lo) * i / 4;
     mk('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 });
@@ -2155,7 +2171,7 @@ function renderChart() {
   for (let k = 0; k < labelled.length; k += step) {
     const i = labelled[k];
     const t = mk('text', { x: x(i), y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 });
-    t.textContent = new Date(pts[i].date + 'T12:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
+    t.textContent = new Date(pts[i].date + 'T12:00:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
   }
   const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
   const defs = mk('defs', {});
@@ -2176,7 +2192,7 @@ function renderChart() {
     const i = Math.round(idxAt(ev)); const p = pts[i];
     dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.v)); dot.setAttribute('opacity', 1);
     tip.innerHTML = '';
-    const l1 = document.createElement('div'); l1.textContent = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : 'Départ';
+    const l1 = document.createElement('div'); l1.textContent = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : 'Départ';
     const l2 = document.createElement('div'); l2.style.fontWeight = 650; l2.textContent = money(p.v, d.currency);
     tip.append(l1, l2);
     if (p.date) { const l3 = document.createElement('div'); l3.className = cls(p.pnl); l3.textContent = money(p.pnl, d.currency, true) + ' ce jour'; tip.append(l3); }
@@ -2340,12 +2356,12 @@ function cardRange(kind, key) {
   const e = new Date(key + 'T12:00:00'); e.setDate(e.getDate() + 6); return [key, isoD(e)];
 }
 function cardLabel(kind, key) {
-  const f = (iso, o) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-BE', o);
+  const f = (iso, o) => new Date(iso + 'T12:00:00').toLocaleDateString(LOCALE, o);
   if (kind === 'day') { const s = f(key, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); }
   if (kind === 'month') { const m = MONTHS[Number(key.slice(5)) - 1]; return m[0].toUpperCase() + m.slice(1) + ' ' + key.slice(0, 4); }
   const [a, b] = cardRange('week', key);
   const sameM = a.slice(0, 7) === b.slice(0, 7);
-  return 'Semaine du ' + f(a, sameM ? { day: 'numeric' } : { day: 'numeric', month: 'long' }) + ' au ' + f(b, { day: 'numeric', month: 'long', year: 'numeric' });
+  return tr('Semaine du ') + f(a, sameM ? { day: 'numeric' } : { day: 'numeric', month: 'long' }) + tr(' au ') + f(b, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function cardStats() {
   const d = state.data, c = state.card, [from, to] = cardRange(c.kind, c.key);
@@ -2462,7 +2478,7 @@ function drawCard(cv) {
         const h = Math.abs(x.v) / mx * (ch / 2 - 30), bx = cx + i * bw + bw * .18;
         g.fillStyle = x.v > 0 ? WIN : x.v < 0 ? LOSS : 'rgba(255,255,255,.14)';
         g.beginPath(); g.roundRect(bx, x.v >= 0 ? mid - Math.max(h, 4) : mid, bw * .64, Math.max(h, 4), Math.min(10, bw * .2)); g.fill();
-        if (c.kind === 'week') { g.fillStyle = MUT; g.font = F(600, 24); g.fillText(new Date(x.k + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'short' }).replace('.', ''), cx + i * bw + bw / 2, y + ch + 34); }
+        if (c.kind === 'week') { g.fillStyle = MUT; g.font = F(600, 24); g.fillText(new Date(x.k + 'T12:00:00').toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', ''), cx + i * bw + bw / 2, y + ch + 34); }
       });
     }
   }
@@ -2571,7 +2587,7 @@ async function buildDetailsUrl() {
   const base = {
     v: 1, k: c.kind, p: c.key, u: unit, c: unit === 'money' ? st.cur : undefined,
     a: c.hideAcc ? undefined : accName, h: c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : undefined,
-    g: new Date().toLocaleDateString('fr-BE'),
+    g: new Date().toLocaleDateString(LOCALE),
     s: { v: main == null ? 0 : +(+main).toFixed(2), pct: st.pctV == null ? null : +st.pctV.toFixed(2), r: st.rOk ? +st.r.toFixed(2) : null,
          n: st.trades.length, w: st.wins, l: st.losses, wr: st.winRate == null ? null : Math.round(st.winRate), b: st.best ? val(st.best) : null },
   };
@@ -2641,7 +2657,7 @@ function renderCardCal(per) {
   if (c.key) box.appendChild(el('div', 'c-cal-sel', cardLabel(c.kind, c.key)));
   else box.appendChild(el('div', 'c-cal-sel', 'Aucun trade pour cette période'));
 }
-const compactMoney = v => v >= 1000 ? (v / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + 'k' : Math.round(v).toString();
+const compactMoney = v => v >= 1000 ? (v / 1000).toLocaleString(LOCALE, { maximumFractionDigits: 1 }) + 'k' : Math.round(v).toString();
 $('#cardHandle').oninput = e => { state.card.handle = e.target.value.trim().slice(0, 30); cardOptions(); clearTimeout(saveCardPrefs.t); saveCardPrefs.t = setTimeout(saveCardPrefs, 600); };
 $('#cardHideAcc').onchange = e => { state.card.hideAcc = e.target.checked; saveCardPrefs(); cardOptions(); };
 $('#cardClose').onclick = () => $('#cardBg').classList.remove('open');
@@ -2760,8 +2776,10 @@ const hNorm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, 
 const hStem = w => { w = w.replace(/(s|x)$/, w.length > 3 ? '' : '$1'); if (w.length > 5) w = w.replace(/(er|ez|ee|e)$/, ''); return w; };
 const hTokens = s => hNorm(s).split(' ').filter(w => w && !HELP_STOP.has(w)).map(hStem);
 HELP_KB.forEach(e => {
-  e._t = new Set(hTokens(e.k + ' ' + e.q + ' ' + (e.alt || []).join(' ')));
-  e._qs = [e.q, ...(e.alt || [])].map(x => ({ n: hNorm(x), t: new Set(hTokens(x)) }));
+  const tq = LANG !== 'fr' ? tr(e.q) : '', ta = LANG !== 'fr' ? tr(e.a) : '';
+  e._t = new Set(hTokens(e.k + ' ' + e.q + ' ' + (e.alt || []).join(' ') + ' ' + tq));
+  if (ta) hTokens(ta.replace(/\*\*/g, '')).forEach(w => w.length >= 5 && e._t.add(w));
+  e._qs = [e.q, ...(e.alt || []), ...(tq ? [tq] : [])].map(x => ({ n: hNorm(x), t: new Set(hTokens(x)) }));
 });
 function helpSearch(text) {
   const qt = hTokens(text); if (!qt.length) return [];
@@ -2791,6 +2809,7 @@ const HELP_ACTS = {
   discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'), login: () => openKey(),
 };
 function helpBubble(who, text, acts, sugg) {
+  if (who === 'bot') text = tr(String(text));
   const m = el('div', 'h-msg ' + who);
   const p = el('div', 'h-txt');
   String(text).split('\n').forEach((line, i) => {
@@ -2815,8 +2834,8 @@ function helpAsk(text) {
   helpBubble('me', text);
   const n = hNorm(text);
   setTimeout(() => {
-    if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, statistiques, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
-    if (/^(merci|top|parfait|super|ok|d accord|nickel)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
+    if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo|hi|hallo|hola|buenas)\b/.test(n) && hTokens(text).length <= 2) return helpBubble('bot', 'Salut ! Pose-moi ta question sur l\'app : comptes, statistiques, journal, cartes de résultats, abonnement…', null, HELP_KB.slice(0, 4));
+    if (/^(merci|top|parfait|super|ok|d accord|nickel|thanks|thank you|thx|danke|gracias|perfect|perfekt|genial)\b/.test(n)) return helpBubble('bot', 'Avec plaisir ! Autre chose ?');
     const res = helpSearch(text);
     if (!res.length || res[0].sc < 2) return helpBubble('bot', 'Je n\'ai pas trouvé de réponse précise. Essaie avec d\'autres mots, regarde ces sujets, ou pose ta question sur le **Discord** :', [['Rejoindre la communauté', 'discord']], (res.length ? res.slice(0, 3).map(x => x.e) : HELP_KB.slice(0, 4)));
     const best = res[0].e, others = res.slice(1, 4).filter(x => x.sc >= Math.max(2, res[0].sc - 2)).map(x => x.e);
@@ -2884,7 +2903,7 @@ function licenceLost() {
   state.lic = Object.assign({}, state.lic || {}, { active: false });
   applyLock(); state.page = 'offres'; showPage();
 }
-const fmtLicDay = iso => { try { return new Date(iso).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+const fmtLicDay = iso => { try { return new Date(iso).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
 async function renderOffres() {
   if (!offresData) { try { offresData = await api('/api/offres'); } catch (e) { offresData = { plans: [] }; } }
   const lic = state.lic || {};
@@ -2991,7 +3010,7 @@ async function renderOffres() {
     const bill = el('div', 'of-bill');
     if (yr) { bill.append('Facturé ' + p.annual.total + ' par an · '); bill.appendChild(el('b', null, '−' + (offresData.annual_discount || 20) + ' %')); }
     else if (p.trial) bill.textContent = 'Puis choisis ton offre, sans obligation';
-    else if (p.annual) bill.textContent = 'Ou ' + p.annual.price + '/mois en annuel';
+    else if (p.annual) bill.textContent = tr('Ou ') + p.annual.price + '/mois en annuel';
     c.appendChild(bill);
     const ul = el('ul');
     const feats = (offresData.features || []).length ? offresData.features : (p.features || []).map(f => ({ label: f, values: { [p.id]: true } }));
@@ -3138,12 +3157,12 @@ $('#accToggle').onclick = ev => {
 
 // ---------- journal de trading ----------
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-const fmtPx = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
-const fmtPts = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString('fr-BE', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const fmtPx = v => v === null || v === undefined ? '—' : Number(v).toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 5 });
+const fmtPts = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const dtObj = iso => new Date(iso);
-const fmtDate = iso => dtObj(iso).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const fmtTime = iso => dtObj(iso).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const fmtLong = iso => dtObj(iso).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + fmtTime(iso);
+const fmtDate = iso => dtObj(iso).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fmtTime = iso => dtObj(iso).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const fmtLong = iso => dtObj(iso).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + fmtTime(iso);
 function fmtDuration(a, b) {
   let sec = Math.max(0, Math.round((dtObj(b) - dtObj(a)) / 1000));
   const d = Math.floor(sec / 86400); sec %= 86400; const h = Math.floor(sec / 3600); sec %= 3600; const m = Math.floor(sec / 60); sec %= 60;
@@ -3212,11 +3231,11 @@ function renderJournal() {
       lastDay = t.d;
       const dayPnl = list.filter(x => x.d === t.d).reduce((s, x) => s + x.n, 0);
       const tr = el('tr', 'j-day'); const td = el('td'); td.colSpan = 3;
-      td.append(new Date(t.d + 'T12:00:00').toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ');
+      td.append(new Date(t.d + 'T12:00:00').toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ');
       td.append(el('span', cls(dayPnl), money(dayPnl, d.currency, true))); tr.appendChild(td); tbody.appendChild(tr);
     }
     const tr = el('tr', 'row'); tr.onclick = () => { state.jTrade = t.id; renderJournal(); window.scrollTo(0, 0); };
-    const c1 = el('td'); c1.append(t.ct ? fmtDate(t.ct) : new Date(t.d + 'T12:00:00').toLocaleDateString('fr-BE'));
+    const c1 = el('td'); c1.append(t.ct ? fmtDate(t.ct) : new Date(t.d + 'T12:00:00').toLocaleDateString(LOCALE));
     if (t.ct) { c1.append(' '); c1.append(el('span', 'muted', fmtTime(t.ct).slice(0, 5))); }
     const c2 = el('td'); c2.append(el('span', 'sym', t.s || '—'));
     if (t.side) { c2.append(' '); c2.append(el('span', 'badge ' + t.side, t.side === 'buy' ? 'Long' : 'Short')); }
@@ -3241,7 +3260,7 @@ function renderTradeDetail(box, t, acc, cur) {
   const cell = (k, v, sub, c) => { const g = el('div'); g.append(el('div', 'k', k)); const vv = el('div', 'v ' + (c || ''), v); if (sub) vv.append(sub); g.append(vv); grid.appendChild(g); return vv; };
   const typ = cell('Type', String(t.id || '—')); if (t.side) { const sm = el('small'); sm.append(el('span', 'badge ' + t.side, sideLabel(t))); typ.append(sm); }
   if (t.ot) cell('Ouverture', fmtDate(t.ot), el('small', null, fmtTime(t.ot)));
-  if (t.v !== undefined) cell('Volume (lots)', t.v.toLocaleString('fr-BE', { maximumFractionDigits: 2 }));
+  if (t.v !== undefined) cell('Volume (lots)', t.v.toLocaleString(LOCALE, { maximumFractionDigits: 2 }));
   cell('Symbole', t.s || '—');
   cell('PnL', money(t.n, cur, true), null, cls(t.n));
   if (move !== null) cell('Points', fmtPts(move), null, cls(move));
@@ -3554,7 +3573,7 @@ function fmtEcoVal(v, ev) {
   if (v === null || v === undefined || v === '') return '';
   if (typeof v !== 'number') return String(v);
   const dec = Math.abs(v) >= 100 || Number.isInteger(v) ? (Number.isInteger(v) ? 0 : 1) : (Math.abs(v) < 10 ? 2 : 1);
-  return v.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: Math.max(dec, 1) }) + (ev.scale || '') + (ev.unit || '');
+  return v.toLocaleString(LOCALE, { minimumFractionDigits: 0, maximumFractionDigits: Math.max(dec, 1) }) + (ev.scale || '') + (ev.unit || '');
 }
 async function renderEco(force) {
   const body = $('#ecoBody'), id = ++ecoReq;
@@ -3586,12 +3605,12 @@ async function renderEco(force) {
     if (day !== lastDay) {
       lastDay = day;
       const tr = el('tr', 'eco-day'); const td = el('td'); td.colSpan = 7;
-      const lbl = ev.t.toLocaleDateString('fr-BE', { timeZone: ECO_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const lbl = ev.t.toLocaleDateString(LOCALE, { timeZone: ECO_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       td.textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
       tr.appendChild(td); body.appendChild(tr);
     }
     const tr = el('tr', 'ev' + (ev.t.getTime() < now - 60000 ? ' past' : '') + (i === nextIdx ? ' next' : ''));
-    const allDay = ev.t.toLocaleTimeString('fr-BE', { timeZone: ECO_TZ, hour: '2-digit', minute: '2-digit' });
+    const allDay = ev.t.toLocaleTimeString(LOCALE, { timeZone: ECO_TZ, hour: '2-digit', minute: '2-digit' });
     const c = ECO_COUNTRIES.find(x => x[0] === (ev.country || '').toUpperCase());
     const tdT = el('td', 'c-time', allDay);
     const tdC = el('td', 'c-cur'); const cur = el('span', 'cur'); cur.append((c ? c[1] : '🏳') + ' ', ev.currency || (c ? c[3] : ev.country || '')); tdC.appendChild(cur);
@@ -3599,9 +3618,10 @@ async function renderEco(force) {
     const tdI = el('td', 'c-imp'); const lvl = ev.importance === 1 ? 3 : ev.importance === 0 ? 2 : 1;
     const bl = el('span', 'bulls b' + lvl); bl.appendChild(document.createElement('i')); tdI.appendChild(bl);
     tdI.title = ['Faible', 'Moyenne', 'Forte'][lvl - 1] + ' importance';
-    const tdE = el('td'); tdE.appendChild(el('span', 'ev-t', ev.title || ev.indicator || '—'));
-    if (ev.title_en && ev.title_en !== ev.title) tdE.title = ev.title_en;
-    if (ev.period) tdE.appendChild(el('span', 'ev-p', '(' + ev.period + ')'));
+    const tdE = el('td'); tdE.appendChild(el('span', 'ev-t', (LANG !== 'fr' && ev.title_en) || ev.title || ev.indicator || '—'));
+    tdE.dataset.noi18n = '';
+    if (LANG === 'fr' && ev.title_en && ev.title_en !== ev.title) tdE.title = ev.title_en;
+    const per = (LANG !== 'fr' && ev.period_en) || ev.period; if (per) tdE.appendChild(el('span', 'ev-p', '(' + per + ')'));
     const tdA = el('td', 'c-val', fmtEcoVal(ev.actual, ev));
     if (typeof ev.actual === 'number' && typeof ev.forecast === 'number' && ev.actual !== ev.forecast) {
       const better = (ev.actual > ev.forecast) !== ECO_INVERSE.test((ev.title || '') + ' ' + (ev.title_en || ''));
@@ -3610,7 +3630,7 @@ async function renderEco(force) {
     tr.append(tdT, tdC, tdI, tdE, tdA, el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), el('td', 'c-val', fmtEcoVal(ev.previous, ev)));
     body.appendChild(tr);
   });
-  $('#ecoUpd').textContent = 'mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');
+  $('#ecoUpd').textContent = 'mis à jour à ' + new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');
   // actualisation automatique tant que la page est ouverte (les valeurs « Actuel » arrivent en direct)
   clearTimeout(ecoTimer);
   ecoTimer = setTimeout(() => { if (state.page === 'eco' && !document.hidden) renderEco(); }, 60000);
@@ -3660,7 +3680,7 @@ function timeAgo(d) {
   if (m < 60) return 'il y a ' + m + ' min';
   const h = Math.round(m / 60);
   if (h < 24) return 'il y a ' + h + ' h';
-  return d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 }
 const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 // mots proches : une recherche « crypto » trouve aussi Bitcoin, Ethereum…
@@ -3762,9 +3782,9 @@ function newsCard(it, kind, terms, kicker) {
   if (kicker) meta.appendChild(el('span', 'kicker', kicker));
   meta.append(el('span', 'src', it.source));
   if (it.date) meta.append(el('span', null, timeAgo(new Date(it.date))));
-  const ttl = el('div', 'ttl'); highlight(ttl, it.title, terms);
+  const ttl = el('div', 'ttl'); ttl.dataset.noi18n = ''; highlight(ttl, it.title, terms);
   tx.append(meta, ttl);
-  if (it.summary) { const sm = el('div', 'sum'); highlight(sm, it.summary, terms); tx.appendChild(sm); }
+  if (it.summary) { const sm = el('div', 'sum'); sm.dataset.noi18n = ''; highlight(sm, it.summary, terms); tx.appendChild(sm); }
   c.appendChild(tx); c.onclick = () => openArticle(it);
   return c;
 }
@@ -3772,8 +3792,8 @@ function newsLine(it, terms) {
   const r = el('button', 'nl'); r.type = 'button'; r.title = 'Lire l\'article';
   const d = it.date ? new Date(it.date) : null;
   const sameDay = d && d.toDateString() === new Date().toDateString();
-  r.appendChild(el('div', 'nl-time', d ? (sameDay ? d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' })) : ''));
-  const b = el('div'); const t = el('div', 'nl-t'); highlight(t, it.title, terms);
+  r.appendChild(el('div', 'nl-time', d ? (sameDay ? d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })) : ''));
+  const b = el('div'); const t = el('div', 'nl-t'); t.dataset.noi18n = ''; highlight(t, it.title, terms);
   const sub = el('div', 'nl-s'); sub.appendChild(el('b', null, it.source)); if (d) sub.append(' · ' + timeAgo(d));
   b.append(t, sub); r.appendChild(b); r.onclick = () => openArticle(it);
   return r;
@@ -3827,7 +3847,7 @@ async function loadNews(force) {
     const r = await api('/api/news?sources=' + encodeURIComponent(newsSourcesFor(state.news.themes).join(',')) + (force ? '&fresh=1' : ''));
     newsItems = r.items || []; newsLoadedAt = Date.now(); state.news.shown = 12;
     const failed = (r.failed || []).map(id => NEWS_SOURCE_NAMES[id] || id);
-    $('#newsSub').textContent = 'Les derniers articles · mis à jour à ' + new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })
+    $('#newsSub').textContent = 'Les derniers articles · mis à jour à ' + new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
       + (failed.length ? ' · indisponible : ' + failed.join(', ') : '');
     renderNews();
   } catch (e) {
@@ -3882,7 +3902,7 @@ function renderLiveTable(snap) {
     const tr = el('tr');
     const sym = el('td'); sym.appendChild(el('b', null, p.symbol));
     const side = el('td'); side.appendChild(el('span', 'badge ' + p.side, p.side === 'buy' ? 'Long' : 'Short'));
-    tr.append(sym, side, el('td', 'r', p.volume.toLocaleString('fr-BE', { maximumFractionDigits: 2 })), el('td', 'r', fmtPx(p.open)), el('td', 'r', fmtPx(p.current)),
+    tr.append(sym, side, el('td', 'r', p.volume.toLocaleString(LOCALE, { maximumFractionDigits: 2 })), el('td', 'r', fmtPx(p.open)), el('td', 'r', fmtPx(p.current)),
       el('td', 'r hide-s', p.sl ? fmtPx(p.sl) : '—'), el('td', 'r hide-s', p.tp ? fmtPx(p.tp) : '—'), el('td', 'r hide-s', fmtDur(p.duration)),
       el('td', 'r ' + (risk ? cls(p.profit) : ''), risk ? fmtR2(p.profit / risk) : '—'), el('td', 'r pnl ' + cls(p.profit), money(p.profit, cur, true)));
     tb.appendChild(tr);
@@ -3902,7 +3922,7 @@ function applyLive(r) {
   const body = $('#liveBody');
   if (r.status === 'running' && r.snap) {
     state.live = { login: state.sel, snap: r.snap };
-    setLiveStatus([el('span', 'ok', '● En direct'), ' · ' + new Date().toLocaleTimeString('fr-BE')]);
+    setLiveStatus([el('span', 'ok', '● En direct'), ' · ' + new Date().toLocaleTimeString(LOCALE)]);
     renderLiveTable(r.snap);
     setLiveVisible(r.snap.positions.length > 0);
     if (state.data) {
@@ -4107,7 +4127,7 @@ let MK_TAB_DEFAULT = {
 state.mk = { tabs: ['Indices', 'Matières premières', 'Obligations', 'Actions'], lists: {}, sel: {}, tab: 'Indices', range: '1D' };
 const mkList = cat => state.mk.lists[cat] || MK_TAB_DEFAULT[cat] || [];
 state.quotes = mkList(state.mk.tab);
-const fmtQ = (v, dg) => Number(v).toLocaleString('fr-BE', { minimumFractionDigits: dg, maximumFractionDigits: dg });
+const fmtQ = (v, dg) => Number(v).toLocaleString(LOCALE, { minimumFractionDigits: dg, maximumFractionDigits: dg });
 function quoteLabel(k) {
   if (k.startsWith('x:')) return k.slice(2);
   const it = quotesCatalog && quotesCatalog.items.find(x => x.key === k);
@@ -4188,7 +4208,7 @@ function drawMkChart(msg) {
   const step = niceStep((y1 - y0) / 3); const dg = Math.max(0, Math.min(5, -Math.floor(Math.log10(step)) + (step / 10 ** Math.floor(Math.log10(step)) < 1.5 ? 1 : 0)));
   for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
     mk('line', { x1: m.l, x2: W - m.r + 6, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 });
-    mk('text', { x: W - m.r + 10, y: Y(v) + 4, fill: 'var(--muted)', 'font-size': 11 }, v.toLocaleString('fr-BE', { minimumFractionDigits: dg, maximumFractionDigits: dg }));
+    mk('text', { x: W - m.r + 10, y: Y(v) + 4, fill: 'var(--muted)', 'font-size': 11 }, v.toLocaleString(LOCALE, { minimumFractionDigits: dg, maximumFractionDigits: dg }));
   }
   if (prev != null) mk('line', { x1: m.l, x2: W - m.r + 6, y1: Y(prev), y2: Y(prev), stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '4 4', opacity: .7 });
   const line = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
@@ -4198,9 +4218,9 @@ function drawMkChart(msg) {
   // dates en bas
   const span = xs[xs.length - 1] - xs[0], n = Math.max(2, Math.min(4, Math.floor((W - m.l - m.r) / 80)));
   const fmtX = t => { const d = new Date(t * 1000);
-    if (span <= 2 * 86400) return d.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
-    if (span <= 120 * 86400) return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' });
-    if (span <= 800 * 86400) return d.toLocaleDateString('fr-BE', { month: 'short', year: '2-digit' });
+    if (span <= 2 * 86400) return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+    if (span <= 120 * 86400) return d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit' });
+    if (span <= 800 * 86400) return d.toLocaleDateString(LOCALE, { month: 'short', year: '2-digit' });
     return String(d.getFullYear()); };
   for (let k = 0; k <= n; k++) { const i = Math.round((pts.length - 1) * k / n);
     mk('text', { x: X(i), y: H - 6, fill: 'var(--muted)', 'font-size': 11, 'text-anchor': k === 0 ? 'start' : k === n ? 'end' : 'middle' }, fmtX(xs[i])); }

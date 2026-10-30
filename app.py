@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from collections import defaultdict
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 
 try:
     import MetaTrader5 as mt5
@@ -1228,6 +1228,8 @@ def api_prefs_set():
                        "range": str(mk.get("range", "1D")).upper() if str(mk.get("range", "1D")).upper() in QUOTE_RANGES else "1D"}
     if isinstance(body.get("mask"), bool):
         prefs["mask"] = body["mask"]
+    if body.get("lang") in LANGS:
+        prefs["lang"] = body["lang"]
     if isinstance(body.get("accOrder"), list):
         prefs["accOrder"] = [str(x)[:40] for x in body["accOrder"]][:200]
     if body.get("tvCount") in (1, 2, 3, 4):
@@ -1576,7 +1578,7 @@ def _eco_fetch(d0, d1, countries):
         events.append({
             "id": it.get("id"), "date": it.get("date"), "title": eco_fr(it.get("title") or it.get("indicator")),
             "title_en": it.get("title") or it.get("indicator"),
-            "country": it.get("country"), "currency": it.get("currency"), "period": eco_period_fr(it.get("period")),
+            "country": it.get("country"), "currency": it.get("currency"), "period": eco_period_fr(it.get("period")), "period_en": it.get("period") or "",
             "importance": imp if imp in (-1, 0, 1) else -1,
             "actual": _num(it.get("actual")), "forecast": _num(it.get("forecast")), "previous": _num(it.get("previous")),
             "unit": it.get("unit") or "", "scale": ECO_SCALE.get(it.get("scale") or "", it.get("scale") or ""),
@@ -2136,9 +2138,64 @@ def api_version():
                     "update": _load(UPDATE_STATUS_FILE, {})})
 
 
+LANGS = ("fr", "en", "de", "es")
+_i18n_cache = {}
+
+
+def i18n_dict():
+    """Dictionnaire des traductions de l'interface : texte français → {en, de, es}."""
+    path = os.path.join(STATIC_DIR, "i18n.json")
+    try:
+        mt = os.path.getmtime(path)
+        if _i18n_cache.get("mt") != mt:
+            with open(path, encoding="utf-8") as f:
+                _i18n_cache.update(mt=mt, d=json.load(f))
+        return _i18n_cache["d"]
+    except (OSError, ValueError):
+        return {}
+
+
+def ui_lang():
+    """Langue de l'interface : choix enregistré, sinon langue du système (Windows), sinon français."""
+    lg = (_load(PREFS_FILE, {}) or {}).get("lang")
+    if lg in LANGS:
+        return lg
+    try:
+        best = request.accept_languages.best_match(list(LANGS))
+        if best:
+            return best
+    except Exception:
+        pass
+    try:
+        import locale
+        loc = (locale.getlocale()[0] or "").lower()[:2]
+        if loc in LANGS:
+            return loc
+    except Exception:
+        pass
+    return "fr"
+
+
+def tr_server(s, lang):
+    if lang == "fr" or not s:
+        return s
+    e = i18n_dict().get(s)
+    return e.get(lang, s) if e else s
+
+
 @app.get("/")
 def index():
-    return send_from_directory(STATIC_DIR, "index.html")
+    lang = ui_lang()
+    with open(os.path.join(STATIC_DIR, "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    d = {k: v[lang] for k, v in i18n_dict().items() if lang in v} if lang != "fr" else {}
+    inject = ("<script>window.ASTRA_LANG=" + json.dumps(lang) + ";window.I18N="
+              + json.dumps(d, ensure_ascii=False).replace("</", "<\\/") + ";</script>")
+    html = html.replace('<html lang="fr">', '<html lang="' + lang + '">', 1).replace("<head>", "<head>\n" + inject, 1)
+    resp = make_response(html)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.get("/favicon.png")
@@ -2893,12 +2950,54 @@ def _mask_name(name):
     return re.sub(r"\d{5,}", MASK, name or "")
 
 
+# textes du rapport PDF (le reste de l'interface est traduit par static/i18n.json)
+REPORT_TR = {
+    'Aucun trade ce mois-ci.': {'en': 'No trades this month.', 'de': 'Keine Trades in diesem Monat.', 'es': 'Ninguna operación este mes.'},
+    'Résultat du mois': {'en': 'Monthly result', 'de': 'Monatsergebnis', 'es': 'Resultado del mes'},
+    'Résultat en %': {'en': 'Result in %', 'de': 'Ergebnis in %', 'es': 'Resultado en %'},
+    'du capital en début de mois': {'en': 'of capital at the start of the month', 'de': 'des Kapitals zu Monatsbeginn', 'es': 'del capital a principio de mes'},
+    'Résultat en R': {'en': 'Result in R', 'de': 'Ergebnis in R', 'es': 'Resultado en R'},
+    'Risque propre à chaque compte': {'en': "Each account's own risk", 'de': 'Eigenes Risiko je Konto', 'es': 'Riesgo propio de cada cuenta'},
+    'Risque par trade non défini': {'en': 'Risk per trade not set', 'de': 'Risiko pro Trade nicht festgelegt', 'es': 'Riesgo por operación no definido'},
+    'Trades gagnants': {'en': 'Winning trades', 'de': 'Gewinntrades', 'es': 'Operaciones ganadoras'},
+    'Trades perdants': {'en': 'Losing trades', 'de': 'Verlusttrades', 'es': 'Operaciones perdedoras'},
+    'Trades au total': {'en': 'Total trades', 'de': 'Trades insgesamt', 'es': 'Operaciones en total'},
+    'Taux de réussite': {'en': 'Win rate', 'de': 'Trefferquote', 'es': 'Tasa de acierto'},
+    '{w} gagnants sur {n} trades': {'en': '{w} winners out of {n} trades', 'de': '{w} Gewinner von {n} Trades', 'es': '{w} ganadoras de {n} operaciones'},
+    'Capital début → fin': {'en': 'Capital start → end', 'de': 'Kapital Beginn → Ende', 'es': 'Capital inicio → fin'},
+    'Clôture': {'en': 'Close', 'de': 'Schließung', 'es': 'Cierre'},
+    'Compte': {'en': 'Account', 'de': 'Konto', 'es': 'Cuenta'},
+    'Symbole': {'en': 'Symbol', 'de': 'Symbol', 'es': 'Símbolo'},
+    'Sens': {'en': 'Side', 'de': 'Richtung', 'es': 'Sentido'},
+    'Lots': {'en': 'Lots', 'de': 'Lots', 'es': 'Lotes'},
+    'Entrée': {'en': 'Entry', 'de': 'Einstieg', 'es': 'Entrada'},
+    'Sortie': {'en': 'Exit', 'de': 'Ausstieg', 'es': 'Salida'},
+    "Aucun trade détaillé pour ce mois. Actualise le compte dans l'app pour charger les trades.": {'en': 'No detailed trades for this month. Refresh the account in the app to load the trades.', 'de': 'Keine detaillierten Trades für diesen Monat. Aktualisiere das Konto in der App, um die Trades zu laden.', 'es': 'No hay operaciones detalladas este mes. Actualiza la cuenta en la app para cargar las operaciones.'},
+    ' · Démo': {'en': ' · Demo', 'de': ' · Demo', 'es': ' · Demo'},
+    '{n} comptes cumulés · ': {'en': '{n} accounts combined · ', 'de': '{n} Konten zusammengefasst · ', 'es': '{n} cuentas acumuladas · '},
+    ' · devises différentes additionnées sans conversion': {'en': ' · different currencies added without conversion', 'de': ' · unterschiedliche Währungen ohne Umrechnung addiert', 'es': ' · divisas distintas sumadas sin conversión'},
+    'comptes': {'en': 'accounts', 'de': 'Konten', 'es': 'cuentas'},
+    'Rapport mensuel': {'en': 'Monthly report', 'de': 'Monatsbericht', 'es': 'Informe mensual'},
+    'Généré le': {'en': 'Generated on', 'de': 'Erstellt am', 'es': 'Generado el'},
+    'à': {'en': 'at', 'de': 'um', 'es': 'a las'},
+    'Synthèse du mois': {'en': 'Month summary', 'de': 'Monatsübersicht', 'es': 'Resumen del mes'},
+    'Évolution du capital': {'en': 'Capital growth', 'de': 'Kapitalentwicklung', 'es': 'Evolución del capital'},
+    'Trades du mois': {'en': 'Trades of the month', 'de': 'Trades des Monats', 'es': 'Operaciones del mes'},
+    'Données lues depuis MetaTrader 5 · Montants en': {'en': 'Data read from MetaTrader 5 · Amounts in', 'de': 'Daten aus MetaTrader 5 gelesen · Beträge in', 'es': 'Datos leídos de MetaTrader 5 · Importes en'},
+    ' · R calculé avec 1 R = ': {'en': ' · R calculated with 1 R = ', 'de': ' · R berechnet mit 1 R = ', 'es': ' · R calculado con 1 R = '},
+    ' · R calculé avec le risque de chaque compte': {'en': " · R calculated with each account's risk", 'de': ' · R berechnet mit dem Risiko jedes Kontos', 'es': ' · R calculado con el riesgo de cada cuenta'},
+}
+REPORT_MONTHS = {'en': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'], 'de': ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'], 'es': ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']}
+
+
 def report_html(rep, auto_print=False, preview=False, masked=False):
     from html import escape as e
+    lang = ui_lang()
+    T = lambda x: REPORT_TR.get(x, {}).get(lang, x) if lang != "fr" else x
 
     cur, month = rep["cur"], rep["month"]
     y, m = int(month[:4]), int(month[5:7])
-    title = f"{MOIS[m - 1].capitalize()} {y}"
+    title = f"{(REPORT_MONTHS[lang][m - 1] if lang in REPORT_MONTHS else MOIS[m - 1]).capitalize()} {y}"
     acc = rep["acc"]
 
     # courbe du capital
@@ -2927,7 +3026,7 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
              f'<stop offset="1" stop-color="#c48a45" stop-opacity="0"/></linearGradient></defs>{grid}'
              f'<line x1="{L}" x2="{W-10}" y1="{base_y:.1f}" y2="{base_y:.1f}" stroke="#8a8f99" stroke-dasharray="4 4"/>'
              f'<path d="{area}" fill="url(#g)"/><path d="{path}" fill="none" stroke="#c48a45" stroke-width="2.2" stroke-linejoin="round"/>'
-             f'{labels}</svg>') if len(vals) > 1 else '<p class="muted">Aucun trade ce mois-ci.</p>'
+             f'{labels}</svg>') if len(vals) > 1 else f'<p class="muted">{T("Aucun trade ce mois-ci.")}</p>'
 
     # synthèse
     def card(k, v, sub="", c_=""):
@@ -2935,17 +3034,17 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
 
     wr = f"{round(rep['wins'] / rep['trades_n'] * 100)} %" if rep["trades_n"] else "—"
     kpis = "".join([
-        card("Résultat du mois", _fmt_money(rep["pnl"], cur, True), "", _cls(rep["pnl"])),
-        card("Résultat en %", _fmt_pct(rep["pct"]), "du capital en début de mois", _cls(rep["pnl"])),
-        card("Résultat en R", _fmt_r(rep["r"]) if rep["r"] is not None else "—",
-             f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else ("Risque propre à chaque compte" if rep.get("multi") and rep["r"] is not None
-                                                                         else "Risque par trade non défini"),
+        card(T("Résultat du mois"), _fmt_money(rep["pnl"], cur, True), "", _cls(rep["pnl"])),
+        card(T("Résultat en %"), _fmt_pct(rep["pct"]), T("du capital en début de mois"), _cls(rep["pnl"])),
+        card(T("Résultat en R"), _fmt_r(rep["r"]) if rep["r"] is not None else "—",
+             f"1 R = {_fmt_money(rep['risk'], cur)}" if rep["risk"] else (T("Risque propre à chaque compte") if rep.get("multi") and rep["r"] is not None
+                                                                         else T("Risque par trade non défini")),
              _cls(rep["r"] or 0)),
-        card("Trades gagnants", str(rep["wins"]), "", "pos" if rep["wins"] else ""),
-        card("Trades perdants", str(rep["losses"]), "", "neg" if rep["losses"] else ""),
-        card("Trades au total", str(rep["trades_n"]), ""),
-        card("Taux de réussite", wr, f"{rep['wins']} gagnants sur {rep['trades_n']} trades"),
-        card("Capital début → fin", _fmt_money(rep["start_cap"], cur) + "  →  " + _fmt_money(rep["end_cap"], cur), ""),
+        card(T("Trades gagnants"), str(rep["wins"]), "", "pos" if rep["wins"] else ""),
+        card(T("Trades perdants"), str(rep["losses"]), "", "neg" if rep["losses"] else ""),
+        card(T("Trades au total"), str(rep["trades_n"]), ""),
+        card(T("Taux de réussite"), wr, T("{w} gagnants sur {n} trades").format(w=rep['wins'], n=rep['trades_n'])),
+        card(T("Capital début → fin"), _fmt_money(rep["start_cap"], cur) + "  →  " + _fmt_money(rep["end_cap"], cur), ""),
     ])
 
     # trades
@@ -2961,25 +3060,25 @@ def report_html(rep, auto_print=False, preview=False, masked=False):
                     f"<td class='r'>{px(t.get('v'))}</td><td class='r'>{px(t.get('op'))}</td><td class='r'>{px(t.get('cp'))}</td>"
                     f"<td class='r {_cls(t['n'])}'><b>{e(_fmt_money(t['n'], cur, True))}</b></td>"
                     f"<td class='r {_cls(t['n']) if t.get('rr') is not None else ''}'>{e(r_txt)}</td></tr>")
-    table = ("<table><thead><tr><th>Clôture</th>" + ("<th>Compte</th>" if rep.get("multi") else "") + "<th>Symbole</th><th>Sens</th><th class='r'>Lots</th><th class='r'>Entrée</th>"
-             "<th class='r'>Sortie</th><th class='r'>PnL</th><th class='r'>R</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
-             ) if rows else '<p class="muted">Aucun trade détaillé pour ce mois. Actualise le compte dans l\'app pour charger les trades.</p>'
+    table = (f"<table><thead><tr><th>{T('Clôture')}</th>" + (f"<th>{T('Compte')}</th>" if rep.get("multi") else "") + f"<th>{T('Symbole')}</th><th>{T('Sens')}</th><th class='r'>{T('Lots')}</th><th class='r'>{T('Entrée')}</th>"
+             f"<th class='r'>{T('Sortie')}</th><th class='r'>PnL</th><th class='r'>R</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+             ) if rows else f'<p class="muted">{T("Aucun trade détaillé pour ce mois. Actualise le compte dans l'app pour charger les trades.")}</p>'
 
-    now = dt.datetime.now().strftime("%d/%m/%Y à %H:%M")
+    now = dt.datetime.now().strftime("%d/%m/%Y ") + T("à") + dt.datetime.now().strftime(" %H:%M")
     name_ = acc.get("name") or acc["login"]
     login_ = acc["login"]
     if masked:
         name_, login_ = _mask_name(name_), MASK
-    acc_line = e(name_) + (f" · {e(login_)} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else " · Démo")
+    acc_line = e(name_) + (f" · {e(login_)} · {e(acc.get('server', ''))}" if acc.get("login") != "0" else T(" · Démo"))
     if rep.get("multi"):
         names = [(_mask_name(a.get("name") or a["login"]) if masked else (a.get("name") or a["login"])) for a in rep["accs"]]
-        acc_line = f"{len(names)} comptes cumulés · " + e(", ".join(names))
+        acc_line = T("{n} comptes cumulés · ").format(n=len(names)) + e(", ".join(names))
         if rep.get("mixed_cur"):
-            acc_line += " · devises différentes additionnées sans conversion"
+            acc_line += T(" · devises différentes additionnées sans conversion")
     script = "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script>" if auto_print else ""
     preview_css = ("<style>html{background:#3a3f4b}body{width:210mm;max-width:calc(100% - 24px);margin:14px auto;"
                    "padding:12mm;background:#fff;border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.35)}</style>") if preview else ""
-    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '') if not rep.get('multi') else str(len(rep['accs'])) + ' comptes'} - {title}</title>
+    return f"""<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>ASTRA CAPITAL - {e(acc.get('name') or '') if not rep.get('multi') else str(len(rep['accs'])) + ' ' + T('comptes')} - {title}</title>
 <style>
 @page {{ size: A4; margin: 12mm 12mm 14mm; }}
 * {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
@@ -3018,11 +3117,11 @@ tr {{ break-inside: avoid; }}
 .badge.buy {{ background: #e7f6ec; color: #15803d; }} .badge.sell {{ background: #fdeaea; color: #dc2626; }}
 .foot {{ margin-top: 16px; color: #9aa3b5; font-size: 9px; text-align: center; }}
 </style></head><body><div class="rep">
-<div class="head"><h1>Rapport mensuel · <span>{title}</span></h1><p>{acc_line}</p><p>Généré le {now}</p></div>
-<h2>Synthèse du mois</h2><div class="kpis">{kpis}</div>
-<h2>Évolution du capital</h2><div class="chart">{chart}</div>
-<div class="page2"><h2>Trades du mois ({len(rep['trades'])})</h2>{table}</div>
-<div class="foot">ASTRA CAPITAL · Données lues depuis MetaTrader 5 · Montants en {e(cur)}{' · R calculé avec 1 R = ' + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else (' · R calculé avec le risque de chaque compte' if rep.get('multi') and rep['r'] is not None else '')}</div>
+<div class="head"><h1>{T("Rapport mensuel")} · <span>{title}</span></h1><p>{acc_line}</p><p>{T("Généré le")} {now}</p></div>
+<h2>{T("Synthèse du mois")}</h2><div class="kpis">{kpis}</div>
+<h2>{T("Évolution du capital")}</h2><div class="chart">{chart}</div>
+<div class="page2"><h2>{T("Trades du mois")} ({len(rep['trades'])})</h2>{table}</div>
+<div class="foot">ASTRA CAPITAL · {T("Données lues depuis MetaTrader 5 · Montants en")} {e(cur)}{T(' · R calculé avec 1 R = ') + e(_fmt_money(rep['risk'], cur)) if rep['risk'] else (T(' · R calculé avec le risque de chaque compte') if rep.get('multi') and rep['r'] is not None else '')}</div>
 </div>{script}{preview_css}</body></html>"""
 
 
