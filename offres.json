@@ -44,7 +44,8 @@
       "perks": [
         "live",
         "pdf",
-        "cards"
+        "cards",
+        "copier"
       ],
       "annual": {
         "price": "28,00 €",
@@ -90,6 +91,14 @@
     },
     {
       "label": "Cartes de résultats à partager (TikTok, Instagram)",
+      "values": {
+        "essai": false,
+        "essentiel": false,
+        "pro": true
+      }
+    },
+    {
+      "label": "Copieur de trades entre tes comptes",
       "values": {
         "essai": false,
         "essentiel": false,

@@ -833,6 +833,60 @@
     .week, .cal .dow.wk { display: none; }
     .day { min-height: 64px; }
   }
+
+  /* ---------- copieur de trades ---------- */
+  .cp-nav { margin-top: -2px; }
+  .cp-nav .cp-tab { display: flex; align-items: center; gap: 9px; background: none; border: 1px solid transparent; color: var(--muted); border-radius: 8px; padding: 7px 9px; text-align: left; font-size: 13px; }
+  .cp-nav .cp-tab:hover { color: var(--fg); background: var(--panel-2); }
+  .cp-nav .cp-tab.on { color: var(--gold); background: var(--gold-soft); border-color: rgba(196,138,69,.35); }
+  .cp-ic { width: 14px; text-align: center; color: var(--gold); }
+  #cpNav[hidden], #copier[hidden], #cpCopiers[hidden], #cpAccounts[hidden], #cpImportRow[hidden], .cp-table[hidden] { display: none; }
+  .cp-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 4px 0 16px; flex-wrap: wrap; }
+  .cp-top h1 { margin: 0; font-size: 24px; }
+  .cp-top p { margin: 6px 0 0; color: var(--muted); max-width: 640px; }
+  .cp-banner { display: flex; gap: 12px; align-items: flex-start; background: var(--gold-soft); border: 1px solid rgba(196,138,69,.35); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--fg); }
+  .cp-banner svg { color: var(--gold); flex: none; margin-top: 1px; }
+  .cp-warn { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); color: #fca5a5; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; }
+  .cp-card { padding: 6px 6px 4px; overflow-x: auto; }
+  .cp-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  .cp-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .cp-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .cp-table tr:last-child td { border-bottom: none; }
+  .cp-table .r { text-align: right; }
+  .cp-table td.nm { font-weight: 600; }
+  .cp-table .mut { color: var(--muted); white-space: nowrap; }
+  .cp-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--muted); }
+  .cp-dot.ok { background: var(--win); box-shadow: 0 0 0 3px var(--win-soft); }
+  .cp-dot.err { background: var(--loss); box-shadow: 0 0 0 3px var(--loss-soft); }
+  .cp-dot.wait { background: var(--gold); animation: cpPulse 1.2s infinite; }
+  @keyframes cpPulse { 50% { opacity: .35; } }
+  .cp-st { font-size: 12.5px; }
+  .cp-st.ok { color: var(--win); } .cp-st.err { color: #fca5a5; } .cp-st.warn { color: var(--gold); }
+  .cp-acts { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+  .cp-ibtn { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); padding: 0; }
+  .cp-ibtn:hover { border-color: var(--gold); color: var(--gold); }
+  .cp-ibtn.play { color: var(--win); } .cp-ibtn.play:hover { border-color: var(--win); color: var(--win); }
+  .cp-ibtn.del:hover, .cp-ibtn.confirm { border-color: var(--loss); color: var(--loss); }
+  .cp-ibtn.confirm { width: auto; padding: 0 10px; font-size: 12px; background: rgba(239,68,68,.12); }
+  .cp-empty { color: var(--muted); text-align: center; padding: 26px 16px; font-size: 14px; }
+  .cp-group { padding: 0; overflow: hidden; }
+  .cp-ghead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--gold); background: var(--panel-2); }
+  .cp-ghead b { font-size: 17px; }
+  .cp-ghead span { color: var(--muted); font-size: 12.5px; margin-left: 10px; }
+  .cp-group .cp-table { margin: 0; }
+  .cp-dir { font-size: 18px; color: var(--win); }
+  .cp-dir.off { color: var(--muted); }
+  .cp-log-card h3 { margin: 10px 12px 8px; font-size: 14px; }
+  .cp-log { max-height: 300px; overflow-y: auto; padding: 0 6px 6px; }
+  .cp-log-row { display: grid; grid-template-columns: 16px 74px 1fr; gap: 8px; align-items: baseline; padding: 6px 6px; border-top: 1px solid var(--line); font-size: 13px; }
+  .cp-log-row:first-child { border-top: none; }
+  .cp-log-row time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cp-log-row .lv { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); align-self: center; }
+  .cp-log-row .lv.ok { background: var(--win); } .cp-log-row .lv.err { background: var(--loss); } .cp-log-row .lv.info { background: var(--gold); }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { width: 100%; padding-right: 40px; }
+  .pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); padding: 4px; display: grid; }
+  .pw-eye:hover, .pw-eye.on { color: var(--gold); }
 </style>
 </head>
 <body>
@@ -852,6 +906,11 @@
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="share"><span class="ic">⇪</span><span class="nav-t">Partager mes résultats</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
+      <button data-page="copier"><span class="ic">⇄</span><span class="nav-t">Copieur de trades</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
+      <div class="sub cp-nav" id="cpNav" hidden>
+        <button type="button" class="cp-tab" data-cp="accounts"><span class="cp-ic">≡</span>Comptes</button>
+        <button type="button" class="cp-tab" data-cp="copiers"><span class="cp-ic">⇉</span>Copieurs</button>
+      </div>
       <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
       <button data-page="abo" class="nav-abo" id="navAbo" hidden><span class="ic">⚙</span><span class="nav-t">Gérer mon abonnement</span></button>
     </nav>
@@ -1138,6 +1197,38 @@
       </div>
     </div>
 
+    <div id="copier" hidden>
+      <div class="cp-top">
+        <div>
+          <h1 id="cpTitle">Comptes du copieur</h1>
+          <p id="cpLead">Ajoute les comptes MT5 à relier : le compte qui envoie les trades et ceux qui les reçoivent.</p>
+        </div>
+        <button type="button" class="btn primary" id="cpAddBtn">+ Ajouter un compte</button>
+      </div>
+      <div class="cp-banner" id="cpBanner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5v5.5M12 16.2v.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <div><b>Le copieur tourne sur ce PC.</b> Les trades sont copiés tant qu'ASTRA Dashboard reste ouvert (tu peux réduire la fenêtre). Pour copier 24 h/24, installe l'application sur ton VPS Windows.</div>
+      </div>
+      <div class="cp-warn" id="cpWarn" hidden></div>
+      <div id="cpAccounts">
+        <div class="card cp-card">
+          <table class="cp-table">
+            <thead><tr><th></th><th>Nom</th><th>Numéro</th><th>Serveur</th><th class="r">Solde</th><th class="r">Équité</th><th class="r">Positions</th><th>Statut</th><th></th></tr></thead>
+            <tbody id="cpAccBody"></tbody>
+          </table>
+          <div class="cp-empty" id="cpAccEmpty" hidden>Aucun compte dans le copieur. Clique sur « + Ajouter un compte » pour commencer.</div>
+        </div>
+      </div>
+      <div id="cpCopiers" hidden>
+        <div id="cpGroups"></div>
+        <div class="cp-empty card" id="cpCopEmpty" hidden></div>
+        <div class="card cp-card cp-log-card">
+          <h3>Journal du copieur</h3>
+          <div class="cp-log" id="cpLog"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="empty-state" id="emptyState" hidden>
       <img class="hero-logo" src="/static/logo.png" alt="ASTRA CAPITAL">
       <h2>Aucun compte connecté</h2>
@@ -1145,6 +1236,97 @@
       <button class="btn primary" onclick="openLogin()">Ajouter un compte</button>
     </div>
   </main>
+</div>
+
+<div class="modal-bg" id="cpAccBg">
+  <form class="modal" id="cpAccForm" autocomplete="off">
+    <h2 id="cpAccTitle">Ajouter un compte</h2>
+    <p class="sub">Compte MetaTrader 5 à relier au copieur.</p>
+    <div class="err" id="cpAccErr"></div>
+    <div class="field" id="cpImportRow">
+      <label for="cpImport">Reprendre un compte du dashboard (facultatif)</label>
+      <select id="cpImport" class="field-select"></select>
+    </div>
+    <div class="field">
+      <label for="cpName">Nom descriptif</label>
+      <input id="cpName" placeholder="Ex. 80k funded" maxlength="60">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="cpLogin">Numéro de compte</label>
+        <input id="cpLogin" inputmode="numeric" required placeholder="Ex. 541497431">
+      </div>
+      <div class="field">
+        <label for="cpServer">Serveur</label>
+        <input id="cpServer" required placeholder="Ex. FTMO-Server">
+      </div>
+    </div>
+    <div class="field">
+      <label for="cpPass">Mot de passe</label>
+      <div class="pw-wrap"><input id="cpPass" type="password"><button type="button" class="pw-eye" id="cpEye" title="Afficher le mot de passe" aria-label="Afficher le mot de passe"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
+      <span class="hint">Un compte qui reçoit les copies a besoin de son mot de passe principal (trading). Pour un compte qui sert seulement de source, le mot de passe investisseur suffit. Il est gardé dans le Gestionnaire d'identification Windows de ce PC.</span>
+    </div>
+    <details>
+      <summary>Options avancées</summary>
+      <div class="field">
+        <label for="cpTerm">Chemin du terminal MT5 (si plusieurs MT5 installés)</label>
+        <input id="cpTerm" placeholder="C:\Program Files\FTMO MetaTrader 5\terminal64.exe">
+      </div>
+    </details>
+    <div class="modal-actions">
+      <div></div>
+      <div class="right">
+        <button type="button" class="btn" id="cpAccCancel">Annuler</button>
+        <button type="submit" class="btn primary" id="cpAccSave">Ajouter le compte</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-bg" id="cpCopBg">
+  <form class="modal" id="cpCopForm" autocomplete="off">
+    <h2 id="cpCopTitle">Créer un copieur</h2>
+    <p class="sub">Chaque trade ouvert sur le compte source est copié sur le compte destination, puis modifié et fermé en même temps.</p>
+    <div class="err" id="cpCopErr"></div>
+    <div class="field">
+      <label for="cpFrom">Copier depuis</label>
+      <select id="cpFrom" class="field-select"></select>
+    </div>
+    <div class="field">
+      <label for="cpTo">Envoyer vers</label>
+      <select id="cpTo" class="field-select"></select>
+    </div>
+    <div class="field">
+      <label for="cpRisk">Type de risque</label>
+      <select id="cpRisk" class="field-select">
+        <option value="balance">Multiplicateur de risque selon le solde</option>
+        <option value="lot">Multiplicateur de lot</option>
+        <option value="fixed">Lot fixe</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="cpMult" id="cpMultLbl">Multiplicateur</label>
+      <input id="cpMult" inputmode="decimal" value="1,00">
+      <span class="hint" id="cpRiskHint"></span>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="cpExisting">Copier les trades déjà ouverts</label>
+        <select id="cpExisting" class="field-select"><option value="0">Non</option><option value="1">Oui</option></select>
+      </div>
+      <div class="field">
+        <label for="cpSltp">Copier le SL et le TP</label>
+        <select id="cpSltp" class="field-select"><option value="1">Oui</option><option value="0">Non</option></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <div></div>
+      <div class="right">
+        <button type="button" class="btn" id="cpCopCancel">Annuler</button>
+        <button type="submit" class="btn primary" id="cpCopSave">Créer le copieur</button>
+      </div>
+    </div>
+  </form>
 </div>
 
 <div class="modal-bg" id="riskBg">
@@ -2710,6 +2892,8 @@ const HELP_KB = [
     a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois et coche les **comptes inclus** : avec plusieurs comptes, résultats, positions et statistiques sont **additionnés** dans un seul rapport. Regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Partager mes résultats sur TikTok / Instagram', k: 'partager carte image tiktok instagram reseaux post story publier resultats photo',
     a: 'Ouvre **Partager mes résultats** dans le menu de gauche : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
+  { q: 'Comment utiliser le copieur de trades ?', k: 'copieur copier copie copy copier trade trades dupliquer repliquer compte source destination multiplicateur lot autre compte',
+    a: 'Ouvre **Copieur de trades** dans le menu de gauche.\n1. Onglet **Comptes** : ajoute le compte qui envoie les trades et ceux qui les reçoivent. Un compte qui **reçoit** les copies a besoin de son mot de passe **principal** (trading).\n2. Onglet **Copieurs** : **+ Créer un copieur**, choisis le compte source, le compte destination et le type de risque (multiplicateur selon le solde, multiplicateur de lot ou lot fixe).\nLes ouvertures, SL/TP, fermetures partielles et fermetures sont copiés. L\'app doit rester ouverte sur le PC (ou ton VPS). Inclus dans l\'offre **Pro**.', act: [['Ouvrir le copieur', 'copier']] },
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',
     a: 'Dans **Partager mes résultats**, coche « Afficher un QR code ». Avec **Détails des trades**, le QR ouvre une page qui montre le résumé et le détail de chaque position (date, symbole, sens, lots, entrée, sortie, résultat), dans la même unité que la carte. Avec **Mon lien**, il ouvre le lien de ton choix, par exemple ta page Myfxbook.' },
   { q: 'Le score de discipline', k: 'score discipline jauge regle stop loss surtrading revenge perte journaliere lot taille note',
@@ -2806,6 +2990,7 @@ const HELP_ACTS = {
   offres: () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); }, journal: () => $('#nav > button[data-page="journal"]').click(),
   eco: () => $('#nav > button[data-page="eco"]').click(), share: () => { state.page = 'share'; showPage(); window.scrollTo(0, 0); },
   abo: () => { state.page = licOk() && state.lic && state.lic.key_hint && !state.lic.trial ? 'abo' : 'offres'; showPage(); window.scrollTo(0, 0); },
+  copier: () => { if (!hasPerk('copier')) return perkUpsell('Le copieur de trades'); state.page = 'copier'; showPage(); window.scrollTo(0, 0); },
   discord: () => openSocial('discord'), tiktok: () => openSocial('tiktok'), login: () => openKey(),
 };
 function helpBubble(who, text, acts, sugg) {
@@ -3131,9 +3316,12 @@ function showPage() {
   $('#offres').hidden = state.page !== 'offres';
   $('#abo').hidden = state.page !== 'abo';
   $('#share').hidden = state.page !== 'share';
-  if (['offres', 'abo', 'share'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
-  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share'].includes(state.page) ? 'none' : '';
-  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo', 'share'].includes(state.page);
+  $('#copier').hidden = state.page !== 'copier';
+  $('#cpNav').hidden = state.page !== 'copier';
+  if (['offres', 'abo', 'share', 'copier'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
+  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share', 'copier'].includes(state.page) ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo', 'share', 'copier'].includes(state.page);
+  if (state.cp) { cpPoll(state.page === 'copier'); if (state.page === 'copier') cpShowTab(state.cp.tab); }
   if (state.page === 'share') renderShare();
   if (state.page === 'offres' || state.page === 'abo') renderOffres();
   if (state.page === 'journal' && hasAcc) renderJournal();
@@ -3142,6 +3330,7 @@ function showPage() {
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
   if (!licOk() && b.dataset.page !== 'offres' && b.dataset.page !== 'abo') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
+  if (b.dataset.page === 'copier' && !hasPerk('copier')) { perkUpsell('Le copieur de trades'); return; }
   state.page = b.dataset.page; state.jTrade = null;
   if (state.page === 'journal' && state.sel === 'all' && state.accounts.length) {
     state.sel = state.accounts[0].login; state.month = null; state.view = null; renderAccounts(); loadData();
@@ -4427,6 +4616,231 @@ api('/api/version').then(v => {
     $('#notices').appendChild(el);
   }
 }).catch(() => {});
+
+// ---------- copieur de trades ----------
+state.cp = { tab: 'accounts', data: null, edit: null, editCop: null, timer: null };
+const CP_RISK = { balance: 'Multiplicateur de risque selon le solde', lot: 'Multiplicateur de lot', fixed: 'Lot fixe' };
+const cpNum = v => Number(v).toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const cpIcon = {
+  edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  del: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  pause: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1"/></svg>',
+};
+function cpBtn(kind, title, fn) {
+  const b = el('button', 'cp-ibtn ' + kind); b.type = 'button'; b.innerHTML = cpIcon[kind]; b.title = title; b.setAttribute('aria-label', title);
+  b.onclick = fn; return b;
+}
+function cpConfirmBtn(title, fn) {  // suppression en deux clics (le bouton devient « Confirmer ? »)
+  const b = cpBtn('del', title, () => {
+    if (b.classList.contains('confirm')) { fn(); return; }
+    b.classList.add('confirm'); b.textContent = tr('Confirmer ?');
+    setTimeout(() => { if (b.isConnected) { b.classList.remove('confirm'); b.innerHTML = cpIcon.del; } }, 3500);
+  });
+  return b;
+}
+const cpAcc = login => ((state.cp.data || {}).accounts || []).find(a => a.login === login) || { name: login, login };
+function cpShowTab(tab) {
+  state.cp.tab = tab;
+  document.querySelectorAll('#cpNav .cp-tab').forEach(b => b.classList.toggle('on', b.dataset.cp === tab));
+  const acc = tab === 'accounts';
+  $('#cpAccounts').hidden = !acc; $('#cpCopiers').hidden = acc;
+  $('#cpTitle').textContent = tr(acc ? 'Comptes du copieur' : 'Copieurs');
+  $('#cpLead').textContent = tr(acc ? 'Ajoute les comptes MT5 à relier : le compte qui envoie les trades et ceux qui les reçoivent.'
+    : 'Choisis quel compte copie vers quel autre, avec quel multiplicateur. Tu peux mettre un copieur en pause à tout moment.');
+  $('#cpAddBtn').textContent = tr(acc ? '+ Ajouter un compte' : '+ Créer un copieur');
+  renderCopier();
+}
+document.querySelectorAll('#cpNav .cp-tab').forEach(b => b.onclick = () => {
+  if (state.page !== 'copier') { state.page = 'copier'; showPage(); }
+  cpShowTab(b.dataset.cp);
+});
+$('#cpAddBtn').onclick = () => state.cp.tab === 'accounts' ? openCpAccount(null) : openCpCopier(null);
+
+async function loadCopier() {
+  try { state.cp.data = await api('/api/copier'); } catch (e) { return; }
+  if (state.page === 'copier') renderCopier();
+}
+function cpPoll(on) {
+  clearInterval(state.cp.timer); state.cp.timer = null;
+  if (on) { loadCopier(); state.cp.timer = setInterval(() => { if (!document.hidden) loadCopier(); }, 1500); }
+}
+function cpStatus(a) {
+  if (a.status === 'ok') {
+    if (a.trade_allowed === false) return ['warn', 'wait', tr('Connecté · mot de passe investisseur : peut seulement servir de source')];
+    if (a.algo_allowed === false) return ['warn', 'wait', tr('Connecté · « Algo Trading » désactivé dans MT5')];
+    return ['ok', 'ok', tr('Connecté')];
+  }
+  if (a.status === 'error') return ['err', 'err', a.error || tr('Erreur inconnue.')];
+  if (a.status === 'off') return ['', '', tr('En attente')];
+  return ['warn', 'wait', tr('Connexion… (jusqu\'à 1 min la première fois)')];
+}
+function renderCopier() {
+  const d = state.cp.data;
+  $('#cpWarn').hidden = true;
+  if (!d) return;
+  if (d.allowed === false) { $('#cpWarn').hidden = false; $('#cpWarn').textContent = tr('Le copieur de trades est inclus dans l\'offre Pro.'); }
+  else if (!d.mt5) { $('#cpWarn').hidden = false; $('#cpWarn').textContent = tr('Le copieur fonctionne uniquement sur Windows, avec MetaTrader 5 installé.'); }
+  if (state.cp.tab === 'accounts') {
+    const body = $('#cpAccBody'); body.innerHTML = '';
+    $('#cpAccEmpty').hidden = d.accounts.length > 0;
+    body.closest('table').hidden = !d.accounts.length;
+    for (const a of d.accounts) {
+      const [sc, dc, txt] = cpStatus(a);
+      const tr_ = el('tr');
+      const dot = el('td'); dot.appendChild(el('span', 'cp-dot ' + dc));
+      const nm = el('td', 'nm', shownName(a.name)); nm.dataset.noi18n = '';
+      const st = el('td'); st.appendChild(el('span', 'cp-st ' + sc, txt));
+      const acts = el('td'); const box = el('div', 'cp-acts');
+      box.append(cpBtn('edit', tr('Modifier le compte'), () => openCpAccount(a)),
+        cpConfirmBtn(tr('Retirer ce compte du copieur'), () => cpPost('/api/copier/account/delete', { login: a.login })));
+      acts.appendChild(box);
+      const has = a.balance !== undefined;
+      tr_.append(dot, nm, el('td', 'mut', shownLogin(a.login)), el('td', 'mut', a.server),
+        el('td', 'r', has ? money(a.balance, a.currency) : '—'), el('td', 'r', has ? money(a.equity, a.currency) : '—'),
+        el('td', 'r', has ? String(a.positions) : '—'), st, acts);
+      body.appendChild(tr_);
+    }
+    return;
+  }
+  // copieurs regroupés par compte source
+  const host = $('#cpGroups'); host.innerHTML = '';
+  const groups = {};
+  for (const c of d.copiers) (groups[c.from] = groups[c.from] || []).push(c);
+  const empty = $('#cpCopEmpty');
+  empty.hidden = d.copiers.length > 0;
+  empty.textContent = tr(d.accounts.length < 2 ? 'Ajoute d\'abord au moins deux comptes dans l\'onglet « Comptes ».' : 'Aucun copieur. Clique sur « + Créer un copieur » pour relier deux comptes.');
+  for (const [from, list] of Object.entries(groups)) {
+    const src = cpAcc(from);
+    const card = el('div', 'card cp-group');
+    const head = el('div', 'cp-ghead'); const hl = el('div');
+    const hb = el('b', null, shownName(src.name)); hb.dataset.noi18n = '';
+    hl.append(hb, el('span', null, shownLogin(src.login) + ' · ' + tr('compte source')));
+    head.appendChild(hl); card.appendChild(head);
+    const wrap = el('div', 'cp-card');
+    const t = el('table', 'cp-table');
+    t.innerHTML = '<thead><tr><th>' + tr('Envoyer vers') + '</th><th>' + tr('Numéro') + '</th><th>' + tr('Type de risque') + '</th><th>' + tr('Sens') + '</th><th>' + tr('Statut') + '</th><th></th></tr></thead>';
+    const tb = el('tbody');
+    for (const c of list) {
+      const dst = cpAcc(c.to);
+      const row = el('tr');
+      const nm = el('td', 'nm', shownName(dst.name)); nm.dataset.noi18n = '';
+      const riskTxt = c.risk === 'fixed' ? tr('Lot fixe') + ' : ' + cpNum(c.mult) : tr(CP_RISK[c.risk]) + ' × ' + cpNum(c.mult);
+      const dir = el('td'); dir.appendChild(el('span', 'cp-dir' + (c.active ? '' : ' off'), '→'));
+      let stTxt, stCls;
+      if (!c.active) { stTxt = tr('En pause'); stCls = ''; }
+      else if (cpAcc(c.from).status !== 'ok' || dst.status !== 'ok') { stTxt = tr('En attente de connexion'); stCls = 'warn'; }
+      else if (dst.trade_allowed === false) { stTxt = tr('Mot de passe principal requis sur ce compte'); stCls = 'err'; }
+      else { stTxt = tr('Actif') + (c.copies ? ' · ' + c.copies + ' ' + tr(c.copies > 1 ? 'positions copiées' : 'position copiée') : ''); stCls = 'ok'; }
+      const st = el('td'); st.appendChild(el('span', 'cp-st ' + stCls, stTxt));
+      const acts = el('td'); const box = el('div', 'cp-acts');
+      box.append(
+        cpBtn(c.active ? 'pause' : 'play', tr(c.active ? 'Mettre en pause' : 'Activer'), () => cpPost('/api/copier/copier/toggle', { id: c.id, active: !c.active })),
+        cpBtn('edit', tr('Modifier le copieur'), () => openCpCopier(c)),
+        cpConfirmBtn(tr('Supprimer ce copieur'), () => cpPost('/api/copier/copier/delete', { id: c.id })));
+      acts.appendChild(box);
+      row.append(nm, el('td', 'mut', shownLogin(dst.login)), el('td', null, riskTxt), dir, st, acts);
+      tb.appendChild(row);
+    }
+    t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); host.appendChild(card);
+  }
+  const log = $('#cpLog'); log.innerHTML = '';
+  if (!d.log.length) log.appendChild(el('div', 'cp-empty', tr('Rien pour l\'instant : chaque copie, fermeture ou erreur s\'affichera ici.')));
+  for (const e of d.log.slice(0, 80)) {
+    const r = el('div', 'cp-log-row');
+    const tm = el('time', null, new Date(e.at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    const msg = el('div', null, e.msg); msg.dataset.noi18n = '';
+    r.append(el('span', 'lv ' + e.level), tm, msg);
+    log.appendChild(r);
+  }
+}
+async function cpPost(path, body) {
+  try { state.cp.data = await api(path, body); renderCopier(); return true; }
+  catch (e) { toast(e.message); return false; }
+}
+
+// --- ajouter / modifier un compte
+function openCpAccount(a) {
+  state.cp.edit = a;
+  $('#cpAccErr').textContent = '';
+  $('#cpAccTitle').textContent = tr(a ? 'Modifier le compte' : 'Ajouter un compte');
+  $('#cpAccSave').textContent = tr(a ? 'Enregistrer' : 'Ajouter le compte');
+  $('#cpName').value = a ? a.name : ''; $('#cpLogin').value = a ? a.login : ''; $('#cpServer').value = a ? a.server : '';
+  $('#cpTerm').value = a ? (a.terminal || '') : ''; $('#cpPass').value = ''; $('#cpPass').type = 'password'; $('#cpEye').classList.remove('on');
+  $('#cpPass').placeholder = a && a.has_password ? tr('Laisser vide pour garder le mot de passe actuel') : '';
+  const sel = $('#cpImport'); sel.innerHTML = '';
+  const used = new Set(((state.cp.data || {}).accounts || []).map(x => x.login));
+  const dash = state.accounts.filter(x => !x.demo && !used.has(x.login));
+  $('#cpImportRow').hidden = !!a || !dash.length;
+  sel.append(new Option(tr('— Choisir —'), ''));
+  for (const x of dash) sel.append(new Option(x.name + ' · ' + x.login, x.login));
+  $('#cpAccBg').classList.add('open');
+  setTimeout(() => (a ? $('#cpPass') : $('#cpName')).focus(), 50);
+}
+$('#cpImport').onchange = () => {
+  const x = state.accounts.find(y => y.login === $('#cpImport').value); if (!x) return;
+  $('#cpName').value = x.name || ''; $('#cpLogin').value = x.login; $('#cpServer').value = x.server || ''; $('#cpTerm').value = x.terminal || '';
+  $('#cpPass').focus();
+};
+$('#cpEye').onclick = () => { const p = $('#cpPass'), on = p.type === 'password'; p.type = on ? 'text' : 'password'; $('#cpEye').classList.toggle('on', on); };
+$('#cpAccCancel').onclick = () => $('#cpAccBg').classList.remove('open');
+$('#cpAccForm').onsubmit = async e => {
+  e.preventDefault();
+  $('#cpAccErr').textContent = '';
+  const btn = $('#cpAccSave'); btn.disabled = true;
+  try {
+    state.cp.data = await api('/api/copier/account', { old: state.cp.edit ? state.cp.edit.login : '', name: $('#cpName').value.trim(),
+      login: $('#cpLogin').value.trim(), server: $('#cpServer').value.trim(), password: $('#cpPass').value, terminal: $('#cpTerm').value.trim() });
+    $('#cpAccBg').classList.remove('open'); renderCopier();
+    toast(tr(state.cp.edit ? 'Compte modifié.' : 'Compte ajouté : connexion en cours…'));
+  } catch (err) { $('#cpAccErr').textContent = err.message; }
+  btn.disabled = false;
+};
+
+// --- créer / modifier un copieur
+function cpRiskUi() {
+  const r = $('#cpRisk').value;
+  $('#cpMultLbl').textContent = tr(r === 'fixed' ? 'Lot fixe' : 'Multiplicateur');
+  $('#cpRiskHint').textContent = tr({
+    balance: 'Lot copié = lot source × (solde destination ÷ solde source) × multiplicateur. Idéal entre comptes de tailles différentes : même risque en %.',
+    lot: 'Lot copié = lot source × multiplicateur. Ex. × 2,00 : 0,50 lot sur la source → 1,00 lot sur la destination.',
+    fixed: 'Chaque trade est copié avec ce lot, quel que soit le lot de la source.',
+  }[r]);
+}
+$('#cpRisk').onchange = cpRiskUi;
+function openCpCopier(c) {
+  const d = state.cp.data || { accounts: [] };
+  if (!c && d.accounts.length < 2) { toast(tr('Ajoute d\'abord au moins deux comptes dans l\'onglet « Comptes ».')); cpShowTab('accounts'); return; }
+  state.cp.editCop = c;
+  $('#cpCopErr').textContent = '';
+  $('#cpCopTitle').textContent = tr(c ? 'Modifier le copieur' : 'Créer un copieur');
+  $('#cpCopSave').textContent = tr(c ? 'Enregistrer' : 'Créer le copieur');
+  for (const id of ['#cpFrom', '#cpTo']) {
+    const s = $(id); s.innerHTML = '';
+    for (const a of d.accounts) { const o = new Option(shownName(a.name) + ' (' + shownLogin(a.login) + ')', a.login); o.dataset.noi18n = ''; s.append(o); }
+  }
+  $('#cpFrom').value = c ? c.from : d.accounts[0].login;
+  $('#cpTo').value = c ? c.to : (d.accounts.find(a => a.login !== $('#cpFrom').value) || d.accounts[0]).login;
+  $('#cpRisk').value = c ? c.risk : 'balance';
+  $('#cpMult').value = cpNum(c ? c.mult : 1);
+  $('#cpExisting').value = c && c.existing ? '1' : '0';
+  $('#cpSltp').value = c && c.sltp === false ? '0' : '1';
+  cpRiskUi();
+  $('#cpCopBg').classList.add('open');
+}
+$('#cpCopCancel').onclick = () => $('#cpCopBg').classList.remove('open');
+$('#cpCopForm').onsubmit = async e => {
+  e.preventDefault();
+  $('#cpCopErr').textContent = '';
+  const btn = $('#cpCopSave'); btn.disabled = true;
+  try {
+    state.cp.data = await api('/api/copier/copier', { id: state.cp.editCop ? state.cp.editCop.id : '', from: $('#cpFrom').value, to: $('#cpTo').value,
+      risk: $('#cpRisk').value, mult: $('#cpMult').value, existing: $('#cpExisting').value === '1', sltp: $('#cpSltp').value === '1' });
+    $('#cpCopBg').classList.remove('open'); renderCopier();
+    toast(tr(state.cp.editCop ? 'Copieur modifié.' : 'Copieur créé : les prochains trades seront copiés.'));
+  } catch (err) { $('#cpCopErr').textContent = err.message; }
+  btn.disabled = false;
+};
 </script>
 </body>
 </html>
