@@ -72,4 +72,13 @@ T = {
   "Abre **Copiador de operaciones** en el menú de la izquierda.\n1. Pestaña **Cuentas**: añade la cuenta que envía las operaciones y las que las reciben. Una cuenta que **recibe** las copias necesita su contraseña **principal** (de trading).\n2. Pestaña **Copiadores**: **+ Crear un copiador**, elige la cuenta de origen, la de destino y el tipo de riesgo (multiplicador según el saldo, multiplicador de lote o lote fijo).\nSe copian las aperturas, SL/TP, cierres parciales y cierres. La app debe seguir abierta en el PC (o tu VPS). Incluido en el plan **Pro**."),
 "Ouvrir le copieur": ("Open the copier", "Kopierer öffnen", "Abrir el copiador"),
 "Copieur de trades entre tes comptes": ("Trade copier between your accounts", "Trade-Kopierer zwischen deinen Konten", "Copiador de operaciones entre tus cuentas"),
+"Direction": ("Direction", "Richtung", "Dirección"),
+"Normale →": ("Normal →", "Normal →", "Normal →"),
+"Inversée ⇄": ("Reversed ⇄", "Umgekehrt ⇄", "Invertida ⇄"),
+"Synchroniser SL / TP": ("Sync SL / TP", "SL / TP synchronisieren", "Sincronizar SL / TP"),
+"Copier les clôtures partielles": ("Copy partial closes", "Teilschließungen kopieren", "Copiar los cierres parciales"),
+"Correspondance des symboles": ("Symbol mapping", "Symbol-Zuordnung", "Correspondencia de símbolos"),
+"si les brokers diffèrent": ("if the brokers differ", "falls die Broker unterschiedlich sind", "si los brókers son distintos"),
+"Écart de prix max à l'ouverture": ("Max price deviation at open", "Max. Preisabweichung bei Eröffnung", "Desviación de precio máx. en la apertura"),
+"en points, 0 = désactivé": ("in points, 0 = off", "in Punkten, 0 = aus", "en puntos, 0 = desactivado"),
 }

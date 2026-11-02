@@ -3889,6 +3889,11 @@ class Mt5Backend:
         if tick is None:
             return False, None, f"Pas de prix pour {sym} (marché fermé ?).", 0
         buy = c["side"] == "buy"
+        price = tick.ask if buy else tick.bid
+        if c.get("slip") and c.get("ref"):
+            pts = abs(price - c["ref"]) / (m["point"] or 0.00001)
+            if pts > c["slip"]:
+                return False, None, f"Écart de prix trop grand : {pts:.0f} points (max {c['slip']:g}).", "slip"
         rd = lambda x: round(x, m["digits"]) if x else 0.0
         req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": vol,
                "type": mt5.ORDER_TYPE_BUY if buy else mt5.ORDER_TYPE_SELL, "price": tick.ask if buy else tick.bid,
@@ -4297,6 +4302,31 @@ class CopierEngine:
             return p["volume"] * mult
         return p["volume"] * sb / mb * mult
 
+    @staticmethod
+    def _symmap(c):
+        out = {}
+        for part in str(c.get("symmap") or "").replace(",", ";").split(";"):
+            if part.count("=") == 1:
+                a, b = (x.strip() for x in part.split("="))
+                if a and b:
+                    out[a] = b
+        return out
+
+    @staticmethod
+    def _side(c, p):
+        if not c.get("reverse"):
+            return p["side"]
+        return "sell" if p["side"] == "buy" else "buy"
+
+    @staticmethod
+    def _stops(c, p):
+        """SL / TP à mettre sur la copie (inversés en mode « Inversée » : le SL de la source devient le TP de la copie)."""
+        if not c.get("sltp", True):
+            return 0.0, 0.0
+        if c.get("reverse"):
+            return p["tp"] or 0.0, p["sl"] or 0.0
+        return p["sl"] or 0.0, p["tp"] or 0.0
+
     def _busy(self, key, timeout=15.0):
         import time
         t = self.inflight.get(key)
@@ -4325,6 +4355,7 @@ class CopierEngine:
             self.armed.add(cid)
             changed = True
         ignore = set(c.get("ignore") or [])
+        smap = self._symmap(c)
         spos = S.snap["pos"]
         by_ticket = {}
         for p in spos:
@@ -4349,9 +4380,11 @@ class CopierEngine:
                     continue
                 vol = self._vol(c, p, M, S)
                 self.inflight[key] = now
-                req = {"cmd": "open", "symbol": p["symbol"], "side": p["side"], "volume": vol,
-                       "sl": p["sl"] if c.get("sltp", True) else 0.0, "tp": p["tp"] if c.get("sltp", True) else 0.0,
-                       "comment": tag + mt}
+                sl, tp = self._stops(c, p)
+                req = {"cmd": "open", "symbol": smap.get(p["symbol"], p["symbol"]), "side": self._side(c, p), "volume": vol,
+                       "sl": sl, "tp": tp, "comment": tag + mt,
+                       "ref": p.get("price") or 0.0, "slip": float(c.get("slip") or 0),
+                       "src_point": p.get("point") or 0.0}
                 S.request(req, lambda r, key=key, mt=mt, p=p, vol=vol: self._opened(c, key, mt, p, vol, r))
                 continue
             if link.get("gone"):
@@ -4363,7 +4396,7 @@ class CopierEngine:
                     self.save_state()
                 continue
             # fermeture partielle sur la source → même proportion sur la destination
-            if link.get("mv0") and p["volume"] < link["mv0"] - 1e-9:
+            if c.get("partial", True) and link.get("mv0") and p["volume"] < link["mv0"] - 1e-9:
                 target = link["sv0"] * p["volume"] / link["mv0"]
                 diff = sp["volume"] - target
                 key = (cid, mt, "partial")
@@ -4373,11 +4406,12 @@ class CopierEngine:
                               lambda r, key=key, mt=mt: self._done(c, key, r, f"Fermeture partielle copiée (#{mt})"))
             if c.get("sltp", True):
                 eps = (sp.get("point") or 0.00001) / 2
-                if abs((sp["sl"] or 0) - (p["sl"] or 0)) > eps or abs((sp["tp"] or 0) - (p["tp"] or 0)) > eps:
+                wsl, wtp = self._stops(c, p)
+                if abs((sp["sl"] or 0) - wsl) > eps or abs((sp["tp"] or 0) - wtp) > eps:
                     key = (cid, mt, "modify")
                     if not self._busy(key, 5) and self.fails[key] < 3:
                         self.inflight[key] = now
-                        S.request({"cmd": "modify", "ticket": sp["ticket"], "sl": p["sl"], "tp": p["tp"]},
+                        S.request({"cmd": "modify", "ticket": sp["ticket"], "sl": wsl, "tp": wtp},
                                   lambda r, key=key, mt=mt: self._done(c, key, r, None))
         # positions fermées sur la source → fermées sur la destination
         for mt, link in list(links.items()):
@@ -4416,6 +4450,8 @@ class CopierEngine:
             self.note("ok", f"{self._name(c['from'])} → {self._name(c['to'])} : {side} {r.get('msg')} copié (#{mt})", c["id"])
         else:
             self.fails[key] += 1
+            if r.get("code") == "slip":
+                self.fails[key] = 3  # le prix s'est éloigné : on ne court pas après
             self.note("err", f"{self._name(c['from'])} → {self._name(c['to'])} : copie de {p['symbol']} refusée — {r.get('msg')}"
                       + (" (abandon après 3 essais)" if self.fails[key] >= 3 else ""), c["id"])
 
@@ -4453,7 +4489,7 @@ class CopierEngine:
                               company=ag.info.get("company"))
             accounts.append({"login": str(a["login"]), "name": a.get("name") or str(a["login"]), "server": a.get("server", ""),
                              "terminal": a.get("terminal", ""), "has_password": bool(copier_password(str(a["login"]))), **st})
-        copiers = [{k: c.get(k) for k in ("id", "from", "to", "risk", "mult", "existing", "sltp", "active")}
+        copiers = [{k: c.get(k) for k in ("id", "from", "to", "risk", "mult", "existing", "sltp", "partial", "reverse", "symmap", "slip", "active")}
                    | {"copies": sum(1 for l in self.state["map"].get(c["id"], {}).values() if not l.get("gone"))}
                    for c in cfg["copiers"]]
         return {"accounts": accounts, "copiers": copiers, "log": log[::-1], "allowed": has_perk("copier"),
@@ -4588,8 +4624,19 @@ def api_copier_copier():
     elif c["from"] != src or c["to"] != dst:
         COPIER.forget(c["id"])
         c["ignore"] = []
+    try:
+        slip = float(str(b.get("slip") or 0).replace(",", "."))
+    except ValueError:
+        slip = -1
+    if not (0 <= slip <= 100000):
+        return jsonify({"error": "L'écart de prix max doit être un nombre de points positif (0 = désactivé)."}), 400
+    symmap = str(b.get("symmap") or "").strip()[:500]
+    for part in [x for x in symmap.replace(",", ";").split(";") if x.strip()]:
+        if part.count("=") != 1 or not all(y.strip() for y in part.split("=")):
+            return jsonify({"error": f"Correspondance des symboles invalide : « {part.strip()} ». Format : US100.cash=NAS100; GER40.cash=DE40"}), 400
     c.update({"from": src, "to": dst, "risk": risk, "mult": round(mult, 4), "existing": bool(b.get("existing")),
-              "sltp": bool(b.get("sltp", True))})
+              "sltp": bool(b.get("sltp", True)), "partial": bool(b.get("partial", True)), "reverse": bool(b.get("reverse")),
+              "symmap": symmap, "slip": slip})
     COPIER.armed.discard(c["id"])
     save_copier(cfg)
     return jsonify(COPIER.public())
