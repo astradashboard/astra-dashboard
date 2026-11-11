@@ -503,6 +503,16 @@
   input.c-sel { margin-top: 0; } input.c-sel:focus, select.c-sel:focus { outline: none; border-color: var(--gold); }
   .c-check { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 13.5px; cursor: pointer; }
   .c-check input { accent-color: var(--gold); }
+  .c-trades { margin-top: 8px; display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .c-trades[hidden] { display: none; }
+  .c-tr { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: center; text-align: left; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .c-tr:hover { border-color: rgba(196,138,69,.6); }
+  .c-tr.on { border-color: var(--gold); background: var(--gold-soft); }
+  .c-tr time { color: var(--muted); font-size: 12px; }
+  .c-tr .sym { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-tr .sym small { display: block; color: var(--muted); font-weight: 500; font-size: 11.5px; }
+  .c-tr .pl { font-weight: 700; } .c-tr .pl.win { color: var(--win); } .c-tr .pl.loss { color: var(--loss); }
   .c-cal { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
   .c-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .c-cal-head b { font-size: 14px; }
@@ -1433,9 +1443,12 @@
     <div class="card-side">
       <h2>Carte de résultats</h2>
       <p class="sub">Une image prête à poster sur TikTok, Instagram ou dans ton groupe.</p>
+      <label class="c-lab" for="cardAcc">Compte</label>
+      <select id="cardAcc" class="c-sel" style="margin-top:0" data-noi18n></select>
       <label class="c-lab">Période</label>
-      <div class="seg c-seg" id="cardKind"><button type="button" data-v="day">Jour</button><button type="button" data-v="week">Semaine</button><button type="button" data-v="month">Mois</button></div>
+      <div class="seg c-seg" id="cardKind"><button type="button" data-v="trade">Trade</button><button type="button" data-v="day">Jour</button><button type="button" data-v="week">Semaine</button><button type="button" data-v="month">Mois</button></div>
       <div class="c-cal" id="cardCal"></div>
+      <div class="c-trades" id="cardTrades" hidden></div>
       <label class="c-lab">Afficher</label>
       <div class="seg c-seg" id="cardMode"><button type="button" data-v="both">Montant + %</button><button type="button" data-v="pct">% seulement</button><button type="button" data-v="r">En R</button></div>
       <label class="c-lab">Format</label>
@@ -2540,33 +2553,39 @@ let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); re
 
 // ---------- cartes de résultats à partager (TikTok, Instagram…) ----------
 const CARD_FORMATS = { post: [1080, 1350, 'Post 4:5'], story: [1080, 1920, 'Story 9:16'], square: [1080, 1080, 'Carré 1:1'] };
-state.card = { kind: 'month', key: null, mode: 'both', format: 'post', handle: '', hideAcc: false, qr: true, links: {}, qrSrc: 'details', _durl: '' };
+state.card = { kind: 'month', key: null, mode: 'both', format: 'post', handle: '', hideAcc: false, qr: true, links: {}, qrSrc: 'details', _durl: '', acc: null, data: null, trade: null };
+const cd = () => state.card.data || state.data;          // données du compte choisi pour la carte
+const cardAcc = () => state.card.acc || state.sel;
+const cardAccName = () => cardAcc() === 'all' ? 'Tous les comptes' : shownName((state.accounts.find(a => a.login === cardAcc()) || {}).name || '');
+const tradeKey = t => (t.a || cardAcc()) + ':' + (t.id ?? t.ct);
+const dayish = k => k === 'day' || k === 'trade';
 const cardLinkOk = u => /^https?:\/\/[^\s/]+\.[^\s]{2,}/i.test(u || '');
-const cardLinkOf = () => state.card.links[state.sel] || '';
+const cardLinkOf = () => state.card.links[cardAcc()] || '';
 const cardLogo = new Image(); cardLogo.src = '/static/logo.png';
 const isoD = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const mondayOf = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return isoD(d); };
 function cardPeriods(kind) {
-  const days = [...new Set((state.data.trades || []).map(t => t.d).concat((state.data.daily || []).filter(x => x.trades || x.pnl).map(x => x.date)))].sort().reverse();
-  const keys = kind === 'day' ? days : kind === 'week' ? [...new Set(days.map(mondayOf))] : [...new Set(days.map(d => d.slice(0, 7)))];
+  const D = cd(), days = [...new Set((D.trades || []).map(t => t.d).concat(kind === 'trade' ? [] : (D.daily || []).filter(x => x.trades || x.pnl).map(x => x.date)))].sort().reverse();
+  const keys = dayish(kind) ? days : kind === 'week' ? [...new Set(days.map(mondayOf))] : [...new Set(days.map(d => d.slice(0, 7)))];
   return keys.map(k => ({ key: k, label: cardLabel(kind, k) }));
 }
 function cardRange(kind, key) {
-  if (kind === 'day') return [key, key];
+  if (dayish(kind)) return [key, key];
   if (kind === 'month') return [key + '-01', key + '-31'];
   const e = new Date(key + 'T12:00:00'); e.setDate(e.getDate() + 6); return [key, isoD(e)];
 }
 function cardLabel(kind, key) {
   const f = (iso, o) => new Date(iso + 'T12:00:00').toLocaleDateString(LOCALE, o);
-  if (kind === 'day') { const s = f(key, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); }
+  if (dayish(kind)) { const s = f(key, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); }
   if (kind === 'month') { const m = MONTHS[Number(key.slice(5)) - 1]; return m[0].toUpperCase() + m.slice(1) + ' ' + key.slice(0, 4); }
   const [a, b] = cardRange('week', key);
   const sameM = a.slice(0, 7) === b.slice(0, 7);
   return tr('Semaine du ') + f(a, sameM ? { day: 'numeric' } : { day: 'numeric', month: 'long' }) + tr(' au ') + f(b, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function cardStats() {
-  const d = state.data, c = state.card, [from, to] = cardRange(c.kind, c.key);
-  const trades = (d.trades || []).filter(t => t.d >= from && t.d <= to).sort((x, y) => (x.ct || x.d) < (y.ct || y.d) ? -1 : 1);
+  const d = cd(), c = state.card, [from, to] = cardRange(c.kind, c.key);
+  let trades = (d.trades || []).filter(t => t.d >= from && t.d <= to).sort((x, y) => (x.ct || x.d) < (y.ct || y.d) ? -1 : 1);
+  if (c.kind === 'trade') trades = trades.filter(t => tradeKey(t) === c.trade).slice(0, 1);
   const daily = (d.daily || []).filter(x => x.date >= from && x.date <= to);
   const pnl = trades.length ? trades.reduce((s, t) => s + t.n, 0) : daily.reduce((s, x) => s + x.pnl, 0);
   const base = d.start_balance + (d.daily || []).filter(x => x.date < from).reduce((s, x) => s + x.pnl, 0);
@@ -2575,7 +2594,7 @@ function cardStats() {
   const wins = trades.filter(t => t.n > 0), losses = trades.filter(t => t.n < 0);
   const gw = wins.reduce((s, t) => s + t.n, 0), gl = -losses.reduce((s, t) => s + t.n, 0);
   const best = trades.reduce((m, t) => !m || t.n > m.n ? t : m, null);
-  const tDays = daily.filter(x => x.trades || x.pnl);
+  const tDays = c.kind === 'trade' ? [] : daily.filter(x => x.trades || x.pnl);
   return { from, to, trades, daily: tDays, pnl, base, pctV: base ? pnl / base * 100 : null, r, rOk, wins: wins.length, losses: losses.length,
     winRate: trades.length ? wins.length / trades.length * 100 : null, pf: gl ? gw / gl : (gw ? Infinity : null), best,
     winDays: tDays.filter(x => x.pnl > 0).length, cur: d.currency };
@@ -2613,9 +2632,12 @@ function drawCard(cv) {
     g.drawImage(cardLogo, (W - lw) / 2, y, lw, lh); y += lh + (sq ? 34 : post ? 40 : 50);
   } else y += 120;
   // titre et période
-  const kindLbl = { day: 'RÉSULTAT DU JOUR', week: 'RÉSULTAT DE LA SEMAINE', month: 'RÉSULTAT DU MOIS' }[c.kind];
+  const kindLbl = { trade: 'RÉSULTAT DU TRADE', day: 'RÉSULTAT DU JOUR', week: 'RÉSULTAT DE LA SEMAINE', month: 'RÉSULTAT DU MOIS' }[c.kind];
+  const T1 = c.kind === 'trade' ? st.trades[0] : null;
   g.fillStyle = GOLD; g.font = F(700, 30); g.letterSpacing = '6px'; g.fillText(kindLbl, W / 2, y); g.letterSpacing = '0px';
-  y += 52; g.fillStyle = MUT; g.font = F(500, 34); g.fillText(cardLabel(c.kind, c.key), W / 2, y);
+  let perTxt = cardLabel(c.kind, c.key);
+  if (T1) perTxt = [T1.s || '', T1.side ? tr(T1.side === 'sell' ? 'Vente' : 'Achat') : '', new Date(c.key + 'T12:00:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' })].filter(Boolean).join('  ·  ');
+  y += 52; g.fillStyle = MUT; g.font = F(500, 34); g.fillText(perTxt, W / 2, y);
   // grand chiffre
   y += sq ? 150 : post ? 165 : 185;
   const main = c.mode === 'r' ? (st.rOk ? fmtR(st.r, true) : '—') : c.mode === 'pct' ? (st.pctV === null ? '—' : pct(st.pctV)) : money(st.pnl, st.cur, true);
@@ -2631,11 +2653,17 @@ function drawCard(cv) {
   y += 76; g.font = F(600, 44); g.fillStyle = FG; if (sec.length) g.fillText(sec.join('   ·   '), W / 2, y);
   // tuiles de statistiques
   y += sq ? 60 : post ? 70 : 80;
-  const tiles = [
+  const dur = T1 && T1.ot && T1.ct ? (() => { const m = Math.max(0, Math.round((new Date(T1.ct) - new Date(T1.ot)) / 60000)); return m >= 1440 ? Math.floor(m / 1440) + ' j ' + Math.floor(m % 1440 / 60) + ' h' : m >= 60 ? Math.floor(m / 60) + ' h ' + pad(m % 60) : m + ' min'; })() : '—';
+  const tiles = T1 ? [
+    ['Lots', T1.v ? Number(T1.v).toLocaleString(LOCALE, { maximumFractionDigits: 2 }) : '—'],
+    ['Durée', dur],
+    ['Entrée', fmtPx(T1.op)],
+    ['Sortie', fmtPx(T1.cp)],
+  ] : [
     ['Trades', String(st.trades.length || st.daily.reduce((s, x) => s + x.trades, 0))],
     ['Taux de réussite', st.winRate === null ? '—' : Math.round(st.winRate) + ' %'],
     c.kind === 'day' ? ['Gagnants / perdants', st.wins + ' / ' + st.losses] : ['Jours gagnants', st.winDays + ' / ' + st.daily.length],
-    ['Meilleur trade', st.best ? (c.mode === 'r' ? (st.rOk ? fmtR(st.best.n / riskAmount(state.data.per_account[st.best.a]), true) : '—') : c.mode === 'pct' ? cardFmt(st.best.n, st, 'pct') : money(st.best.n, st.cur, true)) : '—'],
+    ['Meilleur trade', st.best ? (c.mode === 'r' ? (st.rOk ? fmtR(st.best.n / riskAmount((cd().per_account || {})[st.best.a]), true) : '—') : c.mode === 'pct' ? cardFmt(st.best.n, st, 'pct') : money(st.best.n, st.cur, true)) : '—'],
   ];
   const cols = sq && withQr ? 4 : 2, rows = Math.ceil(tiles.length / cols), gap = cols > 2 ? 16 : 22, tw = (W - 120 - gap * (cols - 1)) / cols, th = sq ? 118 : post ? 120 : 138;
   tiles.forEach(([lab, val], i) => {
@@ -2652,7 +2680,7 @@ function drawCard(cv) {
   const footH = withQr ? 230 + (QS - 150) : 120, lblH = c.kind === 'week' && st.daily.length >= 2 ? 50 : 0;
   const avail = H - y - footH - 40, ch = Math.min(avail - lblH, tall ? 520 : 380);
   y += Math.max(0, (avail - ch - lblH) / 2);
-  if (ch > 120) {
+  if (ch > 120 && !T1) {
     const cx = 70, cw = W - 140;
     if (c.kind === 'day' || st.daily.length < 2) {
       const pts = [0]; for (const t of st.trades) pts.push(pts[pts.length - 1] + t.n);
@@ -2684,7 +2712,7 @@ function drawCard(cv) {
     }
   }
   // pied de carte
-  const accName = state.sel === 'all' ? 'Tous les comptes' : shownName((state.accounts.find(a => a.login === state.sel) || {}).name || '');
+  const accName = cardAccName();
   const handleTxt = c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : 'ASTRA CAPITAL';
   if (withQr) {
     const qs = QS, pd = 12, qx = W - 80 - qs - 2 * pd, qy = H - 72 - qs - 2 * pd, lineY = qy - 26;
@@ -2716,6 +2744,7 @@ function cardOptions() {
   const c = state.card, per = cardPeriods(c.kind);
   if (!per.some(p => p.key === c.key)) c.key = per.length ? per[0].key : null;
   renderCardCal(per);
+  renderCardTrades();
   document.querySelectorAll('#cardKind button').forEach(b => b.classList.toggle('on', b.dataset.v === c.kind));
   document.querySelectorAll('#cardMode button').forEach(b => b.classList.toggle('on', b.dataset.v === c.mode));
   document.querySelectorAll('#cardFormat button').forEach(b => b.classList.toggle('on', b.dataset.v === c.format));
@@ -2734,7 +2763,7 @@ function cardOptions() {
   hint.textContent = det ? 'En scannant, on ouvre une page avec le résumé et le détail des positions (date, symbole, sens, lots, entrée, sortie, résultat), affichés comme sur la carte : en % seulement, aucun montant n\'apparaît.'
     : bad ? 'Lien invalide : il doit commencer par https://' : 'Ex. ta page Myfxbook vérifiée. Lien gardé pour ce compte.';
   if (det && c.qr && c.key) {
-    const sig = [c.kind, c.key, c.mode, c.hideAcc, c.handle, state.sel].join('|');
+    const sig = [c.kind, c.key, c.trade, c.mode, c.hideAcc, c.handle, cardAcc()].join('|');
     if (sig !== c._dsig) { c._dsig = sig; c._durl = ''; buildDetailsUrl().then(u => { if (c._dsig === sig) { c._durl = u; if (c.key) drawCard($('#cardCanvas')); } }).catch(() => {}); }
   }
   $('#cardEmpty').hidden = !!c.key; $('#cardCanvas').hidden = !c.key;
@@ -2745,6 +2774,9 @@ function openCard() {
   if (!hasPerk('cards')) return perkUpsell('Les cartes de résultats');
   if (state.page !== 'share') { state.page = 'share'; showPage(); window.scrollTo(0, 0); return; }
   if (!state.data) return;
+  if (!state.card.acc || (state.card.acc !== 'all' && !state.accounts.some(a => a.login === state.card.acc))) { state.card.acc = state.sel; state.card.data = null; }
+  if (state.card.acc === state.sel) state.card.data = null;
+  fillCardAccs();
   state.card.hideAcc = state.mask || state.card.hideAcc;
   state.card.calView = null;
   $('#cardHandle').value = state.card.handle; $('#cardHideAcc').checked = state.card.hideAcc;
@@ -2774,7 +2806,7 @@ async function b64deflate(text) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 async function buildDetailsUrl() {
-  const c = state.card, st = cardStats(), d = state.data;
+  const c = state.card, st = cardStats(), d = cd();
   const unit = c.mode === 'pct' ? 'pct' : c.mode === 'r' ? 'r' : 'money';
   const val = t => {
     if (unit === 'pct') return st.base ? +(t.n / st.base * 100).toFixed(2) : 0;
@@ -2784,9 +2816,9 @@ async function buildDetailsUrl() {
   const px = v => v == null ? null : +Number(v).toPrecision(7);
   const all = st.trades.map(t => [String(t.ct || t.ot || t.d).slice(0, 16), t.s || '', t.side === 'sell' ? 1 : 0, +(t.v || 0).toFixed(2), px(t.op), px(t.cp), val(t)]);
   const main = unit === 'pct' ? st.pctV : unit === 'r' ? (st.rOk ? st.r : null) : st.pnl;
-  const accName = state.sel === 'all' ? 'Tous les comptes' : shownName((state.accounts.find(a => a.login === state.sel) || {}).name || '');
+  const accName = cardAccName();
   const base = {
-    v: 1, k: c.kind, p: c.key, u: unit, c: unit === 'money' ? st.cur : undefined,
+    v: 1, k: c.kind === 'trade' ? 'day' : c.kind, p: c.key, u: unit, c: unit === 'money' ? st.cur : undefined,
     a: c.hideAcc ? undefined : accName, h: c.handle ? (c.handle.startsWith('@') ? c.handle : '@' + c.handle) : undefined,
     g: new Date().toLocaleDateString(LOCALE),
     s: { v: main == null ? 0 : +(+main).toFixed(2), pct: st.pctV == null ? null : +st.pctV.toFixed(2), r: st.rOk ? +st.r.toFixed(2) : null,
@@ -2800,15 +2832,16 @@ async function buildDetailsUrl() {
     if (url.length <= 420 || n === 0) return url;
   }
 }
-const cardFile = () => 'ASTRA-' + { day: 'jour', week: 'semaine', month: 'mois' }[state.card.kind] + '-' + state.card.key + '.png';
+const cardFile = () => 'ASTRA-' + { trade: 'trade', day: 'jour', week: 'semaine', month: 'mois' }[state.card.kind] + '-' + state.card.key + '.png';
 document.querySelectorAll('#cardKind button').forEach(b => b.onclick = () => { state.card.kind = b.dataset.v; state.card.key = null; state.card.calView = null; cardOptions(); });
 document.querySelectorAll('#cardMode button').forEach(b => b.onclick = () => { if (b.disabled) return; state.card.mode = b.dataset.v; saveCardPrefs(); cardOptions(); });
 document.querySelectorAll('#cardFormat button').forEach(b => b.onclick = () => { state.card.format = b.dataset.v; saveCardPrefs(); cardOptions(); });
 // calendrier de choix de la période (jour, semaine ou mois)
 function renderCardCal(per) {
   const c = state.card, box = $('#cardCal'); box.innerHTML = '';
-  const pnlByDay = {}; for (const x of state.data.daily || []) if (x.trades || x.pnl) pnlByDay[x.date] = x.pnl;
-  for (const t of state.data.trades || []) if (!(t.d in pnlByDay)) pnlByDay[t.d] = 0;
+  const D = cd(), pnlByDay = {};
+  if (c.kind === 'trade') { for (const t of D.trades || []) pnlByDay[t.d] = (pnlByDay[t.d] || 0) + t.n; }
+  else { for (const x of D.daily || []) if (x.trades || x.pnl) pnlByDay[x.date] = x.pnl; for (const t of D.trades || []) if (!(t.d in pnlByDay)) pnlByDay[t.d] = 0; }
   const keys = new Set(per.map(p => p.key));
   const sum = (from, to) => Object.entries(pnlByDay).filter(([d]) => d >= from && d <= to).reduce((s, [, v]) => s + v, 0);
   const tone = v => v > 0 ? ' win' : v < 0 ? ' loss' : '';
@@ -2844,12 +2877,12 @@ function renderCardCal(per) {
       const d = new Date(start); d.setDate(start.getDate() + i);
       const k = isoD(d), inMonth = d.getMonth() === mm - 1;
       if (i >= 35 && !inMonth && d.getDate() < 8 && (d.getDay() + 6) % 7 === 0) break; // pas de 6e ligne vide
-      const wk = mondayOf(k), has = c.kind === 'day' ? keys.has(k) : keys.has(wk) && (k in pnlByDay || true);
+      const wk = mondayOf(k), has = dayish(c.kind) ? keys.has(k) : keys.has(wk) && (k in pnlByDay || true);
       const dayHas = k in pnlByDay, v = pnlByDay[k] || 0;
       const b = el('button', 'cd' + (!inMonth ? ' dim' : '') + (dayHas ? ' has' + tone(v) : (c.kind === 'week' && keys.has(wk) ? ' has' : ''))
         + (selRange && k >= selRange[0] && k <= selRange[1] ? ' sel' : ''), String(d.getDate()));
       b.type = 'button'; if (!inMonth) b.style.opacity = dayHas ? '.55' : '.2';
-      if (c.kind === 'day' ? dayHas : keys.has(wk)) b.onclick = () => { c.key = c.kind === 'day' ? k : wk; cardOptions(); };
+      if (dayish(c.kind) ? dayHas : keys.has(wk)) b.onclick = () => { c.key = dayish(c.kind) ? k : wk; cardOptions(); };
       else b.classList.remove('has');
       grid.appendChild(b);
     }
@@ -2858,6 +2891,43 @@ function renderCardCal(per) {
   if (c.key) box.appendChild(el('div', 'c-cal-sel', cardLabel(c.kind, c.key)));
   else box.appendChild(el('div', 'c-cal-sel', 'Aucun trade pour cette période'));
 }
+// liste des trades du jour choisi (mode « Trade »)
+function renderCardTrades() {
+  const c = state.card, box = $('#cardTrades');
+  box.hidden = c.kind !== 'trade'; box.innerHTML = '';
+  if (c.kind !== 'trade' || !c.key) return;
+  const list = (cd().trades || []).filter(t => t.d === c.key).sort((x, y) => (x.ct || '') < (y.ct || '') ? -1 : 1);
+  if (!list.some(t => tradeKey(t) === c.trade)) c.trade = list.length ? tradeKey(list[list.length - 1]) : null;
+  const multi = cardAcc() === 'all';
+  for (const t of list) {
+    const b = el('button', 'c-tr' + (tradeKey(t) === c.trade ? ' on' : '')); b.type = 'button';
+    const tm = el('time', null, t.ct ? String(t.ct).slice(11, 16) : '—');
+    const sym = el('div', 'sym', (t.s || '—') + ' ');
+    const sub = el('small', null, (t.side === 'sell' ? tr('Vente') : tr('Achat')) + (t.v ? ' · ' + Number(t.v).toLocaleString(LOCALE, { maximumFractionDigits: 2 }) + ' lot' : '')
+      + (multi && t.a ? ' · ' + shownName((state.accounts.find(a => a.login === t.a) || {}).name || t.a) : ''));
+    sym.appendChild(sub);
+    const pl = el('div', 'pl ' + (t.n > 0 ? 'win' : t.n < 0 ? 'loss' : ''), money(t.n, cd().currency, true));
+    b.append(tm, sym, pl);
+    b.onclick = () => { c.trade = tradeKey(t); cardOptions(); };
+    box.appendChild(b);
+  }
+}
+function fillCardAccs() {
+  const s = $('#cardAcc'); s.innerHTML = '';
+  if (state.accounts.length > 1) s.append(new Option(tr('Tous les comptes'), 'all'));
+  for (const a of state.accounts) s.append(new Option(shownName(a.name) + (a.demo ? '' : ' · ' + shownLogin(a.login)), a.login));
+  s.value = cardAcc();
+}
+$('#cardAcc').onchange = async e => {
+  const login = e.target.value, c = state.card;
+  c.acc = login; c.trade = null; c.calView = null;
+  if (login === state.sel) c.data = null;
+  else {
+    try { c.data = await api('/api/data?login=' + encodeURIComponent(login)); }
+    catch (err) { toast(err.message); c.acc = state.sel; c.data = null; e.target.value = state.sel; }
+  }
+  c.key = null; cardOptions();
+};
 const compactMoney = v => v >= 1000 ? (v / 1000).toLocaleString(LOCALE, { maximumFractionDigits: 1 }) + 'k' : Math.round(v).toString();
 $('#cardHandle').oninput = e => { state.card.handle = e.target.value.trim().slice(0, 30); cardOptions(); clearTimeout(saveCardPrefs.t); saveCardPrefs.t = setTimeout(saveCardPrefs, 600); };
 $('#cardHideAcc').onchange = e => { state.card.hideAcc = e.target.checked; saveCardPrefs(); cardOptions(); };

@@ -81,4 +81,12 @@ T = {
 "si les brokers diffèrent": ("if the brokers differ", "falls die Broker unterschiedlich sind", "si los brókers son distintos"),
 "Écart de prix max à l'ouverture": ("Max price deviation at open", "Max. Preisabweichung bei Eröffnung", "Desviación de precio máx. en la apertura"),
 "en points, 0 = désactivé": ("in points, 0 = off", "in Punkten, 0 = aus", "en puntos, 0 = desactivado"),
+"Compte": ("Account", "Konto", "Cuenta"),
+"Trade": ("Trade", "Trade", "Operación"),
+"RÉSULTAT DU TRADE": ("TRADE RESULT", "TRADE-ERGEBNIS", "RESULTADO DE LA OPERACIÓN"),
+"Lots": ("Lots", "Lots", "Lotes"),
+"Entrée": ("Entry", "Einstieg", "Entrada"),
+"Sortie": ("Exit", "Ausstieg", "Salida"),
+"Achat": ("Buy", "Kauf", "Compra"),
+"Vente": ("Sell", "Verkauf", "Venta"),
 }
