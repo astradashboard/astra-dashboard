@@ -778,7 +778,9 @@
   .abo-ex-tot { color: var(--muted); font-size: 14px; } .abo-ex-tot b { color: var(--fg); }
   .abo-ex-acts { display: flex; gap: 10px; flex-wrap: wrap; }
   #aboExtra[hidden] { display: none; }
-  .abo-change { padding: 18px 22px; margin-bottom: 22px; } .abo-change h3 { margin: 0 0 6px; }
+  .abo-change { padding: 18px 22px; margin-bottom: 22px; }
+  .abo-billing { margin: 4px 0 22px; }
+  .abo-plans .of-plan.current { border-color: var(--gold); } .abo-change h3 { margin: 0 0 6px; }
   .abo-ch-sub { color: var(--muted); margin: 0 0 14px; line-height: 1.5; font-size: 13.5px; }
   .abo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
   .abo-opt { background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
@@ -1213,7 +1215,11 @@
         <h3>Changer d'offre</h3>
         <p class="abo-ch-sub">Passe à l'offre ou à la formule qui te convient. Le changement est immédiat : la différence est calculée au prorata du temps restant (facturée si l'offre est plus chère, remboursée si elle l'est moins).</p>
         <div class="abo-mail" id="aboMailRow" hidden><label for="aboMail">E-mail utilisé pour ton achat</label><input id="aboMail" type="email" placeholder="toi@exemple.com" autocomplete="email"></div>
-        <div class="abo-opts" id="aboOpts"></div>
+        <div class="of-billing abo-billing"><div class="seg" id="aboBilling">
+          <button type="button" data-v="month">Mensuel</button>
+          <button type="button" data-v="year">Annuel <span class="of-save">−20 %</span></button>
+        </div></div>
+        <div class="of-plans abo-plans" id="aboOpts"></div>
         <div class="al-err" id="aboErr"></div>
       </div>
       <div class="card abo-change abo-extra" id="aboExtra" hidden>
@@ -3320,26 +3326,28 @@ async function renderOffres() {
   $('#aboMailRow').hidden = !!lic.email || !(lic.key_hint && !lic.trial && !lic.owner);
   const opts = $('#aboOpts'); opts.innerHTML = ''; $('#aboChange').hidden = !(lic.key_hint && !lic.trial && !lic.owner && lic.active);
   if (!$('#aboChange').hidden) {
-    for (const p of (offresData.plans || []).filter(p => !p.trial)) {
-      for (const per of ['month', 'year']) {
-        if (per === 'year' && !(p.annual && p.annual.checkout_url)) continue;
-        if (per === 'month' && !p.checkout_url) continue;
-        const cur = lic.plan === p.id && (lic.period || 'month') === per;
-        const o = el('div', 'abo-opt' + (cur ? ' cur' : ''));
-        o.append(el('b', null, p.name + (per === 'year' ? ' · annuel' : ' · mensuel')),
-          el('span', 'pr', per === 'year' ? (p.annual.total || p.annual.price) + (p.annual.total ? ' par an' : ' par mois') : p.price + ' par mois'),
-          el('small', null, (p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes' : '1 compte') + (per === 'year' ? ' · −' + (offresData.annual_discount || 20) + ' %' : '')));
-        const b = el('button', 'btn' + (cur ? '' : ' primary'), cur ? 'Ton offre actuelle' : 'Passer à cette offre'); b.type = 'button'; b.disabled = cur;
-        let armed = false;
-        b.onclick = async () => {
-          if (!armed) { armed = true; b.textContent = 'Confirmer le changement ?'; setTimeout(() => { if (armed) { armed = false; b.textContent = 'Passer à cette offre'; } }, 4000); return; }
-          armed = false; b.disabled = true; b.textContent = 'Changement en cours…'; $('#aboErr').textContent = '';
-          const mail = $('#aboMail').value.trim(); if (!lic.email && !mail) { $('#aboErr').textContent = 'Indique d\'abord l\'e-mail utilisé pour ton achat.'; $('#aboMail').focus(); b.disabled = false; b.textContent = 'Passer à cette offre'; return; }
-          try { const r = await api('/api/licence/change', { plan: p.id, period: per, email: mail }); if (r.licence) state.lic = r.licence; applyLock(); renderOffres(); toast('Offre changée : ' + p.name + (per === 'year' ? ' annuel' : ' mensuel') + '.'); }
-          catch (e) { $('#aboErr').textContent = e.message; b.disabled = false; b.textContent = 'Passer à cette offre'; }
-        };
-        o.appendChild(b); opts.appendChild(o);
-      }
+    const per = state.aboBilling || lic.period || 'month';
+    document.querySelectorAll('#aboBilling button').forEach(b => {
+      b.classList.toggle('on', b.dataset.v === per);
+      b.onclick = () => { state.aboBilling = b.dataset.v; renderOffres(); };
+    });
+    const paid = (offresData.plans || []).filter(p => !p.trial);
+    if (!paid.some(p => p.id === state.aboSel)) state.aboSel = (paid.find(p => p.id !== lic.plan) || paid[0] || {}).id;
+    for (const p of paid) {
+      const yr = per === 'year';
+      if (yr ? !(p.annual && p.annual.checkout_url) : !p.checkout_url) continue;
+      const cur = lic.plan === p.id && (lic.period || 'month') === per;
+      const c = planCard(p, per, p.id === state.aboSel, cur, () => { state.aboSel = p.id; renderOffres(); });
+      const b = el('button', 'btn' + (cur ? '' : p.id === state.aboSel ? ' primary' : ''), cur ? 'Ton offre actuelle' : 'Passer à cette offre'); b.type = 'button'; b.disabled = cur;
+      let armed = false;
+      b.onclick = async () => {
+        if (!armed) { armed = true; b.textContent = 'Confirmer le changement ?'; setTimeout(() => { if (armed) { armed = false; b.textContent = 'Passer à cette offre'; } }, 4000); return; }
+        armed = false; b.disabled = true; b.textContent = 'Changement en cours…'; $('#aboErr').textContent = '';
+        const mail = $('#aboMail').value.trim(); if (!lic.email && !mail) { $('#aboErr').textContent = 'Indique d\'abord l\'e-mail utilisé pour ton achat.'; $('#aboMail').focus(); b.disabled = false; b.textContent = 'Passer à cette offre'; return; }
+        try { const r = await api('/api/licence/change', { plan: p.id, period: per, email: mail }); if (r.licence) state.lic = r.licence; state.aboBilling = null; applyLock(); renderOffres(); loadState().catch(() => {}); toast('Offre changée : ' + p.name + (per === 'year' ? ' annuel' : ' mensuel') + '.'); }
+        catch (e) { $('#aboErr').textContent = e.message; b.disabled = false; b.textContent = 'Passer à cette offre'; }
+      };
+      c.appendChild(b); opts.appendChild(c);
     }
   }
   renderExtra(lic);
@@ -3353,16 +3361,37 @@ async function renderOffres() {
   const wrap = $('#ofPlans'); wrap.innerHTML = '';
   const plans = offresData.plans || [];
   if (!plans.some(p => p.id === state.ofSel)) state.ofSel = (plans.find(p => lic.active && lic.plan === p.id) || plans.find(p => p.badge) || plans[0] || {}).id;
-  plans.forEach((p, i) => {
+  plans.forEach(p => {
     const best = p.id === state.ofSel; // l'offre sélectionnée est mise en avant
-    const c = el('div', 'of-plan' + (p.trial ? ' trial' : '') + (best ? ' best' : '') + (lic.active && lic.plan === p.id ? ' current' : ''));
-    c.tabIndex = 0; c.setAttribute('role', 'radio'); c.setAttribute('aria-checked', best ? 'true' : 'false');
-    c.onclick = ev => { if (ev.target.closest('button')) return; if (state.ofSel !== p.id) { state.ofSel = p.id; renderOffres(); } };
-    c.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); state.ofSel = p.id; renderOffres(); } };
+    const c = planCard(p, state.ofBilling, best, lic.active && lic.plan === p.id, () => { state.ofSel = p.id; renderOffres(); });
+    const yr = state.ofBilling === 'year' && p.annual;
+    const payUrl = yr ? p.annual.checkout_url : p.checkout_url;
+    const target = lic.active && !lic.trial && offresData.portal_url ? offresData.portal_url : payUrl;
+    let label = 'S\'abonner', dis = false;
+    if (p.trial) {
+      label = lic.trial && lic.active ? 'Essai en cours' : lic.trial_used ? 'Essai déjà utilisé' : lic.active ? 'Inclus dans ton abonnement' : 'Commencer l\'essai gratuit';
+      dis = lic.active || !!lic.trial_used;
+    } else if (lic.active && !lic.trial && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
+    else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
+    else if (!payUrl) { label = 'Bientôt disponible'; dis = true; }
+    else if (lic.active && !lic.trial) label = 'Changer pour cette offre';
+    const b = el('button', 'btn' + (best || plans.length === 1 ? ' primary' : ''), label); b.type = 'button'; b.disabled = dis;
+    if (p.trial) b.onclick = () => startTrial(b);
+    else b.onclick = () => { if (state.ofSel !== p.id) { state.ofSel = p.id; renderOffres(); } openPay(target); };
+    c.appendChild(b); wrap.appendChild(c);
+  });
+}
+// carte d'une offre (page Tarification et page « Gérer mon abonnement »), sans son bouton
+function planCard(p, billing, best, current, onPick) {
+  const c = el('div', 'of-plan' + (p.trial ? ' trial' : '') + (best ? ' best' : '') + (current ? ' current' : ''));
+  c.tabIndex = 0; c.setAttribute('role', 'radio'); c.setAttribute('aria-checked', best ? 'true' : 'false');
+  c.onclick = ev => { if (ev.target.closest('button')) return; if (!best) onPick(); };
+  c.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onPick(); } };
+  {
     if (p.badge) c.appendChild(el('div', 'of-badge', p.badge));
     c.appendChild(el('h2', null, p.name));
     c.appendChild(el('div', 'of-acc', p.trial ? 'Sans carte bancaire · 1 compte connecté' : p.accounts > 1 ? 'Jusqu\'à ' + p.accounts + ' comptes connectés' : '1 compte connecté'));
-    const yr = state.ofBilling === 'year' && p.annual;
+    const yr = billing === 'year' && p.annual;
     const pr = el('div', 'of-price');
     if (yr) pr.append(el('span', 'of-was', p.annual.was || p.price));
     pr.append(el('b', null, yr ? p.annual.price : p.price), el('span', null, yr ? 'par mois' : (p.period || 'par mois'))); c.appendChild(pr);
@@ -3381,21 +3410,8 @@ async function renderOffres() {
       ul.appendChild(li);
     }
     c.appendChild(ul);
-    const payUrl = yr ? p.annual.checkout_url : p.checkout_url;
-    const target = lic.active && !lic.trial && offresData.portal_url ? offresData.portal_url : payUrl;
-    let label = 'S\'abonner', dis = false;
-    if (p.trial) {
-      label = lic.trial && lic.active ? 'Essai en cours' : lic.trial_used ? 'Essai déjà utilisé' : lic.active ? 'Inclus dans ton abonnement' : 'Commencer l\'essai gratuit';
-      dis = lic.active || !!lic.trial_used;
-    } else if (lic.active && !lic.trial && lic.plan === p.id) { label = 'Ton offre actuelle'; dis = true; }
-    else if (lic.owner) { label = 'Inclus dans ton accès'; dis = true; }
-    else if (!payUrl) { label = 'Bientôt disponible'; dis = true; }
-    else if (lic.active && !lic.trial) label = 'Changer pour cette offre';
-    const b = el('button', 'btn' + (best || plans.length === 1 ? ' primary' : ''), label); b.type = 'button'; b.disabled = dis;
-    if (p.trial) b.onclick = () => startTrial(b);
-    else b.onclick = () => { if (state.ofSel !== p.id) { state.ofSel = p.id; renderOffres(); } openPay(target); };
-    c.appendChild(b); wrap.appendChild(c);
-  });
+  }
+  return c;
 }
 let confirmRemoveLic = false;
 let socialLinks = { discord: 'https://discord.gg/YSep3qMT9', tiktok: 'https://www.tiktok.com/@astracapital1' };
