@@ -2390,7 +2390,9 @@ def _lic_public(lic):
     k = lic["key"]
     hint = k[:4] + "…" + k[-4:] if len(k) > 10 else "…"
     return {"active": bool(lic.get("active")), "status": lic.get("status"), "owner": bool(lic.get("owner")),
-            "plan": lic.get("plan"), "plan_name": lic.get("plan_name"), "max_accounts": lic.get("max_accounts"),
+            "plan": lic.get("plan"), "plan_name": lic.get("plan_name"),
+            "max_accounts": (int(lic.get("max_accounts") or 1) + extra_accounts(lic)) if lic.get("max_accounts") else lic.get("max_accounts"),
+            "base_accounts": lic.get("max_accounts"), "extra": extra_accounts(lic),
             "email": lic.get("email"), "renews_at": lic.get("expires_at"), "key_hint": hint,
             "checked_at": lic.get("checked_at"), "offline": bool(lic.get("offline")), "error": lic.get("error"),
             "trial_used": bool(_trial_marks()), "period": lic.get("period") or "month"}
@@ -2474,11 +2476,25 @@ def _perk_refused(name):
                              "Change d'offre dans « Tarification ».", "perk": name}), 403
 
 
+def extra_cfg():
+    """Comptes supplémentaires payants (ex. +5,99 €/mois par compte avec l'offre Essentiel)."""
+    return load_offers().get("extra_account") or {}
+
+
+def extra_accounts(lic):
+    cfg = extra_cfg()
+    if not lic or lic.get("owner") or lic.get("trial") or not lic.get("active"):
+        return 0
+    if lic.get("plan") not in (cfg.get("plans") or []):
+        return 0
+    return max(0, int(lic.get("extra") or 0))
+
+
 def max_accounts():
     lic = licence()
     if lic.get("owner"):
         return None  # illimité
-    return int(lic.get("max_accounts") or 1)
+    return int(lic.get("max_accounts") or 1) + extra_accounts(lic)
 
 
 _OPEN_PATHS = ("/api/licence", "/api/offres", "/api/open-url", "/api/version", "/api/update", "/api/ping", "/api/bye",
@@ -2505,7 +2521,9 @@ def api_offres():
         return q
     return jsonify({"plans": [clean(p) for p in o.get("plans", [])], "annual_discount": o.get("annual_discount"),
                     "features": o.get("features") or [], "portal_url": o.get("portal_url"),
-                    "social": o.get("social") or {}})
+                    "social": o.get("social") or {},
+                    "extra_account": {k: v for k, v in (o.get("extra_account") or {}).items() if k in ("price", "plans", "max")}
+                    | {"product_id": bool((o.get("extra_account") or {}).get("product_id"))}})
 
 
 @app.get("/api/licence")
@@ -2606,6 +2624,87 @@ def api_open_url():
         return jsonify({"error": "Adresse non autorisée."}), 400
     webbrowser.open(url)
     return jsonify({"ok": True})
+
+
+def _relay(path, payload, timeout=60):
+    """Appel du relais de licences (Cloudflare). Renvoie (réponse, message d'erreur)."""
+    import urllib.error
+    import urllib.request
+
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    req = urllib.request.Request(f"{api}/{path}", data=json.dumps(payload).encode(), method="POST", headers={
+        "Accept": "application/json", "Content-Type": "application/json", "User-Agent": "ASTRA-Dashboard"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8") or "{}"), None
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read().decode("utf-8") or "{}").get("error")
+        except Exception:
+            msg = None
+        return None, (msg or f"erreur {e.code}")
+    except Exception:
+        return None, "pas de connexion au serveur de licences"
+
+
+@app.post("/api/licence/extra")
+def api_licence_extra():
+    """Comptes supplémentaires : état (check) ou nouveau nombre (units) — ouvre le paiement Creem si besoin."""
+    body = request.get_json(silent=True) or {}
+    cfg = extra_cfg()
+    lic = _load(LICENCE_FILE, {})
+    if not lic.get("key") or lic.get("owner") or lic.get("trial"):
+        return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
+    if lic.get("plan") not in (cfg.get("plans") or []):
+        return jsonify({"error": "Les comptes supplémentaires s'ajoutent à l'offre Essentiel."}), 400
+    if not cfg.get("product_id"):
+        return jsonify({"error": "Les comptes supplémentaires ne sont pas encore disponibles."}), 400
+    email = str(body.get("email") or lic.get("email") or "").strip()[:200]
+    if not email:
+        return jsonify({"error": "Indique l'e-mail utilisé pour ton achat.", "need_email": True}), 400
+    check = bool(body.get("check"))
+    try:
+        units = int(body.get("units", 0))
+    except (TypeError, ValueError):
+        units = -1
+    if not check and not (0 <= units <= int(cfg.get("max") or 20)):
+        return jsonify({"error": f"Choisis entre 0 et {int(cfg.get('max') or 20)} comptes supplémentaires."}), 400
+    res, err = _relay("extra", {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": email,
+                                "product_id": cfg["product_id"], "action": "status" if check else "set", "units": units})
+    if err:
+        return jsonify({"error": f"Impossible pour le moment : {err.rstrip('.')}."}), 502
+    with _lic_lock:
+        lic = _load(LICENCE_FILE, {})
+        lic["email"] = email
+        if res.get("units") is not None and not res.get("checkout_url"):
+            lic["extra"] = max(0, int(res.get("units") or 0))
+            lic["extra_checked"] = dt.datetime.now().isoformat(timespec="seconds")
+        _save(LICENCE_FILE, lic)
+    return jsonify({"ok": True, "units": res.get("units"), "checkout_url": res.get("checkout_url"),
+                    "licence": _lic_public(licence())})
+
+
+def _extra_autocheck():
+    """Revérifie le nombre de comptes supplémentaires au démarrage (au plus une fois toutes les 12 h)."""
+    try:
+        lic = _load(LICENCE_FILE, {})
+        cfg = extra_cfg()
+        if not lic.get("email") or not cfg.get("product_id") or lic.get("plan") not in (cfg.get("plans") or []) or lic.get("trial"):
+            return
+        last = lic.get("extra_checked")
+        if last and (dt.datetime.now() - dt.datetime.fromisoformat(last)).total_seconds() < 12 * 3600:
+            return
+        res, err = _relay("extra", {"key": lic["key"], "instance_id": lic.get("instance_id") or "", "email": lic["email"],
+                                    "product_id": cfg["product_id"], "action": "status"}, timeout=30)
+        if err or res is None or res.get("units") is None:
+            return
+        with _lic_lock:
+            lic = _load(LICENCE_FILE, {})
+            lic["extra"] = max(0, int(res["units"]))
+            lic["extra_checked"] = dt.datetime.now().isoformat(timespec="seconds")
+            _save(LICENCE_FILE, lic)
+    except Exception:
+        pass
 
 
 @app.post("/api/licence/change")
@@ -2725,6 +2824,10 @@ def api_connect():
         more = (f"Passe à l'offre {bigger.get('name', 'supérieure')} dans « Tarification » pour en connecter jusqu'à "
                 f"{bigger.get('accounts')}, ou retire d'abord un compte." if int(bigger.get("accounts", 1)) > limit
                 else "Retire d'abord un compte pour en connecter un autre.")
+        cfg, lic_ = extra_cfg(), licence()
+        if cfg.get("product_id") and lic_.get("plan") in (cfg.get("plans") or []):
+            more = (f"Ajoute un compte supplémentaire ({cfg.get('price', '5,99 €')}/mois) dans « Gérer mon abonnement », "
+                    f"ou passe à l'offre {bigger.get('name', 'Pro')}.")
         return jsonify({"error": f"Ton offre permet de connecter {limit} compte{'s' if limit > 1 else ''}. " + more,
                         "limit": limit}), 403
 
@@ -4702,6 +4805,7 @@ def serve_only(port):
     threading.Thread(target=_alert_loop, daemon=True).start()
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
     threading.Thread(target=_copier_autostart, daemon=True).start()
+    threading.Thread(target=_extra_autocheck, daemon=True).start()
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
 
@@ -4742,6 +4846,7 @@ def main():
     threading.Thread(target=_alert_loop, daemon=True).start()
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
     threading.Thread(target=_copier_autostart, daemon=True).start()
+    threading.Thread(target=_extra_autocheck, daemon=True).start()
 
     # 1) Fenêtre d'application Edge/Chrome. L'app s'arrête quand la fenêtre se ferme
     #    (signalé par la page), même si Edge reste actif en arrière-plan.

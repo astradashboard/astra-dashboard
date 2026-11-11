@@ -770,6 +770,13 @@
   .abo-mail { margin: 0 0 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; } .abo-mail label { color: var(--muted); font-size: 13px; }
   .abo-mail input { flex: 1; min-width: 220px; max-width: 360px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 9px 12px; font: inherit; }
   .abo-mail input:focus { outline: none; border-color: var(--gold); }
+  .abo-ex-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+  .abo-ex-step { display: flex; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+  .abo-ex-step .btn { width: 38px; height: 38px; padding: 0; font-size: 20px; line-height: 1; }
+  .abo-ex-step b { min-width: 46px; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .abo-ex-tot { color: var(--muted); font-size: 14px; } .abo-ex-tot b { color: var(--fg); }
+  .abo-ex-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+  #aboExtra[hidden] { display: none; }
   .abo-change { padding: 18px 22px; margin-bottom: 22px; } .abo-change h3 { margin: 0 0 6px; }
   .abo-ch-sub { color: var(--muted); margin: 0 0 14px; line-height: 1.5; font-size: 13.5px; }
   .abo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
@@ -1207,6 +1214,19 @@
         <div class="abo-mail" id="aboMailRow" hidden><label for="aboMail">E-mail utilisé pour ton achat</label><input id="aboMail" type="email" placeholder="toi@exemple.com" autocomplete="email"></div>
         <div class="abo-opts" id="aboOpts"></div>
         <div class="al-err" id="aboErr"></div>
+      </div>
+      <div class="card abo-change abo-extra" id="aboExtra" hidden>
+        <h3>Comptes supplémentaires</h3>
+        <p class="abo-ch-sub" id="aboExSub"></p>
+        <div class="abo-ex-row">
+          <div class="abo-ex-step"><button type="button" class="btn" id="aboExMinus" aria-label="Un compte de moins">−</button><b id="aboExN">0</b><button type="button" class="btn" id="aboExPlus" aria-label="Un compte de plus">+</button></div>
+          <div class="abo-ex-tot" id="aboExTot"></div>
+        </div>
+        <div class="abo-ex-acts">
+          <button type="button" class="btn primary" id="aboExSave">Mettre à jour</button>
+          <button type="button" class="btn" id="aboExCheck">Vérifier mes comptes supplémentaires</button>
+        </div>
+        <div class="al-err" id="aboExErr"></div>
       </div>
       <div class="card abo-help">
         <h3>Mettre à jour le paiement ou résilier</h3>
@@ -3025,7 +3045,7 @@ const HELP_KB = [
     alt: ['changer d\'offre ou résilier', 'je veux résilier', 'comment me désabonner', 'y a-t-il un engagement', 'arrêter mon abonnement'],
     a: 'Dans le menu de gauche, ouvre **Gérer mon abonnement** puis clique sur **Gérer / annuler mon abonnement** : ton espace client Creem s\'ouvre et tu peux y **résilier** ou changer de carte. Tu peux aussi utiliser le lien de l\'e-mail de paiement envoyé par **Creem**, ou nous écrire. **Sans engagement**.\nPour changer d\'offre, utilise **Changer d\'offre** sur la même page.', act: [['Gérer mon abonnement', 'abo'], ['Rejoindre la communauté', 'discord']] },
   { q: 'Pourquoi je ne peux pas ajouter un autre compte ?', k: 'limite comptes plusieurs deuxieme second autre compte maximum 2 deux trois mettre combien',
-    a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
+    a: 'L\'offre **Essentiel** (et l\'essai) permet **1 compte**. Avec Essentiel, tu peux ajouter des **comptes supplémentaires** à 5,99 €/mois chacun dans **Gérer mon abonnement**. L\'offre **Pro** permet jusqu\'à **50 comptes**. Le compte démo ne compte pas.', act: [['Voir l\'offre Pro', 'offres']] },
   { q: 'Je peux l\'utiliser sur plusieurs PC ?', k: 'autre pc ordinateur nouveau changer installer licence deplacer portable plusieurs deux 2 machine',
     alt: ['utiliser l\'app sur un autre pc', 'changer d\'ordinateur', 'installer sur mon portable et mon fixe', 'ma clé marche sur combien de pc'],
     a: 'Oui, ta clé fonctionne sur **2 PC**. Pour passer sur un autre ordinateur : sur l\'ancien PC, Tarification → **Retirer de ce PC** pour libérer ta clé, puis installe l\'app sur le nouveau PC et colle la même clé.', act: [['Se connecter', 'login']] },
@@ -3169,6 +3189,52 @@ api('/api/alerts').then(a => { state.alerts = a; syncAlertBtn(); }).catch(() => 
 state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
+// comptes supplémentaires payants (offre Essentiel)
+const exPrice = () => { const v = parseFloat(String((offresData.extra_account || {}).price || '5,99').replace(',', '.')); return isNaN(v) ? 5.99 : v; };
+function renderExtra(lic) {
+  const cfg = offresData.extra_account || {}, box = $('#aboExtra');
+  const show = !!(lic && lic.key_hint && !lic.trial && !lic.owner && lic.active && (cfg.plans || []).includes(lic.plan));
+  box.hidden = !show; if (!show) return;
+  const base = lic.base_accounts || 1, cur = lic.extra || 0;
+  if (state.exN == null || !state.exDirty) state.exN = cur;
+  $('#aboExSub').textContent = tr('Ton offre comprend') + ' ' + base + ' ' + tr(base > 1 ? 'comptes' : 'compte') + '. '
+    + tr('Ajoute des comptes MT5 pour') + ' ' + (cfg.price || '5,99 €') + ' ' + tr('par mois chacun, sans changer d\'offre. Le changement est immédiat et facturé au prorata.');
+  $('#aboExN').textContent = state.exN;
+  const tot = base + state.exN, cost = (state.exN * exPrice()).toLocaleString(LOCALE, { style: 'currency', currency: 'EUR' });
+  $('#aboExTot').innerHTML = '';
+  $('#aboExTot').append(el('b', null, tot + ' ' + tr(tot > 1 ? 'comptes' : 'compte')), document.createTextNode(' ' + tr('au total') + ' · +' + cost + ' ' + tr('par mois')));
+  $('#aboExMinus').disabled = state.exN <= 0; $('#aboExPlus').disabled = state.exN >= (cfg.max || 20);
+  $('#aboExSave').disabled = !cfg.product_id || state.exN === cur;
+  $('#aboExSave').textContent = tr(!cfg.product_id ? 'Bientôt disponible' : state.exN === cur ? 'À jour' : 'Mettre à jour');
+  $('#aboExCheck').hidden = !cfg.product_id;
+}
+$('#aboExMinus').onclick = () => { state.exN = Math.max(0, (state.exN || 0) - 1); state.exDirty = true; renderExtra(state.lic); };
+$('#aboExPlus').onclick = () => { state.exN = Math.min((offresData.extra_account || {}).max || 20, (state.exN || 0) + 1); state.exDirty = true; renderExtra(state.lic); };
+async function extraCall(body, btn) {
+  const lic = state.lic || {}, mail = ($('#aboMail').value || '').trim();
+  $('#aboExErr').textContent = '';
+  if (!lic.email && !mail) { $('#aboExErr').textContent = tr('Indique d\'abord l\'e-mail utilisé pour ton achat.'); $('#aboMailRow').hidden = false; $('#aboMail').focus(); return null; }
+  const t0 = btn.textContent; btn.disabled = true; btn.textContent = tr('Patiente…');
+  try {
+    const r = await api('/api/licence/extra', { ...body, email: mail });
+    if (r.licence) state.lic = r.licence;
+    return r;
+  } catch (e) { $('#aboExErr').textContent = e.message; return null; }
+  finally { btn.disabled = false; btn.textContent = t0; }
+}
+$('#aboExSave').onclick = async () => {
+  const r = await extraCall({ units: state.exN }, $('#aboExSave')); if (!r) return;
+  if (r.checkout_url) {
+    api('/api/open-url', { url: r.checkout_url }).catch(() => window.open(r.checkout_url, '_blank'));
+    toast(tr('La page de paiement s\'ouvre dans ton navigateur. Une fois payé, clique sur « Vérifier mes comptes supplémentaires ».'));
+  } else { state.exDirty = false; toast(tr('Comptes supplémentaires mis à jour :') + ' ' + (r.units || 0) + '.'); }
+  applyLock(); renderOffres();
+};
+$('#aboExCheck').onclick = async () => {
+  const r = await extraCall({ check: true }, $('#aboExCheck')); if (!r) return;
+  state.exDirty = false; toast(tr('Comptes supplémentaires actifs :') + ' ' + (r.units || 0) + '.');
+  applyLock(); renderOffres();
+};
 function perkUpsell(what) { toast(what + (what === 'Le copieur de trades' ? ' est inclus dans l\'offre Pro.' : ' est inclus dans les offres Essentiel et Pro.')); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
 function syncAboNav() { const l = state.lic || {}, show = !!(l.key_hint && !l.trial); $('#navAbo').hidden = !show; if (!show && state.page === 'abo') { state.page = 'offres'; showPage(); } }
 function applyLock() { document.body.classList.toggle('locked', !licOk()); syncAboNav(); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
@@ -3258,6 +3324,7 @@ async function renderOffres() {
       }
     }
   }
+  renderExtra(lic);
   // mensuel / annuel
   document.querySelectorAll('#ofBilling button').forEach(b => {
     b.classList.toggle('on', b.dataset.v === state.ofBilling);

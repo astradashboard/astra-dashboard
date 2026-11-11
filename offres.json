@@ -65,7 +65,7 @@
       "label": "Comptes de trading connectés",
       "values": {
         "essai": "1 compte",
-        "essentiel": "1 compte",
+        "essentiel": "1 compte (+5,99 €/compte)",
         "pro": "Jusqu'à 50"
       }
     },
@@ -156,5 +156,14 @@
     "tiktok": "https://www.tiktok.com/@astracapital1"
   },
   "provider": "creem",
-  "licence_api": "https://astra-licences.astracapital369.workers.dev"
+  "licence_api": "https://astra-licences.astracapital369.workers.dev",
+  "extra_account": {
+    "price": "5,99 €",
+    "product_id": null,
+    "plans": [
+      "essentiel"
+    ],
+    "max": 20,
+    "_aide": "Produit Creem « Compte supplémentaire » (abonnement mensuel 5,99 €, quantité = nombre de comptes). Colle son identifiant prod_… dans product_id."
+  }
 }

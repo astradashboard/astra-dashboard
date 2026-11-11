@@ -19,6 +19,7 @@ export default {
     if (action === 'notify' && request.method === 'POST') return notify(request, env, base, apiKey, cors);
     if (action === 'portal' && request.method === 'POST') return portal(request, base, apiKey, cors);
     if (action === 'change' && request.method === 'POST') return changePlan(request, base, apiKey, cors);
+    if (action === 'extra' && request.method === 'POST') return extraAccounts(request, base, apiKey, cors);
     if (request.method !== 'POST' || !['activate', 'validate', 'deactivate'].includes(action)) {
       return Response.json({ error: 'not found' }, { status: 404, headers: cors });
     }
@@ -164,4 +165,72 @@ async function changePlan(request, base, apiKey, cors) {
   const uj = await u.json().catch(() => ({}));
   if (!u.ok) return fail((uj && (uj.message || uj.error)) ? String(uj.message || uj.error) : 'changement refusé par Creem (' + u.status + ')', 502);
   return Response.json({ ok: true, product_id: idOf(uj.product) || target, status: uj.status || null }, { headers: cors });
+}
+
+// ---------- comptes supplémentaires (abonnement séparé, quantité = nombre de comptes) ----------
+async function customerSubs(cid, base, H) {
+  const subs = new Map();
+  const t = await fetch(`${base}/v1/transactions/search?customer_id=${encodeURIComponent(cid)}&page_size=50`, { headers: H });
+  const tj = await t.json().catch(() => ({}));
+  for (const x of tj.items || []) { const sid = idOf(x.subscription); if (sid && !subs.has(sid)) subs.set(sid, null); }
+  for (const sid of [...subs.keys()].slice(0, 15)) {
+    const g = await fetch(`${base}/v1/subscriptions?subscription_id=${encodeURIComponent(sid)}`, { headers: H });
+    if (g.ok) subs.set(sid, await g.json().catch(() => null));
+  }
+  for (let page = 1; page <= 20; page++) {
+    const q = await fetch(`${base}/v1/subscriptions/search?page_number=${page}&page_size=50`, { headers: H });
+    const qj = await q.json().catch(() => ({}));
+    for (const x of qj.items || []) if (idOf(x.customer) === cid && !subs.get(x.id)) subs.set(x.id, x);
+    if (!qj.pagination || !qj.pagination.next_page) break;
+  }
+  return [...subs.values()].filter(Boolean);
+}
+async function extraAccounts(request, base, apiKey, cors) {
+  const fail = (error, status = 400) => Response.json({ error }, { status, headers: cors });
+  let body; try { body = await request.json(); } catch { return fail('bad request'); }
+  const H = { 'x-api-key': apiKey, 'Content-Type': 'application/json', accept: 'application/json' };
+  const pid = String(body.product_id || '').trim();
+  if (!/^prod_[A-Za-z0-9]+$/.test(pid)) return fail('produit invalide');
+  const key = String(body.key || '').trim().slice(0, 200);
+  const r = await fetch(`${base}/v1/licenses/validate`, { method: 'POST', headers: H,
+    body: JSON.stringify({ key, instance_id: String(body.instance_id || '').slice(0, 100) }) });
+  const lic = await r.json().catch(() => ({}));
+  if (!r.ok || !lic.status) return fail('clé de licence inconnue', 404);
+  const email = String(body.email || '').trim().toLowerCase().slice(0, 200);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("indique l'e-mail utilisé pour l'achat");
+  const c = await fetch(`${base}/v1/customers?email=${encodeURIComponent(email)}`, { headers: H });
+  const cust = await c.json().catch(() => ({}));
+  const cid = c.ok ? (cust.id || (cust.customer && cust.customer.id)) : null;
+  if (!cid) return fail('aucun achat trouvé avec cet e-mail', 404);
+  const live = (await customerSubs(cid, base, H)).filter(x => ['active', 'trialing', 'past_due', 'paused'].includes(x.status));
+  const mine = live.filter(x => idOf(x.product) === pid || (x.items || []).some(i => i.product_id === pid));
+  const itemOf = x => (x.items || []).find(i => i.product_id === pid) || (x.items || [])[0] || null;
+  const unitsOf = x => { const it = itemOf(x); return it && it.units ? Number(it.units) : 1; };
+  const current = mine.reduce((n, x) => n + unitsOf(x), 0);
+  if (body.action !== 'set') return Response.json({ units: current }, { headers: cors });
+  const want = Math.max(0, Math.min(50, parseInt(body.units, 10) || 0));
+  if (!mine.length) {
+    if (!want) return Response.json({ units: 0 }, { headers: cors });
+    const k = await fetch(`${base}/v1/checkouts`, { method: 'POST', headers: H, body: JSON.stringify({
+      product_id: pid, units: want, customer: { email }, success_url: 'https://astracapital.app/',
+      metadata: { licence: key.slice(-8) } }) });
+    const kj = await k.json().catch(() => ({}));
+    if (!k.ok || !kj.checkout_url) return fail((kj && (kj.message || kj.error)) ? String(kj.message || kj.error) : 'paiement indisponible (' + k.status + ')', 502);
+    return Response.json({ checkout_url: kj.checkout_url, units: want }, { headers: cors });
+  }
+  const sub = mine[0];
+  if (!want) {
+    const x = await fetch(`${base}/v1/subscriptions/${sub.id}/cancel`, { method: 'POST', headers: H, body: '{}' });
+    if (!x.ok) { const xj = await x.json().catch(() => ({})); return fail(String((xj && (xj.message || xj.error)) || 'résiliation refusée (' + x.status + ')'), 502); }
+    return Response.json({ units: 0 }, { headers: cors });
+  }
+  const it = itemOf(sub);
+  if (!it) return fail('abonnement sans article', 502);
+  const u = await fetch(`${base}/v1/subscriptions/${sub.id}`, { method: 'POST', headers: H, body: JSON.stringify({
+    items: [{ id: it.id, ...(it.price_id ? { price_id: it.price_id } : { product_id: pid }), units: want }],
+    update_behavior: 'proration-charge-immediately' }) });
+  const uj = await u.json().catch(() => ({}));
+  if (!u.ok) return fail((uj && (uj.message || uj.error)) ? String(uj.message || uj.error) : 'modification refusée par Creem (' + u.status + ')', 502);
+  const ni = (uj.items || []).find(i => i.id === it.id);
+  return Response.json({ units: ni && ni.units ? Number(ni.units) : want }, { headers: cors });
 }

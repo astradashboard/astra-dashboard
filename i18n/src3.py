@@ -171,10 +171,10 @@ T = {
   "Öffne im linken Menü **Mein Abo verwalten** und klicke auf **Abo verwalten / kündigen**: Dein Creem-Kundenbereich öffnet sich und du kannst dort **kündigen** oder die Karte ändern. Du kannst auch den Link in der Zahlungs-E-Mail von **Creem** nutzen oder uns schreiben. **Ohne Bindung**.\nUm den Tarif zu wechseln, nutze **Tarif wechseln** auf derselben Seite.",
   "En el menú de la izquierda, abre **Gestionar mi suscripción** y haz clic en **Gestionar / cancelar mi suscripción**: se abre tu área de cliente de Creem y puedes **cancelar** o cambiar de tarjeta. También puedes usar el enlace del e-mail de pago enviado por **Creem**, o escribirnos. **Sin permanencia**.\nPara cambiar de plan, usa **Cambiar de plan** en la misma página."),
 "Pourquoi je ne peux pas ajouter un autre compte ?": ("Why can't I add another account?", "Warum kann ich kein weiteres Konto hinzufügen?", "¿Por qué no puedo añadir otra cuenta?"),
-"L'offre **Essentiel** (et l'essai) permet **1 compte**. L'offre **Pro** permet jusqu'à **50 comptes**. Le compte démo ne compte pas.":
- ("The **Essentiel** plan (and the trial) allows **1 account**. The **Pro** plan allows up to **50 accounts**. The demo account doesn't count.",
-  "Der Tarif **Essentiel** (und die Testphase) erlaubt **1 Konto**. Der Tarif **Pro** erlaubt bis zu **50 Konten**. Das Demokonto zählt nicht.",
-  "El plan **Essentiel** (y la prueba) permite **1 cuenta**. El plan **Pro** permite hasta **50 cuentas**. La cuenta demo no cuenta."),
+"L'offre **Essentiel** (et l'essai) permet **1 compte**. Avec Essentiel, tu peux ajouter des **comptes supplémentaires** à 5,99 €/mois chacun dans **Gérer mon abonnement**. L'offre **Pro** permet jusqu'à **50 comptes**. Le compte démo ne compte pas.":
+ ("The **Essentiel** plan (and the trial) allows **1 account**. With Essentiel, you can add **extra accounts** at €5.99/month each in **Manage my subscription**. The **Pro** plan allows up to **50 accounts**. The demo account doesn't count.",
+  "Der Tarif **Essentiel** (und die Testphase) erlaubt **1 Konto**. Mit Essentiel kannst du unter **Mein Abo verwalten** **zusätzliche Konten** für je 5,99 €/Monat hinzufügen. Der Tarif **Pro** erlaubt bis zu **50 Konten**. Das Demokonto zählt nicht.",
+  "El plan **Essentiel** (y la prueba) permite **1 cuenta**. Con Essentiel puedes añadir **cuentas adicionales** a 5,99 €/mes cada una en **Gestionar mi suscripción**. El plan **Pro** permite hasta **50 cuentas**. La cuenta demo no cuenta."),
 "Voir l'offre Pro": ("See the Pro plan", "Pro-Tarif ansehen", "Ver el plan Pro"),
 "Je peux l'utiliser sur plusieurs PC ?": ("Can I use it on several PCs?", "Kann ich sie auf mehreren PCs nutzen?", "¿Puedo usarla en varios PC?"),
 "Oui, ta clé fonctionne sur **2 PC**. Pour passer sur un autre ordinateur : sur l'ancien PC, Tarification → **Retirer de ce PC** pour libérer ta clé, puis installe l'app sur le nouveau PC et colle la même clé.":
