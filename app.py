@@ -2215,6 +2215,8 @@ def static_files(name):
 # ---------------------------------------------------------------- licence (abonnement Lemon Squeezy)
 LICENCE_FILE = os.path.join(DATA_DIR, "licence.json")
 OWNER_KEYS = {"20c8f1e472984770c44f9a0ea7ae360e8d577a460fb38a3e64426e804668d303"}  # empreintes SHA-256 des clés propriétaire
+# clés de test (empreinte SHA-256 → offre simulée), sans abonnement Creem
+TEST_KEYS = {"8ff45721f002b3f9eb5d98e03c2f84fabdb66e5d9fb2f9dd596407709980e5c8": "essentiel"}
 LS_API = "https://api.lemonsqueezy.com/v1/licenses/"
 LIC_RECHECK = 6 * 3600      # on revérifie l'abonnement toutes les 6 h
 LIC_GRACE = 3 * 86400       # sans internet, l'accès reste ouvert 3 jours après la dernière vérification réussie
@@ -2227,6 +2229,25 @@ def load_offers():
             return json.load(f)
     except Exception:
         return {"plans": []}
+
+
+def _test_plan(key):
+    """Offre simulée par une clé de test (ou None)."""
+    import hashlib
+    pid = TEST_KEYS.get(hashlib.sha256(key.strip().encode()).hexdigest())
+    if not pid:
+        return None
+    return next((p for p in load_offers().get("plans", []) if p.get("id") == pid), None)
+
+
+def _test_lic(key, old=None):
+    plan = _test_plan(key)
+    lic = {"key": key, "owner": False, "test": True, "active": True, "status": "active", "plan": plan.get("id"),
+           "plan_name": plan.get("name") + " (test)", "max_accounts": int(plan.get("accounts", 1)), "period": "month",
+           "checked_at": dt.datetime.now().isoformat(timespec="seconds")}
+    if old and old.get("key") == key and old.get("extra"):
+        lic["extra"] = old["extra"]
+    return lic
 
 
 def _owner_key(key):
@@ -2409,6 +2430,8 @@ def licence(force=False):
         if lic.get("owner"):
             lic["active"] = _owner_key(lic["key"])
             return lic
+        if lic.get("test"):
+            return _test_lic(lic["key"], lic) if _test_plan(lic["key"]) else {**lic, "active": False, "error": "Clé de test désactivée."}
         now = time.time()
         if lic.get("trial"):  # essai gratuit : actif jusqu'à la date de fin, sans vérification en ligne
             lic["active"] = now < float(lic.get("trial_end", 0))
@@ -2544,6 +2567,10 @@ def api_licence_activate():
     key = str((request.get_json(force=True) or {}).get("key", "")).strip()
     if len(key) < 8 or len(key) > 120:
         return jsonify({"error": "Colle la clé de licence reçue par e-mail après ton achat."}), 400
+    if _test_plan(key):
+        lic = _test_lic(key)
+        _save(LICENCE_FILE, lic)
+        return jsonify(_lic_public(lic))
     if _owner_key(key):
         lic = {"key": key, "owner": True, "active": True, "status": "active", "plan": "owner", "plan_name": "Propriétaire",
                "max_accounts": None, "checked_at": dt.datetime.now().isoformat(timespec="seconds")}
@@ -2653,8 +2680,8 @@ def api_licence_extra():
     body = request.get_json(silent=True) or {}
     cfg = extra_cfg()
     lic = _load(LICENCE_FILE, {})
-    if not lic.get("key") or lic.get("owner") or lic.get("trial"):
-        return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
+    if not lic.get("key") or lic.get("owner") or lic.get("trial") or lic.get("test"):
+        return jsonify({"error": "Aucun abonnement payant sur ce PC (clé de test ou propriétaire)." if lic.get("test") else "Aucun abonnement payant sur ce PC."}), 400
     if lic.get("plan") not in (cfg.get("plans") or []):
         return jsonify({"error": "Les comptes supplémentaires s'ajoutent à l'offre Essentiel."}), 400
     if not cfg.get("product_id"):
@@ -2720,8 +2747,8 @@ def api_licence_change():
         return jsonify({"error": "Offre inconnue."}), 400
     product = (plan.get("annual") or {}).get("variant_id") if period == "year" else plan.get("variant_id")
     lic = _load(LICENCE_FILE, {})
-    if not lic.get("key") or lic.get("owner") or lic.get("trial"):
-        return jsonify({"error": "Aucun abonnement payant sur ce PC."}), 400
+    if not lic.get("key") or lic.get("owner") or lic.get("trial") or lic.get("test"):
+        return jsonify({"error": "Aucun abonnement payant sur ce PC (clé de test ou propriétaire)." if lic.get("test") else "Aucun abonnement payant sur ce PC."}), 400
     if not product:
         return jsonify({"error": "Cette offre n'est pas encore disponible."}), 400
     api = (load_offers().get("licence_api") or "").rstrip("/")
