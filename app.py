@@ -1026,6 +1026,8 @@ def api_live():
     accounts, cache = load_accounts(), load_cache()
     if login not in accounts:
         return jsonify({"status": "error", "error": "Compte introuvable."}), 404
+    if login in locked_logins(accounts, cache):
+        return jsonify({"status": "error", "error": LOCKED_MSG, "locked": True}), 403
     if cache.get(login, {}).get("demo"):
         LIVE["seen"] = time.time()
         return jsonify({"status": "running", "snap": _demo_snapshot(cache[login]), "rev": 0})
@@ -1091,9 +1093,26 @@ def make_demo_data(size=100000.0):
 
 
 # ---------------------------------------------------------------- API
-def account_summary(login, acc, cache):
+def locked_logins(accounts=None, cache=None):
+    """Comptes au-delà de la limite de l'offre (ex. après un passage de Pro à Essentiel) : verrouillés.
+    Les premiers comptes ajoutés restent accessibles ; les comptes démo ne comptent pas."""
+    limit = max_accounts()
+    if limit is None:
+        return set()
+    accounts = load_accounts() if accounts is None else accounts
+    cache = load_cache() if cache is None else cache
+    real = [l for l in accounts if not cache.get(l, {}).get("demo")]
+    return set(real[limit:])
+
+
+LOCKED_MSG = ("Ce compte dépasse le nombre de comptes de ton offre. Ajoute un compte supplémentaire dans « Gérer mon abonnement », "
+              "passe à l'offre Pro, ou retire un autre compte.")
+
+
+def account_summary(login, acc, cache, locked=frozenset()):
     c = cache.get(login, {})
     return {
+        "locked": login in locked,
         "login": login,
         "name": acc.get("name") or login,
         "server": acc.get("server", ""),
@@ -2827,10 +2846,11 @@ def api_licence_portal():
 @app.get("/api/state")
 def api_state():
     accounts, cache = load_accounts(), load_cache()
+    locked = locked_logins(accounts, cache)
     return jsonify({
         "mt5_available": mt5 is not None,
         "keyring_available": keyring is not None,
-        "accounts": [account_summary(k, v, cache) for k, v in accounts.items()],
+        "accounts": [account_summary(k, v, cache, locked) for k, v in accounts.items()],
     })
 
 
@@ -2888,7 +2908,10 @@ def api_refresh():
     body = request.get_json(force=True) or {}
     target = str(body.get("login", "all"))
     accounts, cache = load_accounts(), load_cache()
-    logins = list(accounts) if target == "all" else [target]
+    locked = locked_logins(accounts, cache)
+    if target in locked:
+        return jsonify({"error": LOCKED_MSG, "locked": True}), 403
+    logins = [l for l in (accounts if target == "all" else [target]) if l not in locked]
     errors, need_password = [], []
     for login in logins:
         acc = accounts.get(login)
@@ -3026,7 +3049,8 @@ def _month_report_one(login, month):
 
 def month_report(login, month):
     """Rapport d'un mois pour un ou plusieurs comptes (liste « 123,456 ») : tout est additionné."""
-    logins = [l for l in dict.fromkeys(str(login).split(",")) if l][:50]
+    locked = locked_logins()
+    logins = [l for l in dict.fromkeys(str(login).split(",")) if l and l not in locked][:50]
     if not logins:
         raise KeyError("Compte introuvable.")
     parts = [_month_report_one(l, month) for l in logins]
@@ -3358,7 +3382,10 @@ def api_report_pdf():
 def api_data():
     target = request.args.get("login", "all")
     accounts, cache = load_accounts(), load_cache()
-    logins = [l for l in (accounts if target == "all" else [target]) if l in cache]
+    locked = locked_logins(accounts, cache)
+    if target in locked:
+        return jsonify({"error": LOCKED_MSG, "locked": True}), 403
+    logins = [l for l in (accounts if target == "all" else [target]) if l in cache and l not in locked]
     if not logins:
         return jsonify({"error": "Aucune donnée pour ce compte."}), 404
 

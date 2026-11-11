@@ -55,6 +55,7 @@
   .acc .bal { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .acc { position: relative; }
   .acc.acc-drag { border-color: var(--gold) !important; background: var(--gold-soft) !important; box-shadow: 0 8px 24px rgba(0,0,0,.4); opacity: .95; }
+  .acc.locked { opacity: .5; } .acc.locked:hover { opacity: .75; }
   .acc-x { position: absolute; top: 3px; right: 4px; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; font-size: 14px; line-height: 1;
     color: var(--muted); opacity: 0; transition: opacity .15s, color .15s, background .15s; cursor: pointer; }
   .acc:hover .acc-x { opacity: 1; } .acc-x:hover { color: var(--loss); background: rgba(239,68,68,.14); }
@@ -1668,24 +1669,26 @@ function sortAccounts(list) {
 let accDragging = false;
 function renderAccounts() {
   const list = $('#accList'); list.innerHTML = '';
-  const items = state.accounts.length > 1 ? [{ login: 'all', name: 'Tous les comptes', server: state.accounts.length + ' comptes' }, ...state.accounts] : state.accounts;
-  if (state.accounts.length === 1) state.sel = state.accounts[0].login;
+  const open = state.accounts.filter(a => !a.locked);
+  const items = open.length > 1 ? [{ login: 'all', name: 'Tous les comptes', server: open.length + ' comptes' }, ...state.accounts] : state.accounts;
+  if (open.length === 1 && (state.sel === 'all' || !open.some(a => a.login === state.sel))) state.sel = open[0].login;
+  if (state.accounts.some(a => a.locked && a.login === state.sel)) state.sel = open.length > 1 ? 'all' : (open[0] || {}).login;
   for (const a of items) {
     const b = document.createElement('button');
-    b.className = 'acc' + (a.login === state.sel ? ' active' + (state.page === 'journal' ? ' dimmed' : '') : '');
+    b.className = 'acc' + (a.locked ? ' locked' : '') + (a.login === state.sel ? ' active' + (state.page === 'journal' ? ' dimmed' : '') : '');
     const left = document.createElement('div');
     const nm = document.createElement('div'); nm.textContent = shownName(a.name); if (a.login !== 'all') nm.dataset.noi18n = '';
     const sm = document.createElement('small'); sm.textContent = a.login === 'all' ? a.server : (a.demo ? 'Démo' : shownLogin(a.login) + ' · ' + a.server);
     left.append(nm, sm);
     const bal = document.createElement('span'); bal.className = 'bal';
-    bal.textContent = a.login === 'all' ? '' : money(a.balance, a.currency);
+    bal.textContent = a.login === 'all' ? '' : a.locked ? '🔒' : money(a.balance, a.currency);
     b.append(left, bal);
     if (a.login !== 'all') {
       const x = document.createElement('span'); x.className = 'acc-x'; x.textContent = '×'; x.title = 'Supprimer ce compte'; x.setAttribute('role', 'button');
       x.onclick = ev => { ev.stopPropagation(); deleteAccount(a); };
       b.appendChild(x);
     }
-    b.onclick = () => { if (b.dataset.editing || accDragging) return; state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = ''; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
+    b.onclick = () => { if (b.dataset.editing || accDragging) return; if (a.locked) { accLimitUpsell(); return; } state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = ''; state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData(); };
     if (a.login !== 'all') {
       b.dataset.login = a.login;
       b.title = 'Glisser pour changer l\'ordre · clic droit : renommer, actualiser ou supprimer';
@@ -2524,7 +2527,22 @@ function shiftMonth(delta) {
 
 /* ---------- connexion ---------- */
 let reconnectLogin = null;
+function accLimitReached() {
+  const l = state.lic || {};
+  if (l.owner || !l.active || !l.max_accounts) return false;
+  return state.accounts.filter(a => !a.demo).length >= l.max_accounts;
+}
+async function accLimitUpsell() {
+  if (!offresData) { try { offresData = await api('/api/offres'); } catch (e) { offresData = { plans: [] }; } }
+  const l = state.lic || {}, cfg = (offresData || {}).extra_account || {};
+  const canExtra = cfg.product_id && (cfg.plans || []).includes(l.plan);
+  toast(tr('Ton offre permet de connecter') + ' ' + l.max_accounts + ' ' + tr(l.max_accounts > 1 ? 'comptes' : 'compte') + '. '
+    + tr(canExtra ? 'Ajoute un compte supplémentaire ci-dessous, ou passe à l\'offre Pro.' : 'Passe à l\'offre Pro pour en connecter plus.'));
+  state.page = canExtra ? 'abo' : 'offres'; showPage(); window.scrollTo(0, 0);
+  if (canExtra) setTimeout(() => { const x = $('#aboExtra'); if (x && !x.hidden) x.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
+}
 function openLogin(prefill) {
+  if (!prefill && accLimitReached()) { accLimitUpsell(); return; }
   reconnectLogin = prefill ? prefill.login : null;
   $('#loginForm').reset(); $('#loginErr').style.display = 'none';
   $('#loginTitle').textContent = prefill ? 'Mot de passe requis' : 'Connecter un compte';
@@ -3190,9 +3208,9 @@ state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
 // comptes supplémentaires payants (offre Essentiel)
-const exPrice = () => { const v = parseFloat(String((offresData.extra_account || {}).price || '5,99').replace(',', '.')); return isNaN(v) ? 5.99 : v; };
+const exPrice = () => { const v = parseFloat(String(((offresData || {}).extra_account || {}).price || '5,99').replace(',', '.')); return isNaN(v) ? 5.99 : v; };
 function renderExtra(lic) {
-  const cfg = offresData.extra_account || {}, box = $('#aboExtra');
+  const cfg = (offresData || {}).extra_account || {}, box = $('#aboExtra');
   const show = !!(lic && lic.key_hint && !lic.trial && !lic.owner && lic.active && (cfg.plans || []).includes(lic.plan));
   box.hidden = !show; if (!show) return;
   const base = lic.base_accounts || 1, cur = lic.extra || 0;
@@ -3209,7 +3227,7 @@ function renderExtra(lic) {
   $('#aboExCheck').hidden = !cfg.product_id;
 }
 $('#aboExMinus').onclick = () => { state.exN = Math.max(0, (state.exN || 0) - 1); state.exDirty = true; renderExtra(state.lic); };
-$('#aboExPlus').onclick = () => { state.exN = Math.min((offresData.extra_account || {}).max || 20, (state.exN || 0) + 1); state.exDirty = true; renderExtra(state.lic); };
+$('#aboExPlus').onclick = () => { state.exN = Math.min(((offresData || {}).extra_account || {}).max || 20, (state.exN || 0) + 1); state.exDirty = true; renderExtra(state.lic); };
 async function extraCall(body, btn) {
   const lic = state.lic || {}, mail = ($('#aboMail').value || '').trim();
   $('#aboExErr').textContent = '';
@@ -3228,12 +3246,12 @@ $('#aboExSave').onclick = async () => {
     api('/api/open-url', { url: r.checkout_url }).catch(() => window.open(r.checkout_url, '_blank'));
     toast(tr('La page de paiement s\'ouvre dans ton navigateur. Une fois payé, clique sur « Vérifier mes comptes supplémentaires ».'));
   } else { state.exDirty = false; toast(tr('Comptes supplémentaires mis à jour :') + ' ' + (r.units || 0) + '.'); }
-  applyLock(); renderOffres();
+  applyLock(); renderOffres(); loadState().catch(() => {});
 };
 $('#aboExCheck').onclick = async () => {
   const r = await extraCall({ check: true }, $('#aboExCheck')); if (!r) return;
   state.exDirty = false; toast(tr('Comptes supplémentaires actifs :') + ' ' + (r.units || 0) + '.');
-  applyLock(); renderOffres();
+  applyLock(); renderOffres(); loadState().catch(() => {});
 };
 function perkUpsell(what) { toast(what + (what === 'Le copieur de trades' ? ' est inclus dans l\'offre Pro.' : ' est inclus dans les offres Essentiel et Pro.')); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
 function syncAboNav() { const l = state.lic || {}, show = !!(l.key_hint && !l.trial); $('#navAbo').hidden = !show; if (!show && state.page === 'abo') { state.page = 'offres'; showPage(); } }

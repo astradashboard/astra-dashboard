@@ -110,4 +110,7 @@ T = {
 "Un compte de moins": ("One account less", "Ein Konto weniger", "Una cuenta menos"),
 "Un compte de plus": ("One more account", "Ein Konto mehr", "Una cuenta más"),
 "1 compte (+5,99 €/compte)": ("1 account (+€5.99/account)", "1 Konto (+5,99 €/Konto)", "1 cuenta (+5,99 €/cuenta)"),
+"Ton offre permet de connecter": ("Your plan lets you connect", "Dein Tarif erlaubt", "Tu plan permite conectar"),
+"Ajoute un compte supplémentaire ci-dessous, ou passe à l'offre Pro.": ("Add an extra account below, or switch to the Pro plan.", "Füge unten ein zusätzliches Konto hinzu oder wechsle zum Pro-Tarif.", "Añade una cuenta adicional abajo o pasa al plan Pro."),
+"Passe à l'offre Pro pour en connecter plus.": ("Switch to the Pro plan to connect more.", "Wechsle zum Pro-Tarif, um mehr zu verbinden.", "Pasa al plan Pro para conectar más."),
 }
