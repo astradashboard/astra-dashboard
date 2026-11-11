@@ -159,11 +159,12 @@
   "licence_api": "https://astra-licences.astracapital369.workers.dev",
   "extra_account": {
     "price": "5,99 €",
-    "product_id": null,
+    "product_id": "prod_4PqiDf8G7GTnrh2fECKPQ2",
     "plans": [
       "essentiel"
     ],
     "max": 20,
-    "_aide": "Produit Creem « Compte supplémentaire » (abonnement mensuel 5,99 €, quantité = nombre de comptes). Colle son identifiant prod_… dans product_id."
+    "_aide": "Produit Creem « Compte supplémentaire » (abonnement mensuel 5,99 €, quantité = nombre de comptes). Colle son identifiant prod_… dans product_id.",
+    "checkout_url": "https://www.creem.io/payment/prod_4PqiDf8G7GTnrh2fECKPQ2"
   }
 }
