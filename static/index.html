@@ -2974,13 +2974,13 @@ const HELP_KB = [
   { q: 'Changer la devise affichée', k: 'devise monnaie euro dollar usd eur chf jpy aud conversion',
     a: 'Dans le grand bloc du capital, choisis la devise (EUR, USD, CHF, JPY, AUD) dans le menu en haut à droite. La conversion utilise le cours du jour.' },
   { q: 'Voir les trades en cours en direct', k: 'direct live trade cours ouvert position temps reel seconde equite equity',
-    a: 'Le bloc **Trades en cours** apparaît automatiquement dès qu\'une position est ouverte (et disparaît quand tout est clôturé). Il affiche tes positions et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans l\'offre **Pro**.', act: [['Voir les offres', 'offres']] },
+    a: 'Le bloc **Trades en cours** apparaît automatiquement dès qu\'une position est ouverte (et disparaît quand tout est clôturé). Il affiche tes positions et ton capital qui bouge à la seconde. Il faut avoir **mémorisé le mot de passe** du compte.\nInclus dans les offres **Essentiel** et **Pro**.', act: [['Voir les offres', 'offres']] },
   { q: 'Utiliser le journal de trading', k: 'journal trading historique liste trades detail position filtre gagnant perdant',
     a: 'Ouvre **Journal de trading** dans la colonne de gauche : tous les trades du compte (date, symbole, PnL). Clique sur un trade pour voir son détail : ouverture, volume, sens, frais, profit en % et en R.\nFiltre par mois ou par gagnants / perdants.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Créer le rapport PDF du mois', k: 'pdf rapport mensuel exporter imprimer enregistrer document plusieurs comptes cumul additionner',
-    a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois et coche les **comptes inclus** : avec plusieurs comptes, résultats, positions et statistiques sont **additionnés** dans un seul rapport. Regarde l\'aperçu puis enregistre.\nInclus dans l\'offre **Pro**.', act: [['Ouvrir le journal', 'journal']] },
+    a: 'Dans le **Journal de trading**, clique sur **⤓ PDF du mois**, choisis le mois et coche les **comptes inclus** : avec plusieurs comptes, résultats, positions et statistiques sont **additionnés** dans un seul rapport. Regarde l\'aperçu puis enregistre.\nInclus dans les offres **Essentiel** et **Pro**.', act: [['Ouvrir le journal', 'journal']] },
   { q: 'Partager mes résultats sur TikTok / Instagram', k: 'partager carte image tiktok instagram reseaux post story publier resultats photo',
-    a: 'Ouvre **Partager mes résultats** dans le menu de gauche : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans l\'offre **Pro**.', act: [['Créer une carte', 'share']] },
+    a: 'Ouvre **Partager mes résultats** dans le menu de gauche : choisis le jour, la semaine ou le mois dans le calendrier, l\'affichage (montant, % ou R), le format (post, story, carré), puis **Enregistrer l\'image** ou **Copier**.\nInclus dans les offres **Essentiel** et **Pro**.', act: [['Créer une carte', 'share']] },
   { q: 'Comment utiliser le copieur de trades ?', k: 'copieur copier copie copy copier trade trades dupliquer repliquer compte source destination multiplicateur lot autre compte',
     a: 'Ouvre **Copieur de trades** dans le menu de gauche.\n1. Onglet **Comptes** : ajoute le compte qui envoie les trades et ceux qui les reçoivent. Un compte qui **reçoit** les copies a besoin de son mot de passe **principal** (trading).\n2. Onglet **Copieurs** : **+ Créer un copieur**, choisis le compte source, le compte destination et le type de risque (multiplicateur selon le solde, multiplicateur de lot ou lot fixe).\nLes ouvertures, SL/TP, fermetures partielles et fermetures sont copiés. L\'app doit rester ouverte sur le PC (ou ton VPS). Inclus dans l\'offre **Pro**.', act: [['Ouvrir le copieur', 'copier']] },
   { q: 'Ajouter un QR code sur la carte', k: 'qr code verification verifier preuve myfxbook lien officiel reel detail details positions scanner',
@@ -3016,9 +3016,9 @@ const HELP_KB = [
     a: 'Dans **Tarification**, clique sur **Commencer l\'essai gratuit** : **7 jours d\'accès**, avec les fonctions de l\'offre **Essentiel** (1 compte), **sans carte bancaire**. À la fin de l\'essai, choisis une offre pour continuer.', act: [['Voir les offres', 'offres']] },
   { q: 'Quelle différence entre Essentiel et Pro ?', k: 'difference essentiel pro comparer comparaison offre plan choisir mieux inclus contient fonction',
     alt: ['que contient l\'offre pro', 'pourquoi prendre pro', 'qu\'est-ce qu\'il y a dans essentiel', 'essentiel ou pro'],
-    a: '**Essentiel** (24,95 €/mois) : **1 compte**, statistiques, courbe, calendrier, journal et calendrier économique.\n**Pro** (34,95 €/mois) : jusqu\'à **50 comptes**, plus la vue **tous les comptes**, le **suivi en direct** des positions, le **rapport PDF mensuel** et les **cartes de résultats** à partager.\nEn **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
+    a: '**Essentiel** (24,95 €/mois) : **1 compte**, statistiques, courbe, calendrier, journal, calendrier économique, vue **tous les comptes**, **suivi en direct** des positions, **rapport PDF mensuel** et **cartes de résultats** à partager.\n**Pro** (99,95 €/mois) : tout l\'Essentiel, jusqu\'à **50 comptes** et le **copieur de trades**.\nEn **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
   { q: 'Les offres et l\'abonnement', k: 'offre offres abonnement prix tarif tarification payer paiement essentiel pro annuel mensuel',
-    a: 'Page **Tarification** : **Essai gratuit** 7 jours, **Essentiel** (1 compte) et **Pro** (jusqu\'à 50 comptes, suivi en direct, PDF, cartes de résultats). En **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
+    a: 'Page **Tarification** : **Essai gratuit** 7 jours, **Essentiel** (1 compte, suivi en direct, PDF, cartes de résultats) et **Pro** (jusqu\'à 50 comptes et copieur de trades). En **annuel**, −20 %.', act: [['Voir les offres', 'offres']] },
   { q: 'Activer ma clé de licence', k: 'cle licence activer code debloquer achat email recu',
     a: 'Après ton achat, ta **clé** arrive par e-mail. Clique sur **Connexion** (icône de clé, en haut à gauche), colle la clé puis **Se connecter**.', act: [['Se connecter', 'login']] },
   { q: 'Comment annuler mon abonnement ?', k: 'changer offre resilier annuler annulation arreter stopper abonnement gerer facture remboursement desabonner engagement',
@@ -3037,7 +3037,7 @@ const HELP_KB = [
   { q: 'Le compte démo', k: 'demo demonstration essayer tester fictif exemple',
     a: 'Le **compte démo** affiche des données fictives pour découvrir l\'app sans connecter de vrai compte. Tu peux le supprimer par clic droit.' },
   { q: 'Voir tous mes comptes ensemble', k: 'tous comptes ensemble cumul cumule total global vue combinee',
-    a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans l\'offre **Pro**.' },
+    a: 'Avec plusieurs comptes, choisis **Tous les comptes** en haut de la liste : capital, résultats et calendrier sont additionnés. Inclus dans les offres **Essentiel** et **Pro**.' },
   { q: 'Contacter ASTRA / rejoindre la communauté', k: 'contact contacter support aide humain question communaute discord tiktok groupe serveur coach rejoindre suivre probleme',
     a: 'Rejoins la **communauté ASTRA sur Discord** pour poser tes questions, échanger avec les autres traders et obtenir de l\'aide. Tu peux aussi suivre **@astracapital1** sur TikTok.\nLes boutons sont aussi en bas de la colonne de gauche.', act: [['Rejoindre la communauté', 'discord'], ['Suis-moi sur TikTok', 'tiktok']] },
   { q: 'Que veulent dire les statistiques ?', k: 'taux reussite profit factor facteur drawdown definition signifie veut dire statistique moyenne sharpe rrr valeur attendue esperance lots equity solde perte moyenne ratio indicateur explication',
@@ -3169,7 +3169,7 @@ api('/api/alerts').then(a => { state.alerts = a; syncAlertBtn(); }).catch(() => 
 state.lic = null; let offresData = null;
 const licOk = () => !!(state.lic && state.lic.active);
 const hasPerk = k => !state.lic || !state.lic.perks || state.lic.perks[k] !== false;
-function perkUpsell(what) { toast(what + ' est inclus dans l\'offre Pro.'); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
+function perkUpsell(what) { toast(what + (what === 'Le copieur de trades' ? ' est inclus dans l\'offre Pro.' : ' est inclus dans les offres Essentiel et Pro.')); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
 function syncAboNav() { const l = state.lic || {}, show = !!(l.key_hint && !l.trial); $('#navAbo').hidden = !show; if (!show && state.page === 'abo') { state.page = 'offres'; showPage(); } }
 function applyLock() { document.body.classList.toggle('locked', !licOk()); syncAboNav(); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
 function licenceLost() {
@@ -3494,7 +3494,7 @@ function renderJournal() {
   for (const a of state.accounts) as.append(new Option(shownName(a.name), a.login));
   as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
   const pdfBtn = el('button', 'btn', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
-  if (!hasPerk('pdf')) { pdfBtn.classList.add('perk-off'); pdfBtn.title = 'Inclus dans l\'offre Pro'; pdfBtn.textContent = '⤓ PDF du mois · Pro'; }
+  if (!hasPerk('pdf')) { pdfBtn.classList.add('perk-off'); pdfBtn.title = 'Inclus dans les offres Essentiel et Pro'; pdfBtn.textContent = '⤓ PDF du mois'; }
   pdfBtn.onclick = () => hasPerk('pdf') ? openPdf(months) : perkUpsell('Le rapport PDF mensuel');
   tools.append(as, ms, fs, sum, pdfBtn); box.appendChild(tools);
 
@@ -4239,7 +4239,7 @@ async function liveTick() {
       setLiveStatus([]);
       const body = $('#liveBody'); body.innerHTML = '';
       const bx = el('div', 'live-empty perk-box');
-      bx.append(el('div', null, 'Le suivi en direct des trades en cours est inclus dans l\'offre Pro.'));
+      bx.append(el('div', null, 'Le suivi en direct des trades en cours est inclus dans les offres Essentiel et Pro.'));
       const b = el('button', 'btn primary', 'Voir les offres'); b.type = 'button'; b.onclick = () => { state.page = 'offres'; showPage(); window.scrollTo(0, 0); };
       bx.appendChild(b); body.appendChild(bx);
     }

@@ -89,4 +89,7 @@ T = {
 "Sortie": ("Exit", "Ausstieg", "Salida"),
 "Achat": ("Buy", "Kauf", "Compra"),
 "Vente": ("Sell", "Verkauf", "Venta"),
+" est inclus dans les offres Essentiel et Pro.": (" is included in the Essentiel and Pro plans.", " ist in den Tarifen Essentiel und Pro enthalten.", " está incluido en los planes Essentiel y Pro."),
+"Inclus dans les offres Essentiel et Pro": ("Included in the Essentiel and Pro plans", "In den Tarifen Essentiel und Pro enthalten", "Incluido en los planes Essentiel y Pro"),
+"Le suivi en direct des trades en cours est inclus dans les offres Essentiel et Pro.": ("Live tracking of open trades is included in the Essentiel and Pro plans.", "Die Live-Verfolgung offener Trades ist in den Tarifen Essentiel und Pro enthalten.", "El seguimiento en directo de las operaciones abiertas está incluido en los planes Essentiel y Pro."),
 }
