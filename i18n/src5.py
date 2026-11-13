@@ -113,4 +113,5 @@ T = {
 "Ton offre permet de connecter": ("Your plan lets you connect", "Dein Tarif erlaubt", "Tu plan permite conectar"),
 "Ajoute un compte supplémentaire ci-dessous, ou passe à l'offre Pro.": ("Add an extra account below, or switch to the Pro plan.", "Füge unten ein zusätzliches Konto hinzu oder wechsle zum Pro-Tarif.", "Añade una cuenta adicional abajo o pasa al plan Pro."),
 "Passe à l'offre Pro pour en connecter plus.": ("Switch to the Pro plan to connect more.", "Wechsle zum Pro-Tarif, um mehr zu verbinden.", "Pasa al plan Pro para conectar más."),
+"En veille (aucun copieur actif)": ("Idle (no active copier)", "Im Ruhemodus (kein aktiver Kopierer)", "En espera (ningún copiador activo)"),
 }

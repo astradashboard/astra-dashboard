@@ -3723,8 +3723,21 @@ PERK_NAMES["copier"] = "Le copieur de trades"
 copier_cfg_lock = threading.RLock()
 
 
+_copier_cache = {"key": None, "cfg": None}
+
+
 def load_copier():
+    import copy
+    try:
+        st = os.stat(COPIER_FILE)
+        key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and key == _copier_cache["key"]:
+        return copy.deepcopy(_copier_cache["cfg"])
     c = _load(COPIER_FILE, {})
+    if key is not None:
+        _copier_cache["key"], _copier_cache["cfg"] = key, copy.deepcopy(c)
     c.setdefault("accounts", [])
     c.setdefault("copiers", [])
     return c
@@ -3826,14 +3839,16 @@ def _hide_windows_under(root, stop):
         return True
 
     cb = proto(hide)
-    tick = 0
+    import time
+    t0, last_pids = time.time(), 0.0
     while not stop.is_set():
-        if tick % 10 == 0:
-            pids = _pids_under(root)
+        now = time.time()
+        warm = now - t0 < 30  # au lancement de MT5 les fenêtres apparaissent : on surveille de près
+        if now - last_pids >= (1.0 if warm else 20.0):
+            pids, last_pids = _pids_under(root), now
         if pids:
             user32.EnumWindows(cb, 0)
-        tick += 1
-        stop.wait(0.05)
+        stop.wait(0.1 if warm else 1.0)
 
 
 def _enable_algo_trading(term_dir):
@@ -4173,14 +4188,17 @@ def copier_agent_main():
                 os._exit(0)
 
     cmds = queue.Queue()
+    wake = threading.Event()
 
     def reader():
         for line in sys.stdin:
             try:
                 cmds.put(json.loads(line))
+                wake.set()
             except ValueError:
                 continue
         cmds.put({"cmd": "stop"})  # l'application s'est fermée
+        wake.set()
 
     threading.Thread(target=reader, daemon=True).start()
     first = cmds.get()
@@ -4201,6 +4219,7 @@ def copier_agent_main():
         return
     emit({"ev": "ready", "info": info})
     last_sig, last_emit, fails = None, 0.0, 0
+    period = float(first.get("period") or 0.5)
     try:
         while True:
             try:
@@ -4208,6 +4227,9 @@ def copier_agent_main():
                     c = cmds.get_nowait()
                     if c.get("cmd") == "stop":
                         return
+                    if c.get("cmd") == "rate":
+                        period = min(2.0, max(0.05, float(c.get("period") or 0.5)))
+                        continue
                     try:
                         fn = {"open": be.open, "close": be.close_pos, "modify": be.modify}[c["cmd"]]
                         ok, ticket, msg, code = fn(c)
@@ -4232,7 +4254,8 @@ def copier_agent_main():
             if sig != last_sig or now - last_emit > 1.0:
                 emit({"ev": "snap", "acc": acc, "pos": pos})
                 last_sig, last_emit = sig, now
-            time.sleep(0.1)
+            wake.wait(period)  # attend la prochaine lecture, mais réagit tout de suite à un ordre
+            wake.clear()
     finally:
         be.close()
 
@@ -4250,6 +4273,12 @@ class CopierAgent:
         self.lock = threading.Lock()
         self.results = {}
         self.rid = 0
+        self.period = 0.5
+
+    def set_period(self, period):
+        if abs(period - self.period) > 1e-6:
+            self.period = period
+            self.send({"cmd": "rate", "period": period})
 
     def start(self, password):
         import subprocess
@@ -4264,7 +4293,7 @@ class CopierAgent:
                                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         threading.Thread(target=self._read, daemon=True).start()
         self.send({"cmd": "init", "login": self.login, "server": self.acc.get("server", ""),
-                   "terminal": self.acc.get("terminal", ""), "password": password})
+                   "terminal": self.acc.get("terminal", ""), "password": password, "period": self.period})
 
     def send(self, obj):
         try:
@@ -4377,12 +4406,13 @@ class CopierEngine:
         import time
 
         while True:
+            busy = False
             try:
-                self.tick()
+                busy = self.tick()
             except Exception as ex:
                 self.note("err", f"Erreur interne du copieur : {ex}")
                 time.sleep(1)
-            time.sleep(0.1)
+            time.sleep(0.1 if busy else 1.0)
 
     def stop_all(self):
         with self.lock:
@@ -4398,7 +4428,14 @@ class CopierEngine:
             return
         self._last_ensure = now
         enabled = licence_active() and has_perk("copier")
-        wanted = {str(a["login"]): a for a in cfg["accounts"]} if enabled else {}
+        accs = {str(a["login"]): a for a in cfg["accounts"]}
+        used, sources = set(), set()
+        for c in cfg["copiers"]:
+            if c.get("active") and c.get("from") in accs and c.get("to") in accs:
+                used |= {c["from"], c["to"]}
+                sources.add(c["from"])
+        # un compte qui ne sert à aucun copieur actif reste en veille : pas de MT5 ni de processus en arrière-plan
+        wanted = {l: accs[l] for l in used} if enabled else {}
         with self.lock:
             for login in list(self.agents):
                 a = self.agents[login]
@@ -4410,6 +4447,7 @@ class CopierEngine:
                 a = self.agents.get(login)
                 if a is not None:
                     if a.alive() or a.status in ("ok", "starting") and a.proc is not None:
+                        a.set_period(0.1 if login in sources else 0.5)
                         continue
                     wait = 300 if a.error and "refusée" in a.error else 20
                     if a.proc is None:
@@ -4418,6 +4456,7 @@ class CopierEngine:
                         continue
                 pw = copier_password(login)
                 na = CopierAgent(acc)
+                na.period = 0.1 if login in sources else 0.5
                 self.agents[login] = na
                 if not pw:
                     na.status, na.error, na.died = "error", "Mot de passe manquant : modifie le compte et entre son mot de passe.", now
@@ -4431,13 +4470,14 @@ class CopierEngine:
         cfg = load_copier()
         self._ensure_agents(cfg)
         accs = {str(a["login"]): a for a in cfg["accounts"]}
-        upd = {}
+        upd, busy = {}, False
         for c in cfg["copiers"]:
             if not c.get("active"):
                 self.armed.discard(c["id"])
                 continue
             if c["from"] not in accs or c["to"] not in accs:
                 continue
+            busy = True
             if self._reconcile(c):
                 upd[c["id"]] = c.get("ignore") or []
         if upd:
@@ -4447,6 +4487,7 @@ class CopierEngine:
                     if c["id"] in upd and c.get("active"):
                         c["ignore"] = upd[c["id"]]
                 save_copier(cfg2)
+        return busy
 
     def _vol(self, c, p, M, S):
         mult = float(c.get("mult") or 1.0)

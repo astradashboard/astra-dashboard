@@ -4862,7 +4862,7 @@ function cpStatus(a) {
     return ['ok', 'ok', tr('Connecté')];
   }
   if (a.status === 'error') return ['err', 'err', a.error || tr('Erreur inconnue.')];
-  if (a.status === 'off') return ['', '', tr('En attente')];
+  if (a.status === 'off') return ['', '', tr('En veille (aucun copieur actif)')];
   return ['warn', 'wait', tr('Connexion… (jusqu\'à 1 min la première fois)')];
 }
 function renderCopier() {
