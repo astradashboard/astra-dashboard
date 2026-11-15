@@ -994,6 +994,21 @@
     .of-active .acts .btn:first-child:nth-last-child(4), .of-active .acts .btn.danger { grid-column: 1 / -1; }
   }
 
+  /* invitation « Ajouter à l'écran d'accueil » (téléphone) */
+  .a2hs { position: fixed; inset: 0; z-index: 90; background: rgba(4,6,10,.6); display: flex; align-items: flex-end; padding: 12px; }
+  .a2hs[hidden] { display: none; }
+  .a2hs-card { width: 100%; max-width: 480px; margin: 0 auto; background: var(--panel); border: 1px solid rgba(196,138,69,.45); border-radius: 18px;
+    padding: 18px 18px max(16px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,.5); display: grid; grid-template-columns: 56px 1fr; gap: 12px 14px;
+    animation: a2hsUp .3s ease-out; }
+  @keyframes a2hsUp { from { transform: translateY(40px); opacity: 0; } }
+  .a2hs-ic { width: 56px; height: 56px; border-radius: 13px; }
+  .a2hs-tx b { display: block; font-size: 16px; margin-bottom: 3px; }
+  .a2hs-tx span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .a2hs-steps { grid-column: 1 / -1; margin: 2px 0 0; padding: 12px 14px 12px 32px; background: var(--panel-2); border-radius: 12px; font-size: 14px; line-height: 1.7; }
+  .a2hs-steps .sh { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); vertical-align: -5px; margin: 0 2px; color: #3b82f6; }
+  .a2hs-acts { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .a2hs-acts .btn { height: 44px; justify-content: center; }
+
   /* ---------- app mobile (réglages sur le PC) ---------- */
   #mobile[hidden], #mbBody[hidden] { display: none; }
   .mb-card { padding: 20px; }
@@ -1615,6 +1630,21 @@
   <div class="h-head"><div><b>Assistant ASTRA</b><small>Aide sur l'application</small></div><button type="button" id="helpClose" title="Fermer">✕</button></div>
   <div class="h-msgs" id="helpMsgs"></div>
   <form class="h-form" id="helpForm"><input id="helpInput" placeholder="Pose ta question…" autocomplete="off" maxlength="200"><button class="btn primary" type="submit">Envoyer</button></form>
+</div>
+
+<div class="a2hs" id="a2hs" hidden>
+  <div class="a2hs-card">
+    <img src="/static/pwa-180.png" alt="" class="a2hs-ic">
+    <div class="a2hs-tx">
+      <b>Ajouter à l'écran d'accueil</b>
+      <span>Installe ASTRA sur ton téléphone pour l'ouvrir en un geste, en plein écran, comme une vraie app.</span>
+    </div>
+    <ol class="a2hs-steps" id="a2hsSteps"></ol>
+    <div class="a2hs-acts">
+      <button type="button" class="btn" id="a2hsLater">Plus tard</button>
+      <button type="button" class="btn primary" id="a2hsGo">J'ai compris</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-bg" id="keyBg">
@@ -3818,6 +3848,41 @@ $('#mbReset').onclick = async () => {
   mbLast = null; renderMobile();
 };
 if (REMOTE) { $('#navMobile').hidden = true; document.body.classList.add('remote'); }
+// ---------- invitation « Ajouter à l'écran d'accueil » à la première connexion sur téléphone ----------
+(() => {
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  if (!REMOTE || standalone || !touch) return;
+  let until = 0; try { until = Number(localStorage.getItem('a2hsLater') || 0); } catch (e) {}
+  if (Date.now() < until) return;
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const steps = $('#a2hsSteps'); let promptEv = null;
+  const li = html => { const l = document.createElement('li'); l.innerHTML = html; steps.appendChild(l); };
+  const SHARE = '<span class="sh"><svg width="13" height="15" viewBox="0 0 13 15" fill="none"><path d="M6.5 1v9M3.5 4l3-3 3 3M2 7H1.5v7h10V7H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+  if (ios && /CriOS|FxiOS|EdgiOS/.test(ua)) {
+    li(tr('Ouvre ce lien dans <b>Safari</b> (sur iPhone, l\'ajout se fait depuis Safari).'));
+    li(tr('Touche') + ' ' + SHARE + ' ' + tr('puis <b>« Sur l\'écran d\'accueil »</b>.'));
+  } else if (ios) {
+    li(tr('Touche le bouton Partager') + ' ' + SHARE + ' ' + tr('en bas de Safari.'));
+    li(tr('Fais défiler et choisis <b>« Sur l\'écran d\'accueil »</b>.'));
+    li(tr('Touche <b>Ajouter</b> en haut à droite.'));
+  } else {
+    li(tr('Touche le menu <b>⋮</b> en haut à droite de Chrome.'));
+    li(tr('Choisis <b>« Ajouter à l\'écran d\'accueil »</b> (ou « Installer l\'application »).'));
+  }
+  const show = () => { $('#a2hs').hidden = false; };
+  window.addEventListener('beforeinstallprompt', e => { // Android : installation en un clic
+    e.preventDefault(); promptEv = e; $('#a2hsGo').textContent = tr('Installer');
+  });
+  $('#a2hsGo').onclick = async () => {
+    if (promptEv) { promptEv.prompt(); try { await promptEv.userChoice; } catch (e) {} promptEv = null; }
+    $('#a2hs').hidden = true; try { localStorage.setItem('a2hsLater', String(Date.now() + 2 * 86400000)); } catch (e) {}
+  };
+  $('#a2hsLater').onclick = () => { $('#a2hs').hidden = true; try { localStorage.setItem('a2hsLater', String(Date.now() + 3 * 86400000)); } catch (e) {} };
+  $('#a2hs').addEventListener('click', e => { if (e.target.id === 'a2hs') $('#a2hsLater').click(); });
+  window.addEventListener('appinstalled', () => { $('#a2hs').hidden = true; });
+  setTimeout(show, 1200);
+})();
 $('#burger').onclick = () => document.querySelector('aside').classList.toggle('open');
 // téléphone : pas de zoom (pincer ou double-toucher), comme une vraie app
 ['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
