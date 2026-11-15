@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from collections import defaultdict
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, jsonify, make_response, redirect, request, send_from_directory
 
 try:
     import MetaTrader5 as mt5
@@ -1161,6 +1161,10 @@ def shutdown_app():
     except Exception:
         pass
     try:
+        _mobile_stop()
+    except Exception:
+        pass
+    try:
         live_stop()
         if SESSION.term is not None and mt5_lock.acquire(timeout=3):
             SESSION._close_locked()
@@ -2212,7 +2216,7 @@ def index():
     with open(os.path.join(STATIC_DIR, "index.html"), encoding="utf-8") as f:
         html = f.read()
     d = {k: v[lang] for k, v in i18n_dict().items() if lang in v} if lang != "fr" else {}
-    inject = ("<script>window.ASTRA_LANG=" + json.dumps(lang) + ";window.I18N="
+    inject = ("<script>window.ASTRA_REMOTE=" + json.dumps(is_remote()) + ";window.ASTRA_LANG=" + json.dumps(lang) + ";window.I18N="
               + json.dumps(d, ensure_ascii=False).replace("</", "<\\/") + ";</script>")
     html = html.replace('<html lang="fr">', '<html lang="' + lang + '">', 1).replace("<head>", "<head>\n" + inject, 1)
     resp = make_response(html)
@@ -2540,7 +2544,7 @@ def max_accounts():
 
 
 _OPEN_PATHS = ("/api/licence", "/api/offres", "/api/open-url", "/api/version", "/api/update", "/api/ping", "/api/bye",
-               "/api/quit", "/api/prefs", "/static/", "/favicon.png")
+               "/api/quit", "/api/prefs", "/static/", "/favicon.png", "/manifest.webmanifest")
 
 
 @app.before_request
@@ -4883,6 +4887,246 @@ def _copier_autostart():
         pass
 
 
+# ---------------------------------------------------------------- accès mobile (tunnel Cloudflare + relais)
+# Le téléphone ouvre une adresse fixe sur le relais (…/m/<id>). Le relais retransmet les requêtes au tunnel
+# Cloudflare gratuit lancé par l'app sur ce PC. Chaque requête qui arrive par le tunnel doit porter le jeton.
+MOBILE_FILE = os.path.join(DATA_DIR, "mobile.json")
+CLOUDFLARED_DIR = os.path.join(DATA_DIR, "cloudflared")
+MOBILE = {"status": "off", "url": None, "error": None, "proc": None, "registered": 0.0, "reg_url": None, "started": False}
+_REMOTE_HEADERS = ("Cf-Ray", "Cf-Connecting-Ip", "Cdn-Loop", "X-Forwarded-For")
+_REMOTE_BLOCK = ("/api/quit", "/api/update/apply", "/api/licence/trial", "/api/licence/remove", "/api/open-url", "/api/mobile")
+_mobile_cache = {"key": None, "m": None}
+
+
+def is_remote():
+    """Requête venue du téléphone (passée par le tunnel Cloudflare) plutôt que de la fenêtre du PC."""
+    try:
+        return any(h in request.headers for h in _REMOTE_HEADERS)
+    except RuntimeError:
+        return False
+
+
+def load_mobile():
+    import secrets
+    try:
+        st = os.stat(MOBILE_FILE)
+        key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and key == _mobile_cache["key"]:
+        return dict(_mobile_cache["m"])
+    m = _load(MOBILE_FILE, {})
+    if not m.get("id") or not m.get("secret"):
+        m.setdefault("enabled", False)
+        m["id"], m["secret"] = secrets.token_hex(8), secrets.token_urlsafe(24)
+        _save(MOBILE_FILE, m)
+        return load_mobile()
+    _mobile_cache["key"], _mobile_cache["m"] = key, dict(m)
+    return m
+
+
+def _mobile_cookie(m):
+    import hashlib
+    import hmac
+    return hmac.new(m["secret"].encode(), b"astra-mobile-v1", hashlib.sha256).hexdigest()
+
+
+def mobile_link(m=None):
+    m = m or load_mobile()
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    return f"{api}/?am={m['id']}&k={m['secret']}" if api else None
+
+
+MOBILE_PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASTRA Dashboard</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0d14;color:#e7eaf0;
+font:16px system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}b{color:#d9a05b}p{color:#9aa3b2;max-width:420px}</style></head>
+<body><div><h2><b>ASTRA</b> Dashboard</h2><p>%s</p></div></body></html>"""
+
+
+def _mobile_guard():
+    import hmac
+    if not is_remote():
+        return None
+    p = request.path
+    m = load_mobile()
+    if not m.get("enabled"):
+        return MOBILE_PAGE % "L'accès mobile est désactivé sur le PC.", 403
+    if p.startswith("/static/pwa-"):
+        return None
+    k = request.args.get("k")
+    if k is not None and p == "/":
+        # lien du QR code (ou icône de l'écran d'accueil) : on ouvre la session du téléphone
+        if not hmac.compare_digest(str(k), m["secret"]):
+            return MOBILE_PAGE % "Ce lien n'est plus valable. Scanne le nouveau QR code affiché dans « App mobile » sur ton PC.", 403
+        request.environ["astra.mobile_login"] = True
+        return None
+    if not hmac.compare_digest(request.cookies.get("astra_m", ""), _mobile_cookie(m)):
+        if p.startswith("/api/"):
+            return jsonify({"error": "Accès mobile non autorisé."}), 401
+        return MOBILE_PAGE % "Accès refusé. Scanne le QR code affiché dans « App mobile » sur ton PC.", 401
+    if p in ("/api/ping", "/api/bye"):
+        return "", 204  # seule la fenêtre du PC décide quand l'app se ferme
+    if p.startswith(_REMOTE_BLOCK) or (p == "/api/licence" and request.method == "POST"):
+        return jsonify({"error": "Action disponible uniquement sur le PC."}), 403
+    return None
+
+
+app.before_request_funcs.setdefault(None, []).insert(0, _mobile_guard)
+
+
+@app.after_request
+def _mobile_login_cookie(resp):
+    if request.environ.get("astra.mobile_login"):
+        resp.set_cookie("astra_m", _mobile_cookie(load_mobile()), max_age=400 * 86400, secure=True, httponly=True, samesite="Lax")
+    return resp
+
+
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    m = load_mobile()
+    start = f"/?am={m['id']}&k={m['secret']}" if is_remote() else "/"
+    body = {"name": "ASTRA Dashboard", "short_name": "ASTRA", "start_url": start, "scope": "/", "display": "standalone",
+            "background_color": "#0a0d14", "theme_color": "#0a0d14", "lang": ui_lang(),
+            "icons": [{"src": "/static/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                      {"src": "/static/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                      {"src": "/static/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+    resp = make_response(json.dumps(body))
+    resp.headers["Content-Type"] = "application/manifest+json"
+    return resp
+
+
+def _cloudflared_exe():
+    import shutil
+    import urllib.request
+
+    name = "cloudflared.exe" if os.name == "nt" else "cloudflared"
+    path = os.path.join(CLOUDFLARED_DIR, name)
+    if os.path.isfile(path) and os.path.getsize(path) > 1_000_000:
+        return path
+    os.makedirs(CLOUDFLARED_DIR, exist_ok=True)
+    asset = "cloudflared-windows-amd64.exe" if os.name == "nt" else "cloudflared-linux-amd64"
+    MOBILE["status"] = "download"
+    tmp = path + ".part"
+    req = urllib.request.Request(f"https://github.com/cloudflare/cloudflared/releases/latest/download/{asset}",
+                                 headers={"User-Agent": "ASTRA-Dashboard"})
+    with urllib.request.urlopen(req, timeout=180) as r, open(tmp, "wb") as f:
+        shutil.copyfileobj(r, f, 1 << 20)
+    os.replace(tmp, path)
+    if os.name != "nt":
+        os.chmod(path, 0o755)
+    return path
+
+
+def _mobile_stop():
+    proc = MOBILE.get("proc")
+    MOBILE["proc"], MOBILE["url"] = None, None
+    if proc is not None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def _mobile_register(m):
+    import time
+    r, err = _relay("mobile-register", {"id": m["id"], "secret": m["secret"], "url": MOBILE["url"]}, timeout=30)
+    if err or not (r or {}).get("ok"):
+        msg = err or (r or {}).get("error") or "réponse inattendue"
+        MOBILE["status"], MOBILE["error"] = "error", f"Le relais n'a pas accepté l'adresse : {msg}"
+        return False
+    MOBILE["registered"], MOBILE["reg_url"], MOBILE["reg_id"] = time.time(), MOBILE["url"], m["id"]
+    MOBILE["status"], MOBILE["error"] = "ok", None
+    return True
+
+
+def _mobile_loop():
+    import re
+    import subprocess
+    import time
+
+    backoff, next_try = 5, 0.0
+    while True:
+        try:
+            m = load_mobile()
+            if not m.get("enabled") or not SERVER.get("port"):
+                if MOBILE["proc"] is not None:
+                    _mobile_stop()
+                MOBILE["status"], MOBILE["error"] = "off", None
+                time.sleep(2)
+                continue
+            proc = MOBILE["proc"]
+            if proc is None or proc.poll() is not None:
+                MOBILE["proc"], MOBILE["url"] = None, None
+                if time.time() < next_try:
+                    time.sleep(1)
+                    continue
+                MOBILE["status"], MOBILE["error"] = "starting", None
+                exe = _cloudflared_exe()
+                MOBILE["status"] = "starting"
+                _kill_under(CLOUDFLARED_DIR)
+                proc = subprocess.Popen([exe, "tunnel", "--no-autoupdate", "--url", f"http://127.0.0.1:{SERVER['port']}"],
+                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                        text=True, encoding="utf-8", errors="replace",
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                MOBILE["proc"] = proc
+
+                def read(pr=proc):
+                    for line in pr.stderr:
+                        mm = re.search(r"https://(?!api\.)[a-z0-9-]+\.trycloudflare\.com", line)
+                        if mm and MOBILE["proc"] is pr:
+                            MOBILE["url"] = mm.group(0)
+                threading.Thread(target=read, daemon=True).start()
+                t0 = time.time()
+                while MOBILE["url"] is None and proc.poll() is None and time.time() - t0 < 45:
+                    time.sleep(0.3)
+                if MOBILE["url"] is None:
+                    _mobile_stop()
+                    MOBILE["status"], MOBILE["error"] = "error", "Impossible d'ouvrir le tunnel Cloudflare. Nouvel essai dans un instant."
+                    next_try, backoff = time.time() + backoff, min(backoff * 2, 120)
+                    continue
+                backoff = 5
+                time.sleep(2)  # le temps que l'adresse du tunnel soit connue partout
+            # (ré)enregistre l'adresse : au démarrage, si elle a changé, après un nouveau lien, puis toutes les 6 h
+            if MOBILE["url"] and (MOBILE["reg_url"] != MOBILE["url"] or MOBILE.get("reg_id") != m["id"]
+                                  or time.time() - MOBILE["registered"] > 6 * 3600):
+                if not _mobile_register(m):
+                    time.sleep(30)
+                    continue
+            time.sleep(2)
+        except Exception as ex:
+            MOBILE["status"], MOBILE["error"] = "error", f"Accès mobile : {ex}"
+            time.sleep(15)
+
+
+def mobile_start():
+    if MOBILE["started"]:
+        return
+    MOBILE["started"] = True
+    threading.Thread(target=_mobile_loop, daemon=True).start()
+
+
+@app.get("/api/mobile")
+def api_mobile():
+    m = load_mobile()
+    ok = MOBILE["status"] == "ok"
+    return jsonify({"enabled": bool(m.get("enabled")), "status": MOBILE["status"], "error": MOBILE["error"],
+                    "link": mobile_link(m) if ok else None})
+
+
+@app.post("/api/mobile")
+def api_mobile_set():
+    body = request.get_json(force=True) or {}
+    m = load_mobile()
+    if "enabled" in body:
+        m["enabled"] = bool(body["enabled"])
+    if body.get("reset"):
+        import secrets
+        m["id"], m["secret"] = secrets.token_hex(8), secrets.token_urlsafe(24)
+    _save(MOBILE_FILE, m)
+    mobile_start()
+    return api_mobile()
+
+
 def serve_only(port):
     """Relance après une mise à jour depuis l'app : même port, pas de nouvelle fenêtre."""
     import time
@@ -4901,6 +5145,7 @@ def serve_only(port):
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
     threading.Thread(target=_copier_autostart, daemon=True).start()
     threading.Thread(target=_extra_autocheck, daemon=True).start()
+    mobile_start()
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
 
@@ -4942,6 +5187,7 @@ def main():
     threading.Thread(target=ensure_desktop_shortcut, daemon=True).start()
     threading.Thread(target=_copier_autostart, daemon=True).start()
     threading.Thread(target=_extra_autocheck, daemon=True).start()
+    mobile_start()
 
     # 1) Fenêtre d'application Edge/Chrome. L'app s'arrête quand la fenêtre se ferme
     #    (signalé par la page), même si Edge reste actif en arrière-plan.

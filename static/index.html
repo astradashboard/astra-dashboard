@@ -2,7 +2,14 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<meta name="theme-color" content="#0a0d14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ASTRA">
+<link rel="apple-touch-icon" href="/static/pwa-180.png">
 <title>ASTRA Dashboard</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <style>
@@ -854,6 +861,40 @@
     .day { min-height: 64px; }
   }
 
+  /* ---------- téléphone ---------- */
+  .burger { display: none; }
+  @media (max-width: 760px) {
+    aside { position: sticky; top: 0; z-index: 60; height: auto; max-height: 100vh; overflow-y: auto; gap: 12px;
+      padding: max(10px, env(safe-area-inset-top)) 14px 10px; }
+    aside:not(.open) > :not(.brand) { display: none !important; }
+    aside.open { box-shadow: 0 18px 40px rgba(0,0,0,.55); }
+    .brand { padding: 0; }
+    .burger { display: grid; place-items: center; margin-left: auto; width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--fg); font-size: 20px; padding: 0; }
+    aside.open .burger { color: var(--gold); border-color: rgba(196,138,69,.5); }
+    main { padding: 14px 12px max(32px, env(safe-area-inset-bottom)); }
+    header.top { margin-bottom: 14px; }
+    header.top h1 { font-size: 19px; }
+    .modal { max-width: calc(100vw - 24px); }
+  }
+
+  /* ---------- app mobile (réglages sur le PC) ---------- */
+  #mobile[hidden], #mbBody[hidden] { display: none; }
+  .mb-card { padding: 20px; }
+  .mb-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .mb-row .al-switch { margin-top: 0; }
+  .mb-state { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .mb-state.ok { color: var(--win); } .mb-state.err { color: #fca5a5; } .mb-state.wait { color: var(--gold); }
+  .mb-grid { display: grid; grid-template-columns: 260px 1fr; gap: 26px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); align-items: start; }
+  @media (max-width: 860px) { .mb-grid { grid-template-columns: 1fr; } }
+  .mb-qr { background: #fff; border-radius: 14px; padding: 14px; width: 260px; box-sizing: border-box; }
+  .mb-qr canvas { display: block; width: 100%; height: auto; }
+  .mb-steps h3 { margin: 0 0 10px; font-size: 16px; }
+  .mb-steps ol { margin: 0 0 14px; padding-left: 20px; line-height: 1.6; }
+  .mb-link { display: flex; gap: 8px; margin-bottom: 8px; }
+  .mb-link input { flex: 1; min-width: 0; font-size: 12.5px; }
+  .mb-note { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+
   /* ---------- copieur de trades ---------- */
   .cp-nav { margin-top: -2px; }
   .cp-nav .cp-tab { display: flex; align-items: center; gap: 9px; background: none; border: 1px solid transparent; color: var(--muted); border-radius: 8px; padding: 7px 9px; text-align: left; font-size: 13px; }
@@ -923,6 +964,7 @@
     <div class="brand">
       <img class="brand-mark" src="/static/logo-emblem.png" alt="">
       <div><b>ASTRA CAPITAL</b><span>Dashboard des comptes</span></div>
+      <button type="button" class="burger" id="burger" aria-label="Menu">☰</button>
     </div>
     <button type="button" class="login-btn" id="loginKeyBtn" title="Connexion avec ta clé de licence"><svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="12.5" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M10 9.6l6.5-6.5M14 5.6l2 2M12.4 7.2l1.6 1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="lk-t" id="loginKeyTxt">Connexion</span></button>
     <nav class="nav" id="nav">
@@ -939,6 +981,7 @@
         <button type="button" class="cp-tab" data-cp="accounts"><span class="cp-ic">≡</span>Comptes</button>
         <button type="button" class="cp-tab" data-cp="copiers"><span class="cp-ic">⇉</span>Copieurs</button>
       </div>
+      <button data-page="mobile" id="navMobile"><span class="ic">▯</span><span class="nav-t">App mobile</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="offres" class="nav-offres"><span class="ic">◈</span><span class="nav-t">Tarification</span></button>
       <button data-page="abo" class="nav-abo" id="navAbo" hidden><span class="ic">⚙</span><span class="nav-t">Gérer mon abonnement</span></button>
     </nav>
@@ -1240,6 +1283,35 @@
         <p>Clique sur <b>Gérer / annuler mon abonnement</b> : ton espace client Creem s'ouvre dans ton navigateur, sans mot de passe. Choisis ton abonnement puis <b>Manage Subscription</b> pour changer de carte ou <b>Cancel Subscription</b> pour résilier. Sans engagement.</p>
         <p>Les offres sont détaillées sur la page <a href="#" id="aboToOffres">Tarification</a>. Une question ? Écris-nous à astracapital369@gmail.com.</p>
       </div>
+    </div>
+
+    <div id="mobile" hidden>
+      <div class="cp-top"><div>
+        <h1>App mobile</h1>
+        <p>Suis tes comptes depuis ton téléphone, partout : en Wi-Fi ou en 4G. Le dashboard doit rester ouvert sur ce PC (tu peux réduire la fenêtre).</p>
+      </div></div>
+      <section class="card mb-card">
+        <div class="mb-row">
+          <div><b>Accès depuis le téléphone</b><div class="mb-state" id="mbState">Désactivé</div></div>
+          <label class="al-switch"><input type="checkbox" id="mbOn"><span class="sw"></span></label>
+        </div>
+        <div id="mbBody" hidden>
+          <div class="mb-grid">
+            <div class="mb-qr"><canvas id="mbQr" width="464" height="464"></canvas></div>
+            <div class="mb-steps">
+              <h3>Installer l'app sur ton téléphone</h3>
+              <ol>
+                <li>Scanne ce QR code avec l'appareil photo de ton téléphone.</li>
+                <li><b>iPhone</b> : dans Safari, touche le bouton Partager puis « Sur l'écran d'accueil ».</li>
+                <li><b>Android</b> : dans Chrome, touche ⋮ puis « Ajouter à l'écran d'accueil ».</li>
+              </ol>
+              <div class="mb-link"><input id="mbLink" readonly data-noi18n><button class="btn" id="mbCopy" type="button">Copier le lien</button></div>
+              <p class="mb-note">Ce lien donne accès à tes comptes : ne le partage avec personne.</p>
+              <button class="btn" id="mbReset" type="button">Déconnecter tous les téléphones</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <div id="copier" hidden>
@@ -1590,6 +1662,7 @@ if (!window.tr) { window.tr = s => s; window.trAll = s => s; }
 const LOCALE = window.LOC || 'fr-BE', LANG = window.LANG || 'fr';
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 15).toLocaleDateString(LOCALE, { month: 'long' }));
 
+const REMOTE = !!window.ASTRA_REMOTE; // ouvert depuis le téléphone (app mobile)
 async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   const r = await fetch(path, opts);
@@ -3507,16 +3580,59 @@ function showPage() {
   $('#abo').hidden = state.page !== 'abo';
   $('#share').hidden = state.page !== 'share';
   $('#copier').hidden = state.page !== 'copier';
+  $('#mobile').hidden = state.page !== 'mobile';
   $('#cpNav').hidden = state.page !== 'copier';
-  if (['offres', 'abo', 'share', 'copier'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
-  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share', 'copier'].includes(state.page) ? 'none' : '';
-  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo', 'share', 'copier'].includes(state.page);
+  if (['offres', 'abo', 'share', 'copier', 'mobile'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
+  document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share', 'copier', 'mobile'].includes(state.page) ? 'none' : '';
+  $('#emptyState').hidden = hasAcc || ['eco', 'offres', 'abo', 'share', 'copier', 'mobile'].includes(state.page);
+  renderMobile();
   if (state.cp) { cpPoll(state.page === 'copier'); if (state.page === 'copier') cpShowTab(state.cp.tab); }
   if (state.page === 'share') renderShare();
   if (state.page === 'offres' || state.page === 'abo') renderOffres();
   if (state.page === 'journal' && hasAcc) renderJournal();
   if (state.page === 'eco') { renderEco(true); loadNews(); }
 }
+// ---------- app mobile ----------
+var mbTimer = null, mbLast = null;
+async function renderMobile() {
+  clearTimeout(mbTimer);
+  if (state.page !== 'mobile' || REMOTE) return;
+  let r;
+  try { r = await api('/api/mobile'); } catch (e) { $('#mbState').textContent = e.message; $('#mbState').className = 'mb-state err'; return; }
+  $('#mbOn').checked = r.enabled;
+  const st = !r.enabled ? ['', 'Désactivé'] : r.status === 'ok' ? ['ok', 'Actif : ton téléphone peut se connecter'] :
+    r.status === 'download' ? ['wait', 'Téléchargement du tunnel sécurisé Cloudflare (une seule fois)…'] :
+    r.status === 'error' ? ['err', r.error || 'Erreur inconnue.'] : ['wait', 'Ouverture de la connexion sécurisée…'];
+  $('#mbState').className = 'mb-state ' + st[0]; $('#mbState').textContent = tr(st[1]);
+  $('#mbBody').hidden = !(r.enabled && r.link);
+  if (r.link && r.link !== mbLast && typeof qrcode === 'function') {
+    mbLast = r.link; $('#mbLink').value = r.link;
+    const qr = qrcode(0, 'M'); qr.addData(r.link); qr.make();
+    const cv = $('#mbQr'), g = cv.getContext('2d'), n = qr.getModuleCount(), m = Math.floor(cv.width / n), off = Math.floor((cv.width - m * n) / 2);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#0a0d14';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) g.fillRect(off + x * m, off + y * m, m, m);
+  }
+  if (r.enabled) mbTimer = setTimeout(renderMobile, r.status === 'ok' ? 15000 : 1500);
+}
+$('#mbOn').onchange = async e => {
+  try { await api('/api/mobile', { enabled: e.target.checked }); } catch (er) { toast(er.message); }
+  mbLast = null; renderMobile();
+};
+$('#mbCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('#mbLink').value); toast('Lien copié.'); } catch (e) { $('#mbLink').select(); }
+};
+$('#mbReset').onclick = async () => {
+  if (!confirm('Tous les téléphones connectés seront déconnectés et un nouveau QR code sera créé. Continuer ?')) return;
+  try { await api('/api/mobile', { reset: true }); toast('Nouveau QR code créé : scanne-le sur ton téléphone.'); } catch (e) { toast(e.message); }
+  mbLast = null; renderMobile();
+};
+if (REMOTE) { $('#navMobile').hidden = true; document.body.classList.add('remote'); }
+$('#burger').onclick = () => document.querySelector('aside').classList.toggle('open');
+document.querySelector('aside').addEventListener('click', e => {
+  if (innerWidth > 760 || e.target.closest('#burger, #accToggle, #addBtn, .acc-x')) return;
+  if (e.target.closest('#nav > button, .acc, .cp-tab')) setTimeout(() => document.querySelector('aside').classList.remove('open'), 0);
+});
+
 document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (ev.target.id === 'accToggle') return;
   if (!licOk() && b.dataset.page !== 'offres' && b.dataset.page !== 'abo') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
@@ -4359,7 +4475,7 @@ async function liveTick() {
   const login = state.sel; let r;
   try { r = await api('/api/live?login=' + encodeURIComponent(login)); } catch (e) { r = { status: 'error', error: e.message }; }
   if (login === state.sel && liveActive()) applyLive(r);
-  liveTimer = setTimeout(liveTick, r && r.status === 'running' && r.snap ? 1000 : 2500);
+  liveTimer = setTimeout(liveTick, r && r.status === 'running' && r.snap ? (REMOTE ? 2000 : 1000) : 2500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });
 liveTick();
@@ -4760,6 +4876,7 @@ Promise.all([api('/api/prefs').catch(() => ({})), api('/api/quotes/catalog').cat
 
 // ---------- mise à jour depuis l'app ouverte ----------
 async function checkUpdate() {
+  if (REMOTE) return; // la mise à jour se fait sur le PC
   let u; try { u = await api('/api/update/check'); } catch (e) { return; }
   const box = $('#updateBar');
   if (!u.available) { box.innerHTML = ''; return; }
@@ -4794,8 +4911,10 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 // signes de vie : l'application se ferme quand cette fenêtre est fermée
 const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
-ping(); setInterval(ping, 20000);
-window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });
+if (!REMOTE) {
+  ping(); setInterval(ping, 20000);
+  window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });
+}
 api('/api/version').then(v => {
   $('#appVersion').textContent = 'Version ' + v.version;
   const u = v.update || {};
