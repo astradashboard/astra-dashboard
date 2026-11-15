@@ -1161,6 +1161,13 @@ def shutdown_app():
     except Exception:
         pass
     try:
+        if load_mobile().get("enabled") and MOBILE.get("snap_at"):
+            t = threading.Thread(target=snap_upload, kwargs={"final": True}, daemon=True)  # le téléphone saura à quelle heure le PC s'est arrêté
+            t.start()
+            t.join(8)
+    except Exception:
+        pass
+    try:
         _mobile_stop()
     except Exception:
         pass
@@ -2212,17 +2219,20 @@ def tr_server(s, lang):
 
 @app.get("/")
 def index():
+    resp = make_response(render_index(is_remote()))
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def render_index(remote):
     lang = ui_lang()
     with open(os.path.join(STATIC_DIR, "index.html"), encoding="utf-8") as f:
         html = f.read()
     d = {k: v[lang] for k, v in i18n_dict().items() if lang in v} if lang != "fr" else {}
-    inject = ("<script>window.ASTRA_REMOTE=" + json.dumps(is_remote()) + ";window.ASTRA_LANG=" + json.dumps(lang) + ";window.I18N="
+    inject = ("<script>window.ASTRA_REMOTE=" + json.dumps(bool(remote)) + ";window.ASTRA_LANG=" + json.dumps(lang) + ";window.I18N="
               + json.dumps(d, ensure_ascii=False).replace("</", "<\\/") + ";</script>")
-    html = html.replace('<html lang="fr">', '<html lang="' + lang + '">', 1).replace("<head>", "<head>\n" + inject, 1)
-    resp = make_response(html)
-    resp.headers["Content-Type"] = "text/html; charset=utf-8"
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return html.replace('<html lang="fr">', '<html lang="' + lang + '">', 1).replace("<head>", "<head>\n" + inject, 1)
 
 
 @app.get("/favicon.png")
@@ -5029,7 +5039,9 @@ def _mobile_stop():
 
 def _mobile_register(m):
     import time
-    r, err = _relay("mobile-register", {"id": m["id"], "secret": m["secret"], "url": MOBILE["url"]}, timeout=30)
+    import hashlib
+    r, err = _relay("mobile-register", {"id": m["id"], "secret": m["secret"], "url": MOBILE["url"],
+                                        "ch": hashlib.sha256(_mobile_cookie(m).encode()).hexdigest()}, timeout=30)
     if err or not (r or {}).get("ok"):
         msg = err or (r or {}).get("error") or "réponse inattendue"
         MOBILE["status"], MOBILE["error"] = "error", f"Le relais n'a pas accepté l'adresse : {msg}"
@@ -5098,11 +5110,108 @@ def _mobile_loop():
             time.sleep(15)
 
 
+# ---- copie hors ligne : PC éteint, le téléphone affiche les derniers chiffres envoyés au relais ----
+SNAP_FILE = os.path.join(DATA_DIR, "mobile-copie.json")
+SNAP_PAGES = ["/api/state", "/api/licence", "/api/offres", "/api/prefs", "/api/version", "/api/alerts", "/api/quotes/catalog",
+              "/api/copier", "/api/data?login=all"]
+
+
+def _aesgcm():
+    try:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        return AESGCM
+    except Exception:
+        return None
+
+
+def _snap_entries():
+    from urllib.parse import quote
+    c = app.test_client()
+    out = {}
+    for p in SNAP_PAGES + ["/api/data?login=" + quote(str(l), safe="") for l in load_accounts()]:
+        try:
+            r = c.get(p)
+        except Exception:
+            continue
+        if r.status_code != 200:
+            continue
+        data = r.get_data()
+        if p == "/api/licence":  # sans l'heure de vérification, qui change à chaque fois
+            j = json.loads(data)
+            j.pop("checked_at", None)
+            data = json.dumps(j, sort_keys=True).encode()
+        out[p] = data
+    out["/"] = render_index(True).encode("utf-8")
+    with app.test_request_context("/manifest.webmanifest", headers={"Cf-Ray": "copie"}):
+        out["/manifest.webmanifest"] = pwa_manifest().get_data()
+    return out
+
+
+def _relay_raw(path, query, body, secret, timeout=60):
+    import urllib.request
+    from urllib.parse import urlencode
+    api = (load_offers().get("licence_api") or "").rstrip("/")
+    req = urllib.request.Request(f"{api}/{path}?{urlencode(query)}", data=body, method="POST", headers={
+        "Content-Type": "application/octet-stream", "X-Astra-Key": secret, "User-Agent": "ASTRA-Dashboard"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8") or "{}")
+
+
+def snap_upload(final=False):
+    """Envoie au relais les pages qui ont changé, chiffrées avec la clé du téléphone (le relais ne peut pas les lire)."""
+    import hashlib
+    import time
+    AESGCM = _aesgcm()
+    m = load_mobile()
+    if AESGCM is None or not m.get("enabled"):
+        return False
+    key = hashlib.sha256(("astra-snap:" + _mobile_cookie(m)).encode()).digest()
+    done = _load(SNAP_FILE, {})
+    if done.get("_id") != m["id"]:
+        done = {"_id": m["id"]}  # nouveau lien : tout est renvoyé
+    changed = False
+    for p, data in _snap_entries().items():
+        h = hashlib.sha256(data).hexdigest()
+        if done.get(p) == h:
+            continue
+        nonce = os.urandom(12)
+        r = _relay_raw("mobile-snap", {"id": m["id"], "p": p}, nonce + AESGCM(key).encrypt(nonce, data, None), m["secret"])
+        if not r.get("ok"):
+            raise RuntimeError(r.get("error") or "envoi refusé")
+        done[p], changed = h, True
+    now = time.time()
+    if changed or final or now - float(done.get("_at") or 0) > 2 * 3600:
+        r = _relay_raw("mobile-snap", {"id": m["id"], "at": int(now * 1000)}, b"", m["secret"])
+        if not r.get("ok"):
+            raise RuntimeError(r.get("error") or "envoi refusé")
+        done["_at"] = now
+    _save(SNAP_FILE, done)
+    MOBILE["snap_at"], MOBILE["snap_error"] = now, None
+    return True
+
+
+def _snap_loop():
+    import time
+    last = 0.0
+    while True:
+        time.sleep(5)
+        try:
+            m = load_mobile()
+            if not m.get("enabled"):
+                continue
+            if MOBILE.pop("snap_force", False) or time.time() - last >= 300:
+                last = time.time()
+                snap_upload()
+        except Exception as ex:
+            MOBILE["snap_error"] = str(ex)
+
+
 def mobile_start():
     if MOBILE["started"]:
         return
     MOBILE["started"] = True
     threading.Thread(target=_mobile_loop, daemon=True).start()
+    threading.Thread(target=_snap_loop, daemon=True).start()
 
 
 @app.get("/api/mobile")
@@ -5110,7 +5219,8 @@ def api_mobile():
     m = load_mobile()
     ok = MOBILE["status"] == "ok"
     return jsonify({"enabled": bool(m.get("enabled")), "status": MOBILE["status"], "error": MOBILE["error"],
-                    "link": mobile_link(m) if ok else None})
+                    "link": mobile_link(m) if ok else None, "snap_at": MOBILE.get("snap_at"), "snap_error": MOBILE.get("snap_error"),
+                    "snap_ok": _aesgcm() is not None})
 
 
 @app.post("/api/mobile")

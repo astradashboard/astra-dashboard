@@ -878,6 +878,12 @@
     .modal { max-width: calc(100vw - 24px); }
   }
 
+  .offline-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding: 12px 14px; border-radius: var(--radius);
+    background: var(--gold-soft); border: 1px solid rgba(196,138,69,.4); font-size: 13px; }
+  .offline-bar b { display: block; color: var(--gold); margin-bottom: 2px; }
+  .offline-bar span { color: var(--fg); }
+  .offline-bar .btn { flex: none; }
+
   /* ---------- app mobile (réglages sur le PC) ---------- */
   #mobile[hidden], #mbBody[hidden] { display: none; }
   .mb-card { padding: 20px; }
@@ -894,6 +900,7 @@
   .mb-link { display: flex; gap: 8px; margin-bottom: 8px; }
   .mb-link input { flex: 1; min-width: 0; font-size: 12.5px; }
   .mb-note { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  #mbSnap { margin: 4px 0 0; } #mbSnap.err { color: #fca5a5; } #mbSnap[hidden] { display: none; }
 
   /* ---------- copieur de trades ---------- */
   .cp-nav { margin-top: -2px; }
@@ -1292,7 +1299,7 @@
       </div></div>
       <section class="card mb-card">
         <div class="mb-row">
-          <div><b>Accès depuis le téléphone</b><div class="mb-state" id="mbState">Désactivé</div></div>
+          <div><b>Accès depuis le téléphone</b><div class="mb-state" id="mbState">Désactivé</div><div class="mb-note" id="mbSnap" hidden></div></div>
           <label class="al-switch"><input type="checkbox" id="mbOn"><span class="sw"></span></label>
         </div>
         <div id="mbBody" hidden>
@@ -1663,6 +1670,7 @@ const LOCALE = window.LOC || 'fr-BE', LANG = window.LANG || 'fr';
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 15).toLocaleDateString(LOCALE, { month: 'long' }));
 
 const REMOTE = !!window.ASTRA_REMOTE; // ouvert depuis le téléphone (app mobile)
+const OFFLINE = window.ASTRA_OFFLINE || null; // PC éteint : dernière copie gardée par le relais
 async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   const r = await fetch(path, opts);
@@ -3605,6 +3613,15 @@ async function renderMobile() {
     r.status === 'error' ? ['err', r.error || 'Erreur inconnue.'] : ['wait', 'Ouverture de la connexion sécurisée…'];
   $('#mbState').className = 'mb-state ' + st[0]; $('#mbState').textContent = tr(st[1]);
   $('#mbBody').hidden = !(r.enabled && r.link);
+  const sn = $('#mbSnap');
+  if (sn) {
+    sn.hidden = !r.enabled;
+    sn.className = 'mb-note' + (r.snap_error || !r.snap_ok ? ' err' : '');
+    sn.textContent = !r.snap_ok ? tr('Copie hors ligne indisponible : redémarre le dashboard pour terminer la mise à jour.')
+      : r.snap_error ? tr('Copie hors ligne : envoi impossible pour le moment.') + ' (' + r.snap_error + ')'
+      : r.snap_at ? tr('Copie hors ligne à jour :') + ' ' + new Date(r.snap_at * 1000).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + '. ' + tr('PC éteint, ton téléphone affiche ces derniers chiffres.')
+      : tr('Copie hors ligne : premier envoi en cours…');
+  }
   if (r.link && r.link !== mbLast && typeof qrcode === 'function') {
     mbLast = r.link; $('#mbLink').value = r.link;
     const qr = qrcode(0, 'M'); qr.addData(r.link); qr.make();
@@ -4450,6 +4467,7 @@ function applyLive(r) {
 }
 async function liveTick() {
   clearTimeout(liveTimer);
+  if (OFFLINE) { setLiveVisible(false); return; } // PC éteint : pas de direct
   if (state.lic && state.lic.active && !hasPerk('live')) { // offre sans suivi en direct
     if (state.page === 'dash' && !$('#liveBody').querySelector('.perk-box')) {
       if (state.live) { state.live = null; if (state.data) renderHero(); }
@@ -4911,6 +4929,15 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 // signes de vie : l'application se ferme quand cette fenêtre est fermée
 const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
+if (OFFLINE) {
+  const d = OFFLINE.at ? new Date(OFFLINE.at) : null;
+  const when = d ? d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) + ' · ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : '—';
+  const bar = el('div', 'offline-bar');
+  const txt = el('div'); txt.append(el('b', null, tr('PC hors ligne')), el('span', null, tr('Dernières données reçues :') + ' ' + when + '. ' + tr('Ouvre le dashboard sur ton PC pour voir le direct.')));
+  const again = el('button', 'btn', tr('Réessayer')); again.type = 'button'; again.onclick = () => location.reload();
+  bar.append(txt, again); document.querySelector('main').prepend(bar);
+  $('#refreshBtn').style.display = 'none';
+}
 if (!REMOTE) {
   ping(); setInterval(ping, 20000);
   window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });

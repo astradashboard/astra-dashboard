@@ -13,7 +13,8 @@ export default {
     const action = url.pathname.replace(/^\/+|\/+$/g, '');
     // ---- app mobile : le téléphone passe par ici, le relais retransmet au tunnel du PC ----
     if (action === 'mobile-register' && request.method === 'POST') return mobileRegister(request, env, cors);
-    const RELAY = ['check', 'notify', 'portal', 'change', 'extra', 'activate', 'validate', 'deactivate', 'mobile-register'];
+    if (action === 'mobile-snap' && request.method === 'POST') return mobileSnap(request, env, url, cors);
+    const RELAY = ['check', 'notify', 'portal', 'change', 'extra', 'activate', 'validate', 'deactivate', 'mobile-register', 'mobile-snap'];
     const qid = url.searchParams.get('am');
     if (qid && MOB_ID.test(qid)) return mobileProxy(request, env, qid, true);
     const cid = cookieOf(request, 'am');
@@ -260,7 +261,8 @@ async function mobileRegister(request, env, cors) {
   const h = await sha256('astra-mobile:' + secret);
   const old = await env.MOBILE.get('m:' + id, 'json');
   if (old && old.h !== h) return fail('identifiant déjà utilisé', 403);
-  await env.MOBILE.put('m:' + id, JSON.stringify({ h, url: u, at: Date.now() }), { expirationTtl: 30 * 86400 });
+  const ch = /^[a-f0-9]{64}$/.test(String(body.ch || '')) ? String(body.ch) : (old && old.ch) || null;
+  await env.MOBILE.put('m:' + id, JSON.stringify({ h, ch, url: u, at: Date.now() }), { expirationTtl: 30 * 86400 });
   MOB.delete(id);
   return Response.json({ ok: true }, { headers: cors });
 }
@@ -299,8 +301,83 @@ async function mobileProxy(request, env, id, setCookie) {
     if (r && r.headers.get('content-type')?.includes('json') && r.status === 503) break; // erreur de l'app elle-même
     r = null;
   }
-  if (!r) return mobileOffline(url);
+  if (!r) return mobileSnapshot(request, env, id, url, setCookie);
   const out = new Response(r.body, r);
   if (setCookie) out.headers.append('Set-Cookie', `am=${id}; Path=/; Max-Age=34560000; Secure; HttpOnly; SameSite=Lax`);
   return out;
+}
+
+// ---------- copie hors ligne : PC éteint, on sert les dernières pages envoyées par l'app (chiffrées) ----------
+const TTL = 30 * 86400;
+const enc = t => new TextEncoder().encode(t);
+async function hmacHex(key, msg) {
+  const k = await crypto.subtle.importKey('raw', enc(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, enc(msg)))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function mobileSnap(request, env, url, cors) {
+  const fail = (error, status = 400) => Response.json({ error }, { status, headers: cors });
+  if (!env.MOBILE) return fail("le stockage KV « MOBILE » n'est pas relié au relais", 503);
+  const id = url.searchParams.get('id') || '', secret = request.headers.get('X-Astra-Key') || '';
+  if (!MOB_ID.test(id) || secret.length < 20) return fail('paramètres invalides');
+  const h = await sha256('astra-mobile:' + secret);
+  const rec = await env.MOBILE.get('m:' + id, 'json');
+  if (rec && rec.h !== h) return fail('identifiant déjà utilisé', 403);
+  if (!rec || !rec.ch) {
+    const ch = await sha256(await hmacHex(secret, 'astra-mobile-v1'));
+    await env.MOBILE.put('m:' + id, JSON.stringify({ ...(rec || {}), h, ch, at: Date.now() }), { expirationTtl: TTL });
+    MOB.delete(id);
+  }
+  const at = url.searchParams.get('at'), p = url.searchParams.get('p');
+  if (at) {
+    await env.MOBILE.put('si:' + id, JSON.stringify({ at: Number(at) || Date.now() }), { expirationTtl: TTL });
+  } else if (p && p.startsWith('/') && p.length < 300) {
+    const blob = await request.arrayBuffer();
+    if (blob.byteLength < 13 || blob.byteLength > 24 * 1024 * 1024) return fail('taille invalide');
+    await env.MOBILE.put('s:' + id + ':' + await sha256(p), blob, { expirationTtl: TTL });
+  } else return fail('paramètres invalides');
+  return Response.json({ ok: true }, { headers: cors });
+}
+const CT = { js: 'application/javascript; charset=utf-8', json: 'application/json', png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml',
+  css: 'text/css; charset=utf-8', ico: 'image/x-icon', woff2: 'font/woff2', webp: 'image/webp' };
+async function staticFile(path) {
+  if (path === '/favicon.png') path = '/static/favicon.png';
+  if (!/^\/static\/[\w./-]+$/.test(path) || path.includes('..')) return new Response('not found', { status: 404 });
+  const r = await fetch('https://raw.githubusercontent.com/astradashboard/astra-dashboard/main' + path, { cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!r.ok) return new Response('not found', { status: 404 });
+  return new Response(r.body, { headers: { 'Content-Type': CT[path.split('.').pop().toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'public, max-age=3600' } });
+}
+async function mobileSnapshot(request, env, id, url, entry) {
+  if (!env.MOBILE) return mobileOffline(url);
+  const rec = await env.MOBILE.get('m:' + id, 'json');
+  if (!rec || !rec.ch) return mobileOffline(url);
+  let cookie = cookieOf(request, 'astra_m'), fresh = null;
+  const k = url.searchParams.get('k');
+  if (k && url.pathname === '/') { // lien du QR code / icône de l'écran d'accueil
+    if (await sha256('astra-mobile:' + k) !== rec.h) return mobileOffline(url);
+    cookie = fresh = await hmacHex(k, 'astra-mobile-v1');
+  }
+  if (!cookie || await sha256(cookie) !== rec.ch) return mobileOffline(url);
+  if (url.pathname.startsWith('/static/') || url.pathname === '/favicon.png') return staticFile(url.pathname);
+  const off = "Ton PC est éteint : cette action sera possible quand le dashboard sera ouvert sur ton PC.";
+  if (request.method !== 'GET') return Response.json({ error: off, offline: true }, { status: 503 });
+  let blob = null;
+  for (const p of url.pathname === '/' ? ['/'] : [url.pathname + url.search, url.pathname]) {
+    blob = await env.MOBILE.get('s:' + id + ':' + await sha256(p), 'arrayBuffer');
+    if (blob) break;
+  }
+  if (!blob) return url.pathname.startsWith('/api/') ? Response.json({ error: off, offline: true }, { status: 503 }) : mobileOffline(url);
+  const key = await crypto.subtle.importKey('raw', await crypto.subtle.digest('SHA-256', enc('astra-snap:' + cookie)), 'AES-GCM', false, ['decrypt']);
+  let data;
+  try { data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: blob.slice(0, 12) }, key, blob.slice(12)); }
+  catch { return mobileOffline(url); }
+  let body = data, ct = 'application/json';
+  if (url.pathname === '/') {
+    const si = await env.MOBILE.get('si:' + id, 'json');
+    body = new TextDecoder().decode(data).replace('<head>', `<head>\n<script>window.ASTRA_OFFLINE=${JSON.stringify({ at: si ? si.at : null })};</script>`);
+    ct = 'text/html; charset=utf-8';
+  } else if (url.pathname === '/manifest.webmanifest') ct = 'application/manifest+json';
+  const res = new Response(body, { headers: { 'Content-Type': ct, 'Cache-Control': 'no-store' } });
+  if (fresh) res.headers.append('Set-Cookie', `astra_m=${fresh}; Path=/; Max-Age=34560000; Secure; HttpOnly; SameSite=Lax`);
+  if (entry) res.headers.append('Set-Cookie', `am=${id}; Path=/; Max-Age=34560000; Secure; HttpOnly; SameSite=Lax`);
+  return res;
 }

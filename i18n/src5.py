@@ -136,4 +136,13 @@ T = {
 'Action disponible uniquement sur le PC.': ('Only available on the PC.', 'Nur am PC verfügbar.', 'Solo disponible en el PC.'),
 "Le relais n'a pas accepté l'adresse :": ('The relay did not accept the address:', 'Das Relay hat die Adresse nicht akzeptiert:', 'El relé no aceptó la dirección:'),
 "Impossible d'ouvrir le tunnel Cloudflare. Nouvel essai dans un instant.": ('Could not open the Cloudflare tunnel. Retrying shortly.', 'Cloudflare-Tunnel konnte nicht geöffnet werden. Neuer Versuch gleich.', 'No se pudo abrir el túnel de Cloudflare. Reintentando en un momento.'),
+'PC hors ligne': ('PC offline', 'PC offline', 'PC sin conexión'),
+'Dernières données reçues :': ('Last data received:', 'Zuletzt empfangene Daten:', 'Últimos datos recibidos:'),
+'Ouvre le dashboard sur ton PC pour voir le direct.': ('Open the dashboard on your PC to see live data.', 'Öffne das Dashboard auf deinem PC, um Live-Daten zu sehen.', 'Abre el dashboard en tu PC para ver el directo.'),
+'Réessayer': ('Retry', 'Erneut versuchen', 'Reintentar'),
+'Copie hors ligne indisponible : redémarre le dashboard pour terminer la mise à jour.': ('Offline copy unavailable: restart the dashboard to finish the update.', 'Offline-Kopie nicht verfügbar: starte das Dashboard neu, um das Update abzuschließen.', 'Copia sin conexión no disponible: reinicia el dashboard para terminar la actualización.'),
+'Copie hors ligne : envoi impossible pour le moment.': ('Offline copy: upload not possible right now.', 'Offline-Kopie: Hochladen derzeit nicht möglich.', 'Copia sin conexión: envío imposible por ahora.'),
+'Copie hors ligne à jour :': ('Offline copy up to date:', 'Offline-Kopie aktuell:', 'Copia sin conexión al día:'),
+'PC éteint, ton téléphone affiche ces derniers chiffres.': ('When the PC is off, your phone shows these latest figures.', 'Ist der PC aus, zeigt dein Handy diese letzten Zahlen.', 'Con el PC apagado, tu teléfono muestra estas últimas cifras.'),
+'Copie hors ligne : premier envoi en cours…': ('Offline copy: first upload in progress…', 'Offline-Kopie: erster Upload läuft…', 'Copia sin conexión: primer envío en curso…'),
 }
