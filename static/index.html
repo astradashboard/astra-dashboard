@@ -3494,10 +3494,19 @@ $('#aboExCheck').onclick = async () => {
 function perkUpsell(what) { toast(what + (what === 'Le copieur de trades' ? ' est inclus dans l\'offre Pro.' : ' est inclus dans les offres Essentiel et Pro.')); state.page = 'offres'; showPage(); window.scrollTo(0, 0); }
 function syncAboNav() { const l = state.lic || {}, show = !!(l.key_hint && !l.trial); $('#navAbo').hidden = !show; if (!show && state.page === 'abo') { state.page = 'offres'; showPage(); } }
 function applyLock() { document.body.classList.toggle('locked', !licOk()); syncAboNav(); if (typeof syncHelpFab === 'function') syncHelpFab(); if (typeof syncLoginBtn === 'function') syncLoginBtn(); }
+let licLostCheck = null;
 function licenceLost() {
   if (state.lic && !state.lic.active) return;
-  state.lic = Object.assign({}, state.lic || {}, { active: false });
-  applyLock(); state.page = 'offres'; showPage();
+  if (licLostCheck) return;
+  // on revérifie avant de bloquer : un refus passager (redémarrage, fichier occupé) ne doit pas redemander la clé
+  licLostCheck = setTimeout(async () => {
+    licLostCheck = null;
+    let lic = null;
+    try { lic = await api('/api/licence'); } catch (e) { return; }
+    if (lic && lic.active) { state.lic = lic; return; }
+    state.lic = Object.assign({}, state.lic || {}, lic || {}, { active: false });
+    applyLock(); state.page = 'offres'; showPage();
+  }, 1500);
 }
 const fmtLicDay = iso => { try { return new Date(iso).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
 async function renderOffres() {
@@ -3668,9 +3677,14 @@ async function openPay(url) {
   try { await api('/api/open-url', { url }); toast('La page de paiement s\'ouvre dans ton navigateur. Ta clé arrive ensuite par e-mail.'); }
   catch (e) { window.open(url, '_blank', 'noopener'); }
 }
-async function refreshLicence(force) {
+async function refreshLicence(force, tries = 0) {
   const was = licOk();
-  try { state.lic = await api('/api/licence' + (force ? '?verifier=1' : '')); } catch (e) { state.lic = state.lic || { active: false }; }
+  try { state.lic = await api('/api/licence' + (force ? '?verifier=1' : '')); }
+  catch (e) {
+    // application en train de redémarrer (mise à jour) : on réessaie au lieu de redemander la clé
+    if (!state.lic && tries < 30) { setTimeout(() => refreshLicence(force, tries + 1), 2000); return; }
+    state.lic = state.lic || { active: false };
+  }
   applyLock();
   if (licOk() && !was) { state.page = 'dash'; await loadState(); }
   else if (!licOk()) { state.page = 'offres'; showPage(); }
@@ -3775,8 +3789,15 @@ async function renderMobile() {
       : r.snap_at ? tr('Copie hors ligne à jour :') + ' ' + new Date(r.snap_at * 1000).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + '. ' + tr('PC éteint, ton téléphone affiche ces derniers chiffres.')
       : tr('Copie hors ligne : premier envoi en cours…');
   }
+  if (r.link) $('#mbLink').value = r.link;
+  if (r.link && typeof qrcode !== 'function' && !window._qrLoading) {
+    window._qrLoading = true;
+    const sc = document.createElement('script'); sc.src = '/static/qrcode.js?v=' + Date.now();
+    sc.onload = () => { window._qrLoading = false; mbLast = null; renderMobile(); }; sc.onerror = () => { window._qrLoading = false; };
+    document.head.appendChild(sc);
+  }
   if (r.link && r.link !== mbLast && typeof qrcode === 'function') {
-    mbLast = r.link; $('#mbLink').value = r.link;
+    mbLast = r.link;
     const qr = qrcode(0, 'M'); qr.addData(r.link); qr.make();
     const cv = $('#mbQr'), g = cv.getContext('2d'), n = qr.getModuleCount(), m = Math.floor(cv.width / n), off = Math.floor((cv.width - m * n) / 2);
     g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#0a0d14';

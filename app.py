@@ -44,18 +44,31 @@ app = Flask(__name__, static_folder=None)
 
 # ---------------------------------------------------------------- stockage local
 def _load(path, default):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return default
+    import time
+    for i in range(6):  # Windows : fichier momentanément bloqué pendant qu'il est remplacé
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except PermissionError:
+            time.sleep(0.05)
+        except (OSError, ValueError):
+            return default
+    return default
 
 
 def _save(path, data):
+    import time
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    for i in range(10):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if i == 9:
+                raise
+            time.sleep(0.05)
 
 
 def load_accounts():
@@ -2452,6 +2465,20 @@ def _lic_public(lic):
             "trial_used": bool(_trial_marks()), "period": lic.get("period") or "month"}
 
 
+LICENCE_BACKUP = os.path.join(DATA_DIR, "licence-cle.json")
+
+
+def _lic_backup(lic):
+    """Garde une copie de la clé : elle n'est plus jamais à retaper après une mise à jour."""
+    try:
+        if lic.get("key") and not lic.get("trial"):
+            _save(LICENCE_BACKUP, {k: lic[k] for k in ("key", "owner", "test", "instance_id") if k in lic})
+        elif not lic.get("key"):
+            os.remove(LICENCE_BACKUP)
+    except OSError:
+        pass
+
+
 def licence(force=False):
     """État de la licence de ce PC (revérifiée en ligne de temps en temps)."""
     import time
@@ -2459,7 +2486,18 @@ def licence(force=False):
     with _lic_lock:
         lic = _load(LICENCE_FILE, {})
         if not lic.get("key"):
-            return {}
+            bk = _load(LICENCE_BACKUP, {})
+            if bk.get("key"):  # licence.json perdu : on remet la clé enregistrée
+                lic = {**lic, **bk, "last_ok": time.time(), "active": True}
+                try:
+                    _save(LICENCE_FILE, lic)
+                except OSError:
+                    pass
+            else:
+                return {}
+        elif lic.get("owner") or lic.get("test") or lic.get("instance_id"):
+            if _load(LICENCE_BACKUP, {}).get("key") != lic["key"]:
+                _lic_backup(lic)
         if lic.get("owner"):
             lic["active"] = _owner_key(lic["key"])
             return lic
@@ -2636,6 +2674,7 @@ def api_licence_activate():
     if old.get("trial_start"):
         lic["trial_start"] = old["trial_start"]
     _save(LICENCE_FILE, lic)
+    _lic_backup(lic)
     return jsonify(_lic_public(lic))
 
 
@@ -2667,6 +2706,7 @@ def api_licence_remove():
         except Exception:
             pass
     _save(LICENCE_FILE, {"trial_start": lic["trial_start"]} if lic.get("trial_start") else {})  # l'essai reste « utilisé »
+    _lic_backup({})
     return jsonify({"ok": True})
 
 
