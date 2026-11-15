@@ -1,5 +1,5 @@
 {
-  "version": "1.70.4",
+  "version": "1.71.0",
   "files": [
     "app.py",
     "requirements.txt",
@@ -16,6 +16,7 @@
     "static/i18n.json",
     "static/pwa-192.png",
     "static/pwa-512.png",
-    "static/pwa-180.png"
+    "static/pwa-180.png",
+    "static/pwa-mask-512.png"
   ]
 }

@@ -4999,7 +4999,7 @@ def pwa_manifest():
             "background_color": "#0a0d14", "theme_color": "#0a0d14", "lang": ui_lang(),
             "icons": [{"src": "/static/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
                       {"src": "/static/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                      {"src": "/static/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+                      {"src": "/static/pwa-mask-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
     resp = make_response(json.dumps(body))
     resp.headers["Content-Type"] = "application/manifest+json"
     return resp

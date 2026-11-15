@@ -187,6 +187,19 @@
   .sub-add { background: none; border: 1px dashed var(--line); color: var(--muted); border-radius: 8px; padding: 7px 9px; text-align: left; font-size: 13px; }
   .sub-add:hover { color: var(--gold); border-color: var(--gold); }
   .acc.active.dimmed { background: transparent; border-color: var(--line); }
+  /* comptes en haut du tableau de bord */
+  .acc-bar { display: flex; gap: 8px; align-items: stretch; overflow-x: auto; margin: -4px 0 18px; padding-bottom: 4px; scrollbar-width: thin; }
+  .acc-bar[hidden] { display: none; }
+  .acc-bar .acc-list { flex-direction: row; gap: 8px; }
+  .acc-bar .acc { flex: 0 0 auto; min-width: 150px; max-width: 220px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px;
+    background: var(--panel); border: 1px solid var(--line); padding: 10px 28px 10px 13px; border-radius: 12px; }
+  .acc-bar .acc:hover { background: var(--panel-2); }
+  .acc-bar .acc.active { background: var(--gold-soft); border-color: rgba(196,138,69,.55); }
+  .acc-bar .acc > div:first-child { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .acc-bar .acc small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .acc-bar .acc .bal { font-size: 14px; color: var(--fg); font-weight: 600; }
+  .acc-bar .acc.active .bal { color: var(--gold); }
+  .acc-bar .sub-add { flex: 0 0 auto; display: flex; align-items: center; padding: 0 16px; border-radius: 12px; white-space: nowrap; }
   .nav button { text-align: left; background: transparent; border: 1px solid transparent; color: var(--fg); border-radius: 9px;
     padding: 9px 10px; display: flex; gap: 10px; align-items: center; }
   .nav button:hover { background: var(--panel-2); }
@@ -819,6 +832,7 @@
   body.locked .nav button:not(.nav-offres) .lock { display: inline-flex; }
   body.locked .nav button:not(.nav-offres) .chev { display: none; }
   body.locked #accSub { display: none !important; }
+  @media (max-width: 760px) { .acc-bar { margin: 0 -12px 14px; padding: 0 12px 4px; scrollbar-width: none; } .acc-bar .acc { min-width: 140px; } }
   .nav-offres .ic { color: var(--gold); }
   .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty-state h2 { color: var(--fg); margin-bottom: 6px; }
@@ -1058,11 +1072,7 @@
     </div>
     <button type="button" class="login-btn" id="loginKeyBtn" title="Connexion avec ta clé de licence"><svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="12.5" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M10 9.6l6.5-6.5M14 5.6l2 2M12.4 7.2l1.6 1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span class="lk-t" id="loginKeyTxt">Connexion</span></button>
     <nav class="nav" id="nav">
-      <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="chev" id="accToggle" title="Afficher / masquer les comptes">▾</span></button>
-      <div class="sub" id="accSub">
-        <div class="acc-list" id="accList"></div>
-        <button class="sub-add" id="addBtn">+ Ajouter un compte</button>
-      </div>
+      <button data-page="dash" class="active"><span class="ic">▦</span><span class="nav-t">Tableau de bord</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="journal"><span class="ic">✎</span><span class="nav-t">Journal de trading</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="eco"><span class="ic">◷</span><span class="nav-t">Calendrier économique</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
       <button data-page="share"><span class="ic">⇪</span><span class="nav-t">Partager mes résultats</span><span class="lock" title="Abonnement requis"><svg width="12" height="13" viewBox="0 0 12 13" fill="none"><rect x="1.5" y="5.5" width="9" height="7" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M3.6 5.5V3.8a2.4 2.4 0 0 1 4.8 0v1.7" stroke="currentColor" stroke-width="1.3"/></svg></span></button>
@@ -1096,6 +1106,10 @@
         <button class="btn" id="refreshBtn">↻ Actualiser</button>
       </div>
     </header>
+    <div class="acc-bar" id="accSub">
+      <div class="acc-list" id="accList"></div>
+      <button class="sub-add" id="addBtn" type="button">+ Ajouter un compte</button>
+    </div>
     <div id="updateBar"></div>
     <div id="notices"></div>
 
@@ -1875,15 +1889,15 @@ function renderAccounts() {
 // déplacer un compte dans la colonne de gauche pour changer l'ordre
 $('#accList').addEventListener('pointerdown', e => {
   const btn = e.target.closest('.acc[data-login]'); if (!btn || e.button !== 0 || e.target.closest('.acc-x') || btn.dataset.editing) return;
-  const list = $('#accList'), y0 = e.clientY; let started = false;
+  const list = $('#accList'), x0 = e.clientX; let started = false;
   const move = ev => {
     if (!started) {
-      if (Math.abs(ev.clientY - y0) < 6) return;
+      if (Math.abs(ev.clientX - x0) < 6) return;
       started = true; accDragging = true; btn.classList.add('acc-drag'); document.body.classList.add('q-sorting');
     }
     ev.preventDefault();
     const rows = [...list.querySelectorAll('.acc[data-login]')].filter(r => r !== btn);
-    const after = rows.find(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    const after = rows.find(r => { const b = r.getBoundingClientRect(); return ev.clientX < b.left + b.width / 2; });
     if (after) { if (btn.nextSibling !== after) list.insertBefore(btn, after); }
     else if (rows.length && rows[rows.length - 1].nextSibling !== btn) list.insertBefore(btn, rows[rows.length - 1].nextSibling);
   };
@@ -3680,6 +3694,7 @@ function showPage() {
   $('#share').hidden = state.page !== 'share';
   $('#copier').hidden = state.page !== 'copier';
   $('#mobile').hidden = state.page !== 'mobile';
+  $('#accSub').hidden = state.page !== 'dash' || !hasAcc;
   $('#cpNav').hidden = state.page !== 'copier';
   if (['offres', 'abo', 'share', 'copier', 'mobile'].includes(state.page)) { $('#content').hidden = true; $('#journal').hidden = true; }
   document.querySelector('header.top').style.display = ['eco', 'offres', 'abo', 'share', 'copier', 'mobile'].includes(state.page) ? 'none' : '';
@@ -3752,12 +3767,6 @@ document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   state.page = b.dataset.page; state.jTrade = null;
   showPage(); window.scrollTo(0, 0);
 });
-try { if (localStorage.getItem('accSubClosed') === '1') { $('#accSub').hidden = true; $('#accToggle').classList.add('closed'); } } catch (e) {}
-$('#accToggle').onclick = ev => {
-  ev.stopPropagation();
-  const sub = $('#accSub'); sub.hidden = !sub.hidden; $('#accToggle').classList.toggle('closed', sub.hidden);
-  try { localStorage.setItem('accSubClosed', sub.hidden ? '1' : '0'); } catch (e) {}
-};
 
 // ---------- journal de trading ----------
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };

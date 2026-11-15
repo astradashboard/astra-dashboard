@@ -15,6 +15,9 @@ export default {
     if (action === 'mobile-register' && request.method === 'POST') return mobileRegister(request, env, cors);
     if (action === 'mobile-snap' && request.method === 'POST') return mobileSnap(request, env, url, cors);
     const RELAY = ['check', 'notify', 'portal', 'change', 'extra', 'activate', 'validate', 'deactivate', 'mobile-register', 'mobile-snap'];
+    // icônes de l'app : demandées par le téléphone sans cookie (écran d'accueil)
+    if (/^\/static\/pwa-[\w-]+\.png$/.test(url.pathname) || url.pathname === '/apple-touch-icon.png' || url.pathname === '/apple-touch-icon-precomposed.png')
+      return staticFile(url.pathname.startsWith('/static/') ? url.pathname : '/static/pwa-180.png');
     const qid = url.searchParams.get('am');
     if (qid && MOB_ID.test(qid)) return mobileProxy(request, env, qid, true);
     const cid = cookieOf(request, 'am');
