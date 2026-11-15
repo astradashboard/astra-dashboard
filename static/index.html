@@ -905,6 +905,62 @@
   .offline-bar span { color: var(--fg); }
   .offline-bar .btn { flex: none; }
 
+  @media (max-width: 760px) {
+    .modal-bg { z-index: 80; padding: max(10px, env(safe-area-inset-top)) 10px 10px; }
+    .modal { max-height: calc(100dvh - 24px); padding: 18px 16px; }
+    .modal.pdf-done { padding: 18px 16px; }
+    .modal.pdf-done.big { height: calc(100dvh - 24px); max-height: none; }
+    .modal.pdf-done.big .pdf-thumb { overflow-x: hidden; }
+    .modal.pdf-done.big .pdf-sheet { width: 794px; max-width: none; zoom: var(--pz, .45); margin: 8px auto; }
+    .pdf-done-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    .pdf-done-actions #pdfToggle { margin-right: 0 !important; }
+    .pdf-done-actions #pdfGo { grid-column: 1 / -1; order: -1; height: 46px; }
+    .pdf-accs { max-height: 92px; }
+
+    /* calendrier économique */
+    .eco-head { margin-bottom: 10px; }
+    .eco-head h1 { font-size: 20px; }
+    .eco-tabs { display: block; border-bottom: none; margin-bottom: 10px; }
+    #ecoRange .eco-days { display: flex; width: 100%; height: 40px; margin-bottom: 8px; }
+    #ecoRange .eco-days button { flex: 1 0 auto; padding: 0 12px; }
+    .eco-line-tools { display: grid; grid-template-columns: 1fr 44px; gap: 8px; margin: 0; }
+    .eco-zones { grid-column: 1; grid-row: 1; }
+    .eco-zones-btn { width: 100%; height: 40px; justify-content: space-between; }
+    .eco-zones-menu { width: min(300px, calc(100vw - 24px)); }
+    .eco-alert-btn { grid-column: 2; grid-row: 1; width: 44px; height: 40px; }
+    #ecoImp { grid-column: 1 / -1; display: flex; height: 40px; }
+    #ecoImp button { flex: 1; justify-content: center; }
+    .eco-tz { grid-column: 1 / -1; }
+    .eco-tz select { max-width: none; width: 100%; height: 40px; }
+    .eco-card { overflow: hidden; }
+    .eco-table thead { display: none; }
+    .eco-table, .eco-table tbody { display: block; }
+    .eco-table tr.eco-day, .eco-table tr.empty { display: block; }
+    .eco-table tr.eco-day td, .eco-table tr.empty td { display: block; }
+    .eco-table tr.ev { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "t c i" "e e e" "a f p"; gap: 6px 10px;
+      padding: 11px 14px; border-bottom: 1px solid var(--line); }
+    .eco-table tr.ev td { display: block; padding: 0; border: none; width: auto !important; background: none !important; }
+    .eco-table tr.ev.next { background: rgba(196,138,69,.08); }
+    .eco-table td.c-time { grid-area: t; font-weight: 650; } .eco-table td.c-cur { grid-area: c; } .eco-table td.c-imp { grid-area: i; }
+    .eco-table td.c-ev { grid-area: e; font-size: 14.5px; line-height: 1.35; }
+    .eco-table td.c-val, .eco-table .c-val:nth-child(7) { display: block; text-align: left; font-size: 13.5px; }
+    .eco-table td.c-val:nth-child(5) { grid-area: a; } .eco-table td.c-val:nth-child(6) { grid-area: f; } .eco-table td.c-val:nth-child(7) { grid-area: p; }
+    .eco-table td.c-val::before { content: attr(data-l); display: block; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 1px; }
+    /* actualité */
+    .news-head { align-items: center; margin-top: 22px; }
+    .news-filters { flex-direction: column; align-items: stretch; gap: 10px; }
+    .news-filters .chips.themes { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+    .theme-chip { flex: 0 0 auto; white-space: nowrap; font-size: 13px; padding: 7px 12px; }
+    .news-search { flex: 1 1 auto; width: 100%; }
+    .themes .t-lab { display: none; }
+    #newsRefresh { white-space: nowrap; flex: none; }
+    /* abonnement */
+    .of-active { flex-wrap: wrap; }
+    .of-active .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+    .of-active .acts .btn { width: 100%; justify-content: center; }
+    .of-active .acts .btn:first-child:nth-last-child(4), .of-active .acts .btn.danger { grid-column: 1 / -1; }
+  }
+
   /* ---------- app mobile (réglages sur le PC) ---------- */
   #mobile[hidden], #mbBody[hidden] { display: none; }
   .mb-card { padding: 20px; }
@@ -1934,6 +1990,8 @@ async function fillPdfSheet() {
 }
 function setPdfBig(big) {
   $('#pdfForm').classList.toggle('big', big);
+  const th = $('#pdfThumb');
+  requestAnimationFrame(() => th.style.setProperty('--pz', Math.min(1, (th.clientWidth - 16) / 794).toFixed(3)));
   $('#pdfToggle').textContent = big ? '↙ Réduire' : '🔍 Aperçu';
 }
 $('#pdfMonth').onchange = fillPdfSheet;
@@ -3411,7 +3469,8 @@ async function renderOffres() {
       if (!confirmRemoveLic) { confirmRemoveLic = true; rm.textContent = 'Confirmer ?'; setTimeout(() => { confirmRemoveLic = false; rm.textContent = 'Retirer de ce PC'; }, 3000); return; }
       await api('/api/licence/remove', {}); confirmRemoveLic = false; await refreshLicence(); toast('Licence retirée de ce PC.');
     };
-    if (lic.trial) acts.innerHTML = ''; else acts.append(v, rm);
+    const mk = el('button', 'btn', 'Modifier la clé d\'accès'); mk.type = 'button'; mk.onclick = openKey;
+    if (lic.trial) acts.innerHTML = ''; else acts.append(v, mk, rm);
     box.append(el('div', 'st', lic.active ? '✓' : '!'), tx, acts);
   } else box.hidden = true;
   $('#ofKeyBox').hidden = !!lic.active && !lic.trial;
@@ -4162,7 +4221,9 @@ async function renderEco(force) {
       const better = (ev.actual > ev.forecast) !== ECO_INVERSE.test((ev.title || '') + ' ' + (ev.title_en || ''));
       tdA.classList.add(better ? 'val-up' : 'val-down');
     }
-    tr.append(tdT, tdC, tdI, tdE, tdA, el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), el('td', 'c-val', fmtEcoVal(ev.previous, ev)));
+    const tdF = el('td', 'c-val', fmtEcoVal(ev.forecast, ev)), tdP = el('td', 'c-val', fmtEcoVal(ev.previous, ev));
+    tdA.dataset.l = window.tr('Actuel'); tdF.dataset.l = window.tr('Prévision'); tdP.dataset.l = window.tr('Précédent'); tdE.classList.add('c-ev');
+    tr.append(tdT, tdC, tdI, tdE, tdA, tdF, tdP);
     body.appendChild(tr);
   });
   $('#ecoUpd').textContent = 'mis à jour à ' + new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + (data.stale ? ' (hors ligne)' : '');

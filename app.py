@@ -4904,7 +4904,7 @@ MOBILE_FILE = os.path.join(DATA_DIR, "mobile.json")
 CLOUDFLARED_DIR = os.path.join(DATA_DIR, "cloudflared")
 MOBILE = {"status": "off", "url": None, "error": None, "proc": None, "registered": 0.0, "reg_url": None, "started": False}
 _REMOTE_HEADERS = ("Cf-Ray", "Cf-Connecting-Ip", "Cdn-Loop", "X-Forwarded-For")
-_REMOTE_BLOCK = ("/api/quit", "/api/update/apply", "/api/licence/trial", "/api/licence/remove", "/api/open-url", "/api/mobile")
+_REMOTE_BLOCK = ("/api/quit", "/api/update/apply", "/api/licence/trial", "/api/open-url", "/api/mobile")
 _mobile_cache = {"key": None, "m": None}
 
 
@@ -4976,7 +4976,7 @@ def _mobile_guard():
         return MOBILE_PAGE % "Accès refusé. Scanne le QR code affiché dans « App mobile » sur ton PC.", 401
     if p in ("/api/ping", "/api/bye"):
         return "", 204  # seule la fenêtre du PC décide quand l'app se ferme
-    if p.startswith(_REMOTE_BLOCK) or (p == "/api/licence" and request.method == "POST"):
+    if p.startswith(_REMOTE_BLOCK):
         return jsonify({"error": "Action disponible uniquement sur le PC."}), 403
     return None
 
