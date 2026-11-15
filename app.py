@@ -5219,7 +5219,7 @@ def api_mobile():
     m = load_mobile()
     ok = MOBILE["status"] == "ok"
     return jsonify({"enabled": bool(m.get("enabled")), "status": MOBILE["status"], "error": MOBILE["error"],
-                    "link": mobile_link(m) if ok else None, "snap_at": MOBILE.get("snap_at"), "snap_error": MOBILE.get("snap_error"),
+                    "link": mobile_link(m) if m.get("enabled") else None, "snap_at": MOBILE.get("snap_at"), "snap_error": MOBILE.get("snap_error"),
                     "snap_ok": _aesgcm() is not None})
 
 
