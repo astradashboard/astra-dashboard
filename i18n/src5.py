@@ -147,4 +147,8 @@ T = {
 'Copie hors ligne : premier envoi en cours…': ('Offline copy: first upload in progress…', 'Offline-Kopie: erster Upload läuft…', 'Copia sin conexión: primer envío en curso…'),
 'Thèmes': ('Topics', 'Themen', 'Temas'),
 'choisis': ('selected', 'ausgewählt', 'elegidos'),
+'Nouveau nom du compte': ('New account name', 'Neuer Kontoname', 'Nuevo nombre de la cuenta'),
+'Compte affiché': ('Account shown', 'Angezeigtes Konto', 'Cuenta mostrada'),
+'Options du compte': ('Account options', 'Kontooptionen', 'Opciones de la cuenta'),
+'Devise': ("Currency", "Währung", "Divisa"),
 }

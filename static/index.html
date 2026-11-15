@@ -121,6 +121,12 @@
   .hero .h-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .hero select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .hero select:focus { outline: none; border-color: var(--gold); }
+  .h-sels { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  #heroAcc { max-width: 230px; text-overflow: ellipsis; }
+  .h-more { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); border-radius: 9px; height: 31px; width: 32px; padding: 0; font-size: 16px; line-height: 1; }
+  .h-more:hover { color: var(--gold); border-color: var(--gold); }
+  .h-more[hidden] { display: none; }
+  .acc-bar { display: none !important; }
   .hero .h-fx { color: var(--muted); font-size: 12px; margin-top: 8px; }
   .hero .h-value { font-size: 46px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 6px; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .hero .h-month { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -832,7 +838,14 @@
   body.locked .nav button:not(.nav-offres) .lock { display: inline-flex; }
   body.locked .nav button:not(.nav-offres) .chev { display: none; }
   body.locked #accSub { display: none !important; }
-  @media (max-width: 760px) { .acc-bar { margin: 0 -12px 14px; padding: 0 12px 4px; scrollbar-width: none; } .acc-bar .acc { min-width: 140px; } }
+  @media (max-width: 760px) {
+    .hero .h-top { flex-wrap: wrap; }
+    .h-sels { width: 100%; justify-content: stretch; flex-wrap: nowrap; }
+    #heroAcc { flex: 1 1 auto; min-width: 0; max-width: none; }
+    #heroCur { flex: 0 0 auto; min-width: 0; max-width: 40%; }
+    .hero select { font-size: 14px !important; padding: 7px 8px; }
+    .h-more { height: 35px; flex: none; }
+  }
   .nav-offres .ic { color: var(--gold); }
   .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty-state h2 { color: var(--fg); margin-bottom: 6px; }
@@ -1118,6 +1131,9 @@
       <section class="hero" id="hero">
         <div class="h-top">
           <div class="h-label-wrap"><div class="h-label">Capital du compte</div><span class="live-dot" id="heroLive" hidden>En direct</span></div>
+          <div class="h-sels">
+          <select id="heroAcc" title="Compte affiché" data-noi18n></select>
+          <button type="button" class="h-more" id="heroAccMore" title="Options du compte">⋯</button>
           <select id="heroCur" title="Devise d'affichage">
             <option value="">Devise du compte</option>
             <option value="EUR">EUR · Euro €</option>
@@ -1126,6 +1142,7 @@
             <option value="JPY">JPY · Yen ¥</option>
             <option value="AUD">AUD · Dollar australien</option>
           </select>
+          </div>
         </div>
         <div class="h-value" id="heroValue">—</div>
         <div class="h-month" id="heroMonth"></div>
@@ -1855,6 +1872,30 @@ function sortAccounts(list) {
   return (list || []).map((a, i) => [a, i]).sort((x, y) => pos(x[0].login) - pos(y[0].login) || x[1] - y[1]).map(x => x[0]);
 }
 let accDragging = false;
+function selectAccount(a) {
+  if (a.locked) { accLimitUpsell(); return; }
+  state.jTrade = null; state.page = 'dash'; state.live = null; liveRev = null; $('#liveBody').innerHTML = '';
+  state.sel = a.login; state.month = null; state.view = null; renderAccounts(); loadData();
+}
+function renderHeroAcc(items) {
+  const s = $('#heroAcc'); if (!s) return; s.innerHTML = '';
+  for (const a of items) s.append(new Option(a.login === 'all' ? tr('Tous les comptes') + ' (' + state.accounts.filter(x => !x.locked).length + ')'
+    : shownName(a.name) + (a.locked ? ' 🔒' : ' · ' + money(a.balance, a.currency)), a.login));
+  s.append(new Option('+ ' + tr('Ajouter un compte'), '__add'));
+  s.value = state.sel;
+  $('#heroAccMore').hidden = state.sel === 'all' || !state.accounts.some(a => a.login === state.sel);
+}
+$('#heroAcc').onchange = e => {
+  const v = e.target.value;
+  if (v === '__add') { e.target.value = state.sel; openLogin(); return; }
+  const a = v === 'all' ? { login: 'all' } : state.accounts.find(x => x.login === v);
+  if (a) selectAccount(a); else e.target.value = state.sel;
+};
+$('#heroAccMore').onclick = e => {
+  e.stopPropagation();
+  const a = state.accounts.find(x => x.login === state.sel); if (!a) return;
+  const r = e.currentTarget.getBoundingClientRect(); openAccountMenu(a, r.left, r.bottom + 6, null);
+};
 function renderAccounts() {
   const list = $('#accList'); list.innerHTML = '';
   const open = state.accounts.filter(a => !a.locked);
@@ -1884,6 +1925,7 @@ function renderAccounts() {
     }
     list.appendChild(b);
   }
+  renderHeroAcc(items);
 }
 
 // déplacer un compte dans la colonne de gauche pour changer l'ordre
@@ -2081,6 +2123,11 @@ window.addEventListener('blur', closeMenu);
 document.addEventListener('scroll', closeMenu, true);
 
 function startRename(acc, btn) {
+  if (!btn || !btn.offsetParent) { // depuis le menu « ⋯ » du tableau de bord
+    const name = (prompt(tr('Nouveau nom du compte'), acc.name) || '').trim();
+    if (name && name !== acc.name) api('/api/rename', { login: acc.login, name }).catch(e => notice(e.message, true)).then(loadState);
+    return;
+  }
   const nameEl = btn.querySelector('div > div'); if (!nameEl) return;
   btn.dataset.editing = '1';
   const input = document.createElement('input'); input.className = 'acc-edit'; input.value = acc.name; input.maxLength = 60;
@@ -2398,7 +2445,7 @@ async function renderHero() {
   const acc = state.accounts.find(a => a.login === state.sel);
   $('#hero .h-label').textContent = acc ? 'Capital du compte' : 'Capital total des comptes';
   $('#heroCur').value = state.heroCur;
-  const sel = $('#heroCur').options[0]; sel.textContent = 'Devise du compte (' + (cur || 'USD') + ')';
+  const sel = $('#heroCur').options[0]; sel.textContent = innerWidth <= 760 ? tr('Devise') + ' (' + (cur || 'USD') + ')' : 'Devise du compte (' + (cur || 'USD') + ')';
   const now = new Date(); const key = now.getFullYear() + '-' + pad(now.getMonth() + 1);
   const pnl = d.daily.filter(x => x.date.startsWith(key)).reduce((s, x) => s + x.pnl, 0);
   const startOfMonth = d.balance - pnl;
