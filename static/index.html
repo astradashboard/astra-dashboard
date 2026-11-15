@@ -197,6 +197,15 @@
   .j-tools select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; font: inherit; }
   .j-tools .sum { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
   .j-tools .sum b { font-weight: 650; }
+  .j-accname { display: block; color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+  @media (max-width: 760px) {
+    .j-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .j-tools .j-acc { grid-column: 1 / -1; }
+    .j-tools .j-filter { display: none; }
+    .j-tools select, .j-tools .j-pdf { width: 100%; min-width: 0; height: 44px; box-sizing: border-box; }
+    .j-tools .j-pdf { display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    .j-tools .sum { grid-column: 1 / -1; order: 10; margin: 2px 2px 0; font-size: 14px; }
+  }
   .j-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .j-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em;
     padding: 0 14px 8px; border-bottom: 1px solid var(--line); }
@@ -1882,8 +1891,9 @@ function renderPdfAccs() {
   $('#pdfAccField').hidden = state.accounts.length < 2;
 }
 function openPdf(months) {
-  const acc = state.accounts.find(a => a.login === state.sel); if (!acc) return;
-  state.pdfAccs = [acc.login];
+  const acc = state.accounts.find(a => a.login === state.sel);
+  if (!acc && state.sel !== 'all') return;
+  state.pdfAccs = acc ? [acc.login] : state.accounts.filter(a => !a.locked).map(a => a.login);
   // mois disponibles sur l'ensemble des comptes
   api('/api/data?login=all').then(d => {
     const all = [...new Set([...(months || []), ...(d.daily || []).filter(x => x.trades || x.pnl).map(x => x.date.slice(0, 7))])].sort().reverse();
@@ -3671,9 +3681,6 @@ document.querySelectorAll('#nav > button').forEach(b => b.onclick = ev => {
   if (!licOk() && b.dataset.page !== 'offres' && b.dataset.page !== 'abo') { toast('Choisis une offre pour débloquer l\'application.'); state.page = 'offres'; showPage(); return; }
   if (b.dataset.page === 'copier' && !hasPerk('copier')) { perkUpsell('Le copieur de trades'); return; }
   state.page = b.dataset.page; state.jTrade = null;
-  if (state.page === 'journal' && state.sel === 'all' && state.accounts.length) {
-    state.sel = state.accounts[0].login; state.month = null; state.view = null; renderAccounts(); loadData();
-  }
   showPage(); window.scrollTo(0, 0);
 });
 try { if (localStorage.getItem('accSubClosed') === '1') { $('#accSub').hidden = true; $('#accToggle').classList.add('closed'); } } catch (e) {}
@@ -3701,22 +3708,19 @@ const sideLabel = t => t.side === 'buy' ? '↗ Achat · Long' : '↘ Vente · Sh
 const pts = (t, price) => price === null || price === undefined || t.op === undefined ? null : (t.side === 'buy' ? price - t.op : t.op - price);
 
 function journalTrades() {
-  return (state.data && state.data.trades || []).filter(t => t.a === state.sel).slice().sort((a, b) => (b.ct || b.d).localeCompare(a.ct || a.d));
+  return (state.data && state.data.trades || []).filter(t => state.sel === 'all' || t.a === state.sel).slice().sort((a, b) => (b.ct || b.d).localeCompare(a.ct || a.d));
 }
 
 function renderJournal() {
   const box = $('#journal'); box.innerHTML = '';
   const accs = state.accounts.filter(a => !a.demo || true);
-  if (state.sel === 'all') {
-    if (state.accounts.length) { state.sel = state.accounts[0].login; renderAccounts(); loadData(); }
-    return;
-  }
   const d = state.data; if (!d) return;
-  const acc = (d.per_account || {})[state.sel] || {};
+  const isAll = state.sel === 'all', pa = d.per_account || {};
+  const acc = isAll ? { has_trades: Object.values(pa).some(a => a.has_trades) } : pa[state.sel] || {};
   const all = journalTrades();
   if (state.jTrade) {
-    const t = all.find(x => String(x.id) === String(state.jTrade));
-    if (t) return renderTradeDetail(box, t, acc, d.currency);
+    const t = all.find(x => String(x.id) === String(state.jTrade) && (!isAll || !state.jTradeAcc || x.a === state.jTradeAcc));
+    if (t) return renderTradeDetail(box, t, isAll ? pa[t.a] || {} : acc, d.currency);
     state.jTrade = null;
   }
   if (!acc.has_trades || (all.length && all[0].s === undefined)) {
@@ -3727,23 +3731,25 @@ function renderJournal() {
   // filtres
   const tools = el('div', 'j-tools');
   const months = [...new Set(all.map(t => t.d.slice(0, 7)))];
-  const ms = el('select');
+  const ms = el('select', 'j-month');
   ms.append(new Option('Tous les mois', 'all'));
   for (const k of months) { const mn = MONTHS[Number(k.slice(5)) - 1]; ms.append(new Option(mn.charAt(0).toUpperCase() + mn.slice(1) + ' ' + k.slice(0, 4), k)); }
   if (state.jMonth !== 'all' && !months.includes(state.jMonth)) state.jMonth = 'all';
   ms.value = state.jMonth; ms.onchange = () => { state.jMonth = ms.value; renderJournal(); };
-  const fs = el('select');
+  const fs = el('select', 'j-filter');
   fs.append(new Option('Tous les trades', 'all'), new Option('Gagnants', 'win'), new Option('Perdants', 'loss'));
   fs.value = state.jFilter; fs.onchange = () => { state.jFilter = fs.value; renderJournal(); };
+  if (innerWidth <= 760) state.jFilter = 'all'; // pas de filtre gagnants / perdants sur téléphone
   const list = all.filter(t => (state.jMonth === 'all' || t.d.startsWith(state.jMonth))
     && (state.jFilter === 'all' || (state.jFilter === 'win' ? t.n > 0 : t.n < 0)));
   const total = list.reduce((s, t) => s + t.n, 0);
   const sum = el('div', 'sum'); sum.append(list.length + ' trade' + (list.length > 1 ? 's' : '') + ' · ');
   const tb = el('b', cls(total), money(total, d.currency, true)); sum.append(tb);
-  const as = el('select'); as.title = 'Compte du journal';
+  const as = el('select', 'j-acc'); as.title = 'Compte du journal';
+  if (state.accounts.length > 1) as.append(new Option('Tous les comptes', 'all'));
   for (const a of state.accounts) as.append(new Option(shownName(a.name), a.login));
   as.value = state.sel; as.onchange = () => { state.sel = as.value; state.jMonth = 'all'; state.jTrade = null; renderAccounts(); loadData(); };
-  const pdfBtn = el('button', 'btn', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
+  const pdfBtn = el('button', 'btn j-pdf', '⤓ PDF du mois'); pdfBtn.title = 'Enregistrer les résultats d\'un mois en PDF';
   if (!hasPerk('pdf')) { pdfBtn.classList.add('perk-off'); pdfBtn.title = 'Inclus dans les offres Essentiel et Pro'; pdfBtn.textContent = '⤓ PDF du mois'; }
   pdfBtn.onclick = () => hasPerk('pdf') ? openPdf(months) : perkUpsell('Le rapport PDF mensuel');
   tools.append(as, ms, fs, sum, pdfBtn); box.appendChild(tools);
@@ -3762,11 +3768,12 @@ function renderJournal() {
       td.append(new Date(t.d + 'T12:00:00').toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ');
       td.append(el('span', cls(dayPnl), money(dayPnl, d.currency, true))); tr.appendChild(td); tbody.appendChild(tr);
     }
-    const tr = el('tr', 'row'); tr.onclick = () => { state.jTrade = t.id; renderJournal(); window.scrollTo(0, 0); };
+    const tr = el('tr', 'row'); tr.onclick = () => { state.jTrade = t.id; state.jTradeAcc = t.a; renderJournal(); window.scrollTo(0, 0); };
     const c1 = el('td'); c1.append(t.ct ? fmtDate(t.ct) : new Date(t.d + 'T12:00:00').toLocaleDateString(LOCALE));
     if (t.ct) { c1.append(' '); c1.append(el('span', 'muted', fmtTime(t.ct).slice(0, 5))); }
     const c2 = el('td'); c2.append(el('span', 'sym', t.s || '—'));
     if (t.side) { c2.append(' '); c2.append(el('span', 'badge ' + t.side, t.side === 'buy' ? 'Long' : 'Short')); }
+    if (isAll && pa[t.a]) c2.append(el('span', 'j-accname', shownName(pa[t.a].name || t.a)));
     const c3 = el('td', 'pnl ' + cls(t.n), money(t.n, d.currency, true));
     tr.append(c1, c2, c3); tbody.appendChild(tr);
   }
