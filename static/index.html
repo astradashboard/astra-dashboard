@@ -385,6 +385,8 @@
   .chip-list { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
   .chip-group { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; width: 96px; flex: 0 0 auto; }
   .news-search { position: relative; flex: 0 0 280px; max-width: 100%; }
+  .news-themes-m { display: none; }
+  .news-themes-m .muted { color: var(--muted); }
   .news-search input { width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 999px;
     padding: 8px 14px 8px 34px; font: inherit; font-size: 13.5px; }
   .news-search input:focus { outline: none; border-color: var(--gold); }
@@ -953,6 +955,10 @@
     .theme-chip { flex: 0 0 auto; white-space: nowrap; font-size: 13px; padding: 7px 12px; }
     .news-search { flex: 1 1 auto; width: 100%; }
     .themes .t-lab { display: none; }
+    .news-filters .chips.themes { display: none; }
+    .news-themes-m { display: block; position: relative; }
+    .news-themes-m .eco-zones-btn { width: 100%; height: 40px; justify-content: space-between; }
+    .news-themes-m .eco-zones-menu { width: 100%; box-sizing: border-box; }
     #newsRefresh { white-space: nowrap; flex: none; }
     /* abonnement */
     .of-active { flex-wrap: wrap; }
@@ -1281,6 +1287,10 @@
       </div>
       <div class="news-filters">
         <div class="chips themes" id="newsThemes"></div>
+        <div class="news-themes-m" id="newsThemesM">
+          <button type="button" class="btn eco-zones-btn" id="newsThemesBtn"></button>
+          <div class="eco-zones-menu" id="newsThemesMenu" hidden></div>
+        </div>
         <div class="news-search">
           <span class="ns-ic">⌕</span>
           <input type="search" id="newsSearch" placeholder="Rechercher : crypto, BCE, pétrole…" autocomplete="off">
@@ -4269,7 +4279,25 @@ function buildNewsThemes() {
     };
     box.appendChild(c);
   }
+  // téléphone : même choix dans un menu déroulant
+  const menu = $('#newsThemesMenu'); menu.innerHTML = '';
+  for (const [id, label] of NEWS_THEMES) {
+    const on = state.news.themes.includes(id);
+    const lb = el('label'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = on;
+    cb.onchange = () => {
+      if (on && state.news.themes.length === 1) { cb.checked = true; return; }
+      state.news.themes = on ? state.news.themes.filter(x => x !== id) : NEWS_THEMES.map(t => t[0]).filter(x => x === id || state.news.themes.includes(x));
+      api('/api/prefs', { newsThemes: state.news.themes }).catch(() => {});
+      buildNewsThemes(); state.news.shown = 12; loadNews(true);
+    };
+    lb.append(cb, document.createTextNode(label)); menu.appendChild(lb);
+  }
+  const btn = $('#newsThemesBtn'); btn.innerHTML = '';
+  const n = state.news.themes.length;
+  btn.append(el('span', null, tr('Thèmes')), el('span', 'muted', n === 1 ? (NEWS_THEMES.find(t => t[0] === state.news.themes[0]) || [, ''])[1] : n + ' ' + tr('choisis')), el('span', 'muted', '▾'));
 }
+$('#newsThemesBtn').onclick = e => { e.stopPropagation(); $('#newsThemesMenu').hidden = !$('#newsThemesMenu').hidden; };
+document.addEventListener('click', e => { if (!e.target.closest('#newsThemesM')) $('#newsThemesMenu').hidden = true; });
 function timeAgo(d) {
   const m = Math.round((Date.now() - d) / 60000);
   if (m < 1) return "à l'instant";

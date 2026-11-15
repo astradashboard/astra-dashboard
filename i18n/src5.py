@@ -145,4 +145,6 @@ T = {
 'Copie hors ligne à jour :': ('Offline copy up to date:', 'Offline-Kopie aktuell:', 'Copia sin conexión al día:'),
 'PC éteint, ton téléphone affiche ces derniers chiffres.': ('When the PC is off, your phone shows these latest figures.', 'Ist der PC aus, zeigt dein Handy diese letzten Zahlen.', 'Con el PC apagado, tu teléfono muestra estas últimas cifras.'),
 'Copie hors ligne : premier envoi en cours…': ('Offline copy: first upload in progress…', 'Offline-Kopie: erster Upload läuft…', 'Copia sin conexión: primer envío en curso…'),
+'Thèmes': ('Topics', 'Themen', 'Temas'),
+'choisis': ('selected', 'ausgewählt', 'elegidos'),
 }
